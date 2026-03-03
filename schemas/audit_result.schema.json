@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/xopsio/shopify-image-audit/schemas/audit_result.schema.json",
+  "title": "Shopify Image Audit Result",
+  "type": "object",
+  "required": ["meta", "vitals", "images", "summary"],
+  "properties": {
+    "meta": {
+      "type": "object",
+      "required": ["url", "timestamp_utc", "device", "runs", "tool"],
+      "properties": {
+        "url": { "type": "string", "minLength": 1 },
+        "timestamp_utc": { "type": "string", "minLength": 10 },
+        "device": { "type": "string", "enum": ["mobile", "desktop"] },
+        "runs": { "type": "integer", "minimum": 1 },
+        "tool": { "type": "string", "enum": ["lighthouse"] },
+        "notes": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "vitals": {
+      "type": "object",
+      "required": ["lcp_ms", "cls", "inp_ms", "ttfb_ms"],
+      "properties": {
+        "lcp_ms": { "type": "number", "minimum": 0 },
+        "cls": { "type": "number", "minimum": 0 },
+        "inp_ms": { "type": "number", "minimum": 0 },
+        "ttfb_ms": { "type": "number", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "images": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["src", "role", "score", "bytes", "mime"],
+        "properties": {
+          "src": { "type": "string", "minLength": 1 },
+          "role": {
+            "type": "string",
+            "enum": ["hero", "above_fold", "product_primary", "product_secondary", "decorative", "unknown"]
+          },
+          "score": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "bytes": { "type": "integer", "minimum": 0 },
+          "mime": { "type": "string", "minLength": 1 },
+          "displayed_width": { "type": "integer", "minimum": 0 },
+          "displayed_height": { "type": "integer", "minimum": 0 },
+          "natural_width": { "type": "integer", "minimum": 0 },
+          "natural_height": { "type": "integer", "minimum": 0 },
+          "is_lcp_candidate": { "type": "boolean" },
+          "waste_bytes_est": { "type": "integer", "minimum": 0 },
+          "recommendation": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["top_issues"],
+      "properties": {
+        "top_issues": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
