@@ -1,0 +1,30 @@
+{
+  "lcpCandidate": {
+    "url": "https://cdn.shopify.com/s/files/1/0123/4567/files/hero-optimized.webp"
+  },
+  "images": [
+    {
+      "url": "https://cdn.shopify.com/s/files/1/0123/4567/files/hero-optimized.webp",
+      "resourceSize": 95000,
+      "mimeType": "image/webp",
+      "displayedWidth": 1200,
+      "displayedHeight": 600,
+      "naturalWidth": 1200,
+      "naturalHeight": 600
+    },
+    {
+      "url": "https://cdn.shopify.com/s/files/1/0123/4567/files/product-a-optimized.webp",
+      "resourceSize": 42000,
+      "mimeType": "image/webp",
+      "displayedWidth": 600,
+      "displayedHeight": 600
+    },
+    {
+      "url": "https://cdn.shopify.com/s/files/1/0123/4567/files/logo.svg",
+      "resourceSize": 2100,
+      "mimeType": "image/svg+xml",
+      "displayedWidth": 200,
+      "displayedHeight": 60
+    }
+  ]
+}
