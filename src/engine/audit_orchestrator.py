@@ -102,7 +102,7 @@ def _extract_vitals(data: dict[str, Any]) -> dict[str, Any]:
             return default
         try:
             return float(value)
-        except (ValueError, TypeError):
+        except (TypeError, ValueError):
             return default
 
     return {
