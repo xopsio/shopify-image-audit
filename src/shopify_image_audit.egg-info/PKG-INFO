@@ -1,0 +1,35 @@
+Metadata-Version: 2.4
+Name: shopify-image-audit
+Version: 0.1.0
+Summary: Shopify store image audit – Lighthouse-based analysis with heuristic and ML scoring
+Author: xopsio
+License-Expression: MIT
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: jsonschema>=4.20
+Requires-Dist: pydantic>=2.6
+Requires-Dist: typer>=0.12
+Requires-Dist: rich>=13.7
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0; extra == "dev"
+Requires-Dist: pytest-cov>=5.0; extra == "dev"
+Requires-Dist: ruff>=0.4; extra == "dev"
+
+# Shopify Image Audit
+
+Työkalu Shopify-kuvien suorituskyvyn auditointiin ja optimointisuosituksiin Lighthouse-pohjaisesti.
+
+## Governance & Domain Division
+
+Projektin domain-jako, omistajuus ja kehitysperiaatteet on dokumentoitu tiedostoon  
+[docs/governance.md](docs/governance.md).
+
+## Asennus & Käyttö
+
+(Tässä myöhemmin asennusohjeet, CLI-esimerkit jne.)
+
+## Lisätietoa
+
+- [QA Checklist](QA_CHECKLIST.md)
+- [CLI Specification](docs/spec/cli_v0_1.md)
+- [Measurement Protocol](docs/runbook/measurement_protocol.md)
