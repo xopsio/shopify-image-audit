@@ -1,17 +1,27 @@
 """
 Typer-based CLI for Shopify Image Audit.
 
-Commands
---------
-audit            – Run the full audit pipeline on a Lighthouse JSON / fixture.
-validate-schema  – Validate an existing JSON file against the schema.
-render-html      – (stub) Render an audit result to HTML.
-version          – Print tool version.
+Matches docs/spec/cli_v0_1.md contract:
+    audit run <url> [options]
+    audit extract <lighthouse.json>
+    audit score <audit_input.json>
+    audit report <audit_result.json>
+
+The console-script entry point is ``audit`` (see pyproject.toml),
+so the user invokes:
+    audit run https://example.myshopify.com --device mobile --runs 3
+
+Exit codes (spec):
+    0  – success
+    2  – invalid arguments
+    10 – lighthouse failure
 """
 
 from __future__ import annotations
 
 import json
+import shutil
+import subprocess
 from pathlib import Path
 from typing import Optional
 
@@ -23,53 +33,119 @@ from rich.table import Table
 from audit.models import AuditResult
 from engine.audit_orchestrator import run_audit
 
-app = typer.Typer(
-    name="shopify-image-audit",
-    help="Shopify store image audit – Lighthouse-based analysis with heuristic and ML scoring.",
-    add_completion=False,
-)
+# --- Exit codes per spec ---------------------------------------------------
+EXIT_OK = 0
+EXIT_INVALID_ARGS = 2
+EXIT_LIGHTHOUSE_FAILURE = 10
 
 _VERSION = "0.1.0"
 
 console = Console()
 
-# ---- repo-level paths ----
+# ---- repo-level paths -----------------------------------------------------
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SCHEMA_PATH = _REPO_ROOT / "schemas" / "audit_result.schema.json"
 
+# ---------------------------------------------------------------------------
+# Top-level app – NO nested "audit" group so that `audit run …` works
+# directly from the console-script named ``audit``.
+# ---------------------------------------------------------------------------
+app = typer.Typer(
+    name="audit",
+    help="Shopify store image audit – Lighthouse-based analysis with heuristic and ML scoring.",
+    add_completion=False,
+)
+
 
 # ---------------------------------------------------------------------------
-# audit
+# Lighthouse helper
+# ---------------------------------------------------------------------------
+
+def _run_lighthouse(
+    url: str,
+    *,
+    device: str,
+    runs: int,
+    out_dir: Path,
+) -> Path:
+    """Run Lighthouse CLI and return the path to the best JSON report.
+
+    Raises ``typer.Exit(code=10)`` on failure.
+    """
+    lh_bin = shutil.which("lighthouse")
+    if lh_bin is None:
+        rprint("[red]Error:[/red] `lighthouse` CLI not found on PATH. Install with: npm i -g lighthouse")
+        raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE)
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    form_factor = "desktop" if device == "desktop" else "mobile"
+    emulated = "none" if device == "desktop" else "mobile"
+
+    best_path: Path | None = None
+    for i in range(1, runs + 1):
+        out_file = out_dir / f"lhr_run{i}.json"
+        cmd = [
+            lh_bin,
+            url,
+            "--output=json",
+            f"--output-path={out_file}",
+            f"--preset={form_factor}",
+            f"--emulated-form-factor={emulated}",
+            "--only-categories=performance",
+            "--chrome-flags=--headless",
+        ]
+        rprint(f"[cyan]Lighthouse run {i}/{runs}…[/cyan]")
+        try:
+            subprocess.run(cmd, check=True, capture_output=True, text=True)
+        except subprocess.CalledProcessError as exc:
+            rprint(f"[red]Lighthouse failed (run {i}):[/red] {exc.stderr[:500]}")
+            raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE)
+        best_path = out_file  # simple: use the last successful run
+
+    assert best_path is not None
+    return best_path
+
+
+# ---------------------------------------------------------------------------
+# run
 # ---------------------------------------------------------------------------
 
 @app.command()
-def audit(
-    url: Optional[str] = typer.Argument(None, help="Shopify store URL to audit (requires Lighthouse)."),
-    lhr: Optional[Path] = typer.Option(None, "--lhr", help="Path to an existing Lighthouse JSON report or fixture."),
+def run(
+    url: str = typer.Argument(..., help="Shopify store URL to audit."),
     device: str = typer.Option("mobile", "--device", help="Device type: mobile or desktop."),
-    runs: int = typer.Option(1, "--runs", help="Number of Lighthouse runs."),
-    output: Optional[Path] = typer.Option(None, "-o", "--output", help="Write JSON result to this file."),
+    runs: int = typer.Option(3, "--runs", help="Number of Lighthouse runs (default 3)."),
+    out_dir: Path = typer.Option("artifacts", "--out-dir", help="Directory for output artifacts."),
+    lhr: Optional[Path] = typer.Option(None, "--lhr", help="Use an existing Lighthouse JSON instead of running live."),
 ) -> None:
-    """Run the full image audit pipeline."""
-    if lhr is None and url is None:
-        rprint("[red]Error:[/red] Provide either a URL or --lhr <path>.")
-        raise typer.Exit(code=1)
+    """Run Lighthouse audit on <url>, analyse images, and write results."""
+    # --- validate args ---
+    if device not in ("mobile", "desktop"):
+        rprint(f"[red]Error:[/red] --device must be 'mobile' or 'desktop', got '{device}'.")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
 
+    if runs < 1:
+        rprint("[red]Error:[/red] --runs must be >= 1.")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
+
+    # --- obtain LHR JSON ---
     if lhr is not None:
+        if not lhr.exists():
+            rprint(f"[red]Error:[/red] File not found: {lhr}")
+            raise typer.Exit(code=EXIT_INVALID_ARGS)
         json_path = lhr
     else:
-        # Lighthouse live run (placeholder – requires lighthouse_runner)
-        rprint(f"[yellow]Live Lighthouse run for {url} is not yet implemented.[/yellow]")
-        rprint("[yellow]Please provide --lhr with a pre-existing report.[/yellow]")
-        raise typer.Exit(code=1)
+        json_path = _run_lighthouse(url, device=device, runs=runs, out_dir=out_dir)
 
-    if not json_path.exists():
-        rprint(f"[red]File not found:[/red] {json_path}")
-        raise typer.Exit(code=1)
+    # --- run the audit pipeline ---
+    try:
+        result: AuditResult = run_audit(json_path, url=url, device=device, runs=runs)
+    except Exception as exc:
+        rprint(f"[red]Audit pipeline error:[/red] {exc}")
+        raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE)
 
-    result: AuditResult = run_audit(json_path, url=url, device=device, runs=runs)
-
-    # pretty table
+    # --- pretty table ---
     table = Table(title="Image Audit Results")
     table.add_column("src", style="cyan", no_wrap=False, max_width=60)
     table.add_column("role", style="magenta")
@@ -95,52 +171,82 @@ def audit(
     for issue in result.summary.top_issues:
         rprint(f"  - {issue}")
 
-    # write to file
-    if output:
-        output.write_text(result.model_dump_json(indent=2), encoding="utf-8")
-        rprint(f"\n[green]Result written to {output}[/green]")
+    # --- write JSON result ---
+    out_dir_path = Path(out_dir)
+    out_dir_path.mkdir(parents=True, exist_ok=True)
+    result_file = out_dir_path / "audit_result.json"
+    result_file.write_text(result.model_dump_json(indent=2), encoding="utf-8")
+    rprint(f"\n[green]Result written to {result_file}[/green]")
+
+    raise typer.Exit(code=EXIT_OK)
 
 
 # ---------------------------------------------------------------------------
-# validate-schema
+# extract
 # ---------------------------------------------------------------------------
 
-@app.command("validate-schema")
-def validate_schema(
-    path: Path = typer.Argument(..., help="Path to a JSON file to validate against the audit schema."),
+@app.command()
+def extract(
+    lighthouse_json: Path = typer.Argument(..., help="Path to a Lighthouse JSON report."),
 ) -> None:
-    """Validate a JSON file against audit_result.schema.json using Pydantic."""
-    if not path.exists():
-        rprint(f"[red]File not found:[/red] {path}")
-        raise typer.Exit(code=1)
+    """Extract image + LCP-related features into an intermediate JSON."""
+    if not lighthouse_json.exists():
+        rprint(f"[red]Error:[/red] File not found: {lighthouse_json}")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
 
-    with open(path, encoding="utf-8") as f:
-        data = json.load(f)
+    from audit.parser import parse
 
-    try:
-        AuditResult.model_validate(data)
-        rprint(f"[green]OK: {path} is valid.[/green]")
-    except Exception as exc:
-        rprint(f"[red]FAIL: Validation failed:[/red]\n{exc}")
-        raise typer.Exit(code=1)
+    with open(lighthouse_json, encoding="utf-8") as f:
+        raw = json.load(f)
+
+    images = parse(raw)
+    rprint(json.dumps(images, indent=2))
+    raise typer.Exit(code=EXIT_OK)
 
 
 # ---------------------------------------------------------------------------
-# render-html (stub)
+# score
 # ---------------------------------------------------------------------------
 
-@app.command("render-html")
-def render_html(
-    path: Path = typer.Argument(..., help="Path to audit result JSON."),
+@app.command()
+def score(
+    audit_input_json: Path = typer.Argument(..., help="Path to intermediate audit input JSON."),
+) -> None:
+    """Assign role, score (0-100), and recommendations to each image."""
+    if not audit_input_json.exists():
+        rprint(f"[red]Error:[/red] File not found: {audit_input_json}")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
+
+    from audit.ranker_heuristic import rank
+
+    with open(audit_input_json, encoding="utf-8") as f:
+        images = json.load(f)
+
+    scored = rank(images)
+    rprint(json.dumps(scored, indent=2))
+    raise typer.Exit(code=EXIT_OK)
+
+
+# ---------------------------------------------------------------------------
+# report
+# ---------------------------------------------------------------------------
+
+@app.command()
+def report(
+    audit_result_json: Path = typer.Argument(..., help="Path to audit_result.json."),
     output: Path = typer.Option("report.html", "-o", "--output", help="Output HTML file."),
 ) -> None:
-    """Render an audit result JSON to an HTML report (stub)."""
+    """Render an audit result JSON to an HTML report."""
+    if not audit_result_json.exists():
+        rprint(f"[red]Error:[/red] File not found: {audit_result_json}")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
+
     rprint("[yellow]HTML rendering is not yet implemented.[/yellow]")
-    raise typer.Exit(code=0)
+    raise typer.Exit(code=EXIT_OK)
 
 
 # ---------------------------------------------------------------------------
-# version
+# version (convenience, not in spec but harmless)
 # ---------------------------------------------------------------------------
 
 @app.command()
