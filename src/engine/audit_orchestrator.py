@@ -92,17 +92,24 @@ def _build_summary(images: list[dict[str, Any]]) -> dict[str, Any]:
 
 def _extract_vitals(data: dict[str, Any]) -> dict[str, Any]:
     """Best-effort extraction of Web Vitals from LHR or fixture JSON."""
-    # Lighthouse LHR stores metrics inside audits.metrics.details.items[0]
     audits = data.get("audits") or {}
     metrics_audit = audits.get("metrics") or {}
     metrics_details = (metrics_audit.get("details") or {}).get("items") or [{}]
     m = metrics_details[0] if metrics_details else {}
 
+    def safe_float(value: Any, default: float = 0.0) -> float:
+        if value is None:
+            return default
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return default
+
     return {
-        "lcp_ms": float(m.get("largestContentfulPaint", data.get("lcp_ms", 0))),
-        "cls": float(m.get("cumulativeLayoutShift", data.get("cls", 0))),
-        "inp_ms": float(m.get("interactive", data.get("inp_ms", 0))),
-        "ttfb_ms": float(m.get("serverResponseTime", data.get("ttfb_ms", 0))),
+        "lcp_ms": safe_float(m.get("largestContentfulPaint", data.get("lcp_ms"))),
+        "cls": safe_float(m.get("cumulativeLayoutShift", data.get("cls"))),
+        "inp_ms": safe_float(m.get("interactive", data.get("inp_ms"))),
+        "ttfb_ms": safe_float(m.get("serverResponseTime", data.get("ttfb_ms"))),
     }
 
 
