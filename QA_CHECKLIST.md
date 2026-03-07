@@ -1,4 +1,4 @@
-@'
+
 # QA Checklist (Sprint 1)
 
 **Single source of truth:** `docs/`, `schemas/`, and this `QA_CHECKLIST.md` define the contracts and rules; code must conform.
