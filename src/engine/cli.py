@@ -137,8 +137,13 @@ def run(
     if ".." in out_dir_p.parts:
         rprint("[red]Error:[/red] --out-dir must not contain '..' segments.")
         raise typer.Exit(code=EXIT_INVALID_ARGS)
+    # Resolve and check containment using pathlib's safe relative_to()
     resolved_out = Path.cwd().joinpath(out_dir_p).resolve()
-    if not str(resolved_out).startswith(str(Path.cwd().resolve())):
+    cwd_resolved = Path.cwd().resolve()
+
+    try:
+        resolved_out.relative_to(cwd_resolved)
+    except ValueError:
         rprint("[red]Error:[/red] --out-dir resolves outside the working directory.")
         raise typer.Exit(code=EXIT_INVALID_ARGS)
 

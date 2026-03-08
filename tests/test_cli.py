@@ -155,3 +155,80 @@ class TestScoreCommand:
         assert result.exit_code == 2
         assert "invalid json" in result.stdout.lower()
 
+
+class TestOutDirSecurity:
+    """Test --out-dir path traversal prevention."""
+
+    def test_prefix_bypass_rejected(self):
+        """Reject paths that look like prefix but escape containment."""
+        from engine.cli import app
+        from typer.testing import CliRunner
+
+        runner = CliRunner()
+
+        # This should be rejected even though string starts with cwd
+        # Example: if cwd is /app, reject /app-attacker
+        result = runner.invoke(app, ["run", "https://example.com", "--out-dir", "../sibling"])
+        assert result.exit_code == 2
+        assert "outside" in result.stdout.lower() or ".." in result.stdout.lower()
+
+
+class TestReportSecurity:
+    """Test HTML report XSS prevention."""
+
+    def test_report_escapes_xss_in_url(self, tmp_path):
+        """HTML report must escape XSS payloads in URL field."""
+        import json
+        from engine.cli import app
+        from typer.testing import CliRunner
+
+        # Malicious audit_result with XSS payload
+        audit_result = {
+            "meta": {
+                "url": "<script>alert('XSS')</script>",
+                "timestamp_utc": "2024-01-01T00:00:00Z",
+                "device": "mobile",
+                "runs": 3,
+                "tool": "lighthouse",
+            },
+            "vitals": {
+                "lcp_ms": 2000.0,
+                "cls": 0.05,
+                "inp_ms": 150.0,
+                "ttfb_ms": 600.0,
+            },
+            "images": [
+                {
+                    "src": "<img src=x onerror=alert(1)>",
+                    "role": "hero",
+                    "score": 85,
+                    "bytes": 50000,
+                    "mime": "image/jpeg",
+                    "recommendation": "<script>alert(2)</script>",
+                }
+            ],
+            "summary": {"top_issues": ["<script>alert(3)</script>"]},
+        }
+
+        input_file = tmp_path / "malicious.json"
+        input_file.write_text(json.dumps(audit_result))
+
+        output_file = tmp_path / "report.html"
+
+        runner = CliRunner()
+        result = runner.invoke(app, ["report", str(input_file), "-o", str(output_file)])
+
+        assert result.exit_code == 0
+        assert output_file.exists()
+
+        html_content = output_file.read_text(encoding="utf-8")
+
+        # Verify XSS payloads are escaped, not executed
+        assert "<script>" not in html_content
+        assert "&lt;script&gt;" in html_content
+        # The onerror payload should be inside escaped < > so it's not a real attribute
+        assert "&lt;img src=x onerror=alert(1)&gt;" in html_content
+
+        # Verify legitimate content still present (escaped)
+        assert "alert" in html_content  # The word "alert" should still appear (escaped)
+

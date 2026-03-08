@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from html import escape
 from pathlib import Path
 from typing import Any
 
@@ -243,12 +244,12 @@ def generate_html_report(audit_result: dict[str, Any]) -> str:
         <h1>🖼️ Shopify Image Audit Report</h1>
         
         <div class="meta">
-            <p><strong>URL:</strong> {meta['url']}</p>
-            <p><strong>Timestamp:</strong> {meta['timestamp_utc']}</p>
-            <p><strong>Device:</strong> {meta['device'].capitalize()}</p>
+            <p><strong>URL:</strong> {escape(meta['url'])}</p>
+            <p><strong>Timestamp:</strong> {escape(meta['timestamp_utc'])}</p>
+            <p><strong>Device:</strong> {escape(meta['device']).capitalize()}</p>
             <p><strong>Runs:</strong> {meta['runs']}</p>
-            <p><strong>Tool:</strong> {meta['tool'].capitalize()}</p>
-            {f"<p><strong>Notes:</strong> {meta.get('notes', 'N/A')}</p>" if meta.get('notes') else ""}
+            <p><strong>Tool:</strong> {escape(meta['tool']).capitalize()}</p>
+            {f"<p><strong>Notes:</strong> {escape(meta.get('notes', 'N/A'))}</p>" if meta.get('notes') else ""}
         </div>
 
         <h2>📊 Core Web Vitals</h2>
@@ -298,7 +299,7 @@ def generate_html_report(audit_result: dict[str, Any]) -> str:
         {f'''<div class="issues">
             <h3>⚠️ Top Issues</h3>
             <ul>
-                {"".join(f"<li>{issue}</li>" for issue in summary['top_issues'])}
+                {"".join(f"<li>{escape(issue)}</li>" for issue in summary['top_issues'])}
             </ul>
         </div>''' if summary['top_issues'] else ''}
 
@@ -329,13 +330,13 @@ def generate_html_report(audit_result: dict[str, Any]) -> str:
         lcp_badge = '<span class="lcp-badge">LCP</span> ' if img.get("is_lcp_candidate") else ""
 
         html += f"""                <tr>
-                    <td class="bytes" title="{img['src']}">{lcp_badge}{src_display}</td>
-                    <td><span class="role {img['role']}">{img['role'].replace('_', ' ')}</span></td>
+                    <td class="bytes" title="{escape(img['src'])}">{lcp_badge}{escape(src_display)}</td>
+                    <td><span class="role {escape(img['role'])}">{escape(img['role'].replace('_', ' '))}</span></td>
                     <td><span class="score {score_class}">{img['score']}</span></td>
                     <td class="bytes">{img['bytes'] / 1024:.1f} KB</td>
                     <td>{dimensions}</td>
                     <td class="bytes">{img.get('waste_bytes_est', 0) / 1024:.1f} KB</td>
-                    <td class="recommendation">{img.get('recommendation', '—')}</td>
+                    <td class="recommendation">{escape(img.get('recommendation', '—'))}</td>
                 </tr>
 """
 
@@ -347,7 +348,9 @@ def generate_html_report(audit_result: dict[str, Any]) -> str:
 """
 
     for role, count in sorted(role_counts.items()):
-        html += f'            <li><span class="role {role}">{role.replace("_", " ")}</span>: {count} image{"s" if count != 1 else ""}</li>\n'
+        role_escaped = escape(role)
+        role_display = escape(role.replace("_", " "))
+        html += f'            <li><span class="role {role_escaped}">{role_display}</span>: {count} image{"s" if count != 1 else ""}</li>\n'
 
     html += f"""        </ul>
 
