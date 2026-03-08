@@ -28,7 +28,7 @@ class TestCliUrlScheme:
 
 class TestCliOutDir:
     def test_absolute_path_rejected(self) -> None:
-        result = runner.invoke(app, ["run", "https://example.com", "--out-dir", "/absolute/path"])
+        result = runner.invoke(app, ["run", "https://example.com", "--out-dir", "C:\\absolute\\path"])
         assert result.exit_code == 2
 
     def test_dotdot_rejected(self) -> None:
