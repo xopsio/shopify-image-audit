@@ -63,3 +63,28 @@ class TestExtractVitals:
         result = _extract_vitals(data)
         assert result["lcp_ms"] == 0.0
 
+    def test_audits_wrong_type_list(self) -> None:
+        data = {"audits": ["not", "a", "dict"], "lcp_ms": 100.0}
+        result = _extract_vitals(data)
+        assert result["lcp_ms"] == 100.0
+
+    def test_metrics_wrong_type_string(self) -> None:
+        data = {"audits": {"metrics": "bad"}, "lcp_ms": 200.0}
+        result = _extract_vitals(data)
+        assert result["lcp_ms"] == 200.0
+
+    def test_details_wrong_type(self) -> None:
+        data = {"audits": {"metrics": {"details": 42}}, "lcp_ms": 300.0}
+        result = _extract_vitals(data)
+        assert result["lcp_ms"] == 300.0
+
+    def test_items_wrong_type_string(self) -> None:
+        data = {"audits": {"metrics": {"details": {"items": "bad"}}}, "lcp_ms": 400.0}
+        result = _extract_vitals(data)
+        assert result["lcp_ms"] == 400.0
+
+    def test_items_first_element_not_dict(self) -> None:
+        data = {"audits": {"metrics": {"details": {"items": ["not-a-dict"]}}}, "lcp_ms": 500.0}
+        result = _extract_vitals(data)
+        assert result["lcp_ms"] == 500.0
+

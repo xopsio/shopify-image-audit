@@ -10,6 +10,16 @@ from pathlib import Path
 from typing import Any
 
 
+def safe_int(value: Any) -> int | None:
+    """Convert value to int safely; return None if conversion fails."""
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _normalize_image(
     url: str,
     bytes_: int = 0,
@@ -87,10 +97,10 @@ def _parse_lighthouse_audits(data: dict[str, Any]) -> tuple[list[dict[str, Any]]
                     url=url,
                     bytes_=bytes_,
                     mime=mime,
-                    displayed_width=int(dw) if dw is not None else None,
-                    displayed_height=int(dh) if dh is not None else None,
-                    natural_width=int(nw) if nw is not None else None,
-                    natural_height=int(nh) if nh is not None else None,
+                    displayed_width=safe_int(dw),
+                    displayed_height=safe_int(dh),
+                    natural_width=safe_int(nw),
+                    natural_height=safe_int(nh),
                     is_lcp_candidate=(url == lcp_url),
                 )
             )
@@ -127,10 +137,10 @@ def _parse_fixture_format(data: dict[str, Any]) -> tuple[list[dict[str, Any]], s
                 url=url,
                 bytes_=bytes_,
                 mime=mime,
-                displayed_width=int(dw) if dw is not None else None,
-                displayed_height=int(dh) if dh is not None else None,
-                natural_width=int(nw) if nw is not None else None,
-                natural_height=int(nh) if nh is not None else None,
+                displayed_width=safe_int(dw),
+                displayed_height=safe_int(dh),
+                natural_width=safe_int(nw),
+                natural_height=safe_int(nh),
                 is_lcp_candidate=(url == lcp_url),
             )
         )

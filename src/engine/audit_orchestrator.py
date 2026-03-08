@@ -92,10 +92,15 @@ def _build_summary(images: list[dict[str, Any]]) -> dict[str, Any]:
 
 def _extract_vitals(data: dict[str, Any]) -> dict[str, Any]:
     """Best-effort extraction of Web Vitals from LHR or fixture JSON."""
-    audits = data.get("audits") or {}
-    metrics_audit = audits.get("metrics") or {}
-    metrics_details = (metrics_audit.get("details") or {}).get("items") or [{}]
-    m = metrics_details[0] if metrics_details else {}
+    audits = data.get("audits")
+    audits = audits if isinstance(audits, dict) else {}
+    metrics_audit = audits.get("metrics")
+    metrics_audit = metrics_audit if isinstance(metrics_audit, dict) else {}
+    details = metrics_audit.get("details")
+    details = details if isinstance(details, dict) else {}
+    items = details.get("items")
+    items = items if isinstance(items, list) and items else [{}]
+    m = items[0] if isinstance(items[0], dict) else {}
 
     def safe_float(value: Any, default: float = 0.0) -> float:
         if value is None:

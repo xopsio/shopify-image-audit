@@ -24,6 +24,7 @@ import shutil
 import subprocess
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlparse
 
 import typer
 from rich import print as rprint
@@ -120,6 +121,26 @@ def run(
     lhr: Optional[Path] = typer.Option(None, "--lhr", help="Use an existing Lighthouse JSON instead of running live."),
 ) -> None:
     """Run Lighthouse audit on <url>, analyse images, and write results."""
+    # --- validate URL scheme ---
+    parsed_url = urlparse(url)
+    if parsed_url.scheme not in ("http", "https"):
+        scheme_display = parsed_url.scheme or "(empty)"
+        rprint(f"[red]Error:[/red] URL scheme must be http or https, got '{scheme_display}'.")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
+
+    # --- validate --out-dir safety ---
+    out_dir_p = Path(out_dir)
+    if out_dir_p.is_absolute():
+        rprint("[red]Error:[/red] --out-dir must be a relative path.")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
+    if ".." in out_dir_p.parts:
+        rprint("[red]Error:[/red] --out-dir must not contain '..' segments.")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
+    resolved_out = Path.cwd().joinpath(out_dir_p).resolve()
+    if not str(resolved_out).startswith(str(Path.cwd().resolve())):
+        rprint("[red]Error:[/red] --out-dir resolves outside the working directory.")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
+
     # --- validate args ---
     if device not in ("mobile", "desktop"):
         rprint(f"[red]Error:[/red] --device must be 'mobile' or 'desktop', got '{device}'.")
