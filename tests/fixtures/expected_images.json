@@ -1,0 +1,23 @@
+[
+  {
+    "src": "https://cdn.example.com/hero.webp",
+    "bytes": 320000,
+    "mime": "image/webp",
+    "displayed_width": 1200,
+    "displayed_height": 800,
+    "natural_width": 2400,
+    "natural_height": 1600,
+    "is_lcp_candidate": true
+  },
+  {
+    "src": "https://cdn.example.com/logo.png",
+    "bytes": 24000,
+    "mime": "image/png",
+    "displayed_width": 200,
+    "displayed_height": 80,
+    "natural_width": 400,
+    "natural_height": 160,
+    "is_lcp_candidate": false
+  }
+]
+
