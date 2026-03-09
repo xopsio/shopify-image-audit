@@ -306,6 +306,4 @@ WS-003: Update CLI specification
 
 ## References
 
-* See `docs/SPRINT_1_RETROSPECTIVE.md` for Sprint 1 analysis
-* See `docs/spec-3x3-model.pdf` for the original model
-* See `CLAUDE_DOMAIN_REPORT.md` for detailed code analysis
+* See `archive/sprint1-analysis/CLAUDE_DOMAIN_REPORT.md` for detailed code analysis
