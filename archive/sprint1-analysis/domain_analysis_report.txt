@@ -1,0 +1,108 @@
+================================================================================
+DOMAIN IMPLEMENTATION ANALYSIS
+================================================================================
+Project root: D:\shopify-image-audit
+
+
+JetBrains/Claude
+--------------------------------------------------------------------------------
+Expected: Orchestrator, CLI, data models, tests, packaging
+
+  [OK] src/engine/
+   Files: 3
+   Lines: 514
+      - engine\__init__.py: 0 lines
+      - engine\audit_orchestrator.py: 191 lines
+      - engine\cli.py: 323 lines
+  [OK] tests/
+   Files: 6
+   Lines: 934
+      - tests\test_cli.py: 234 lines
+      - tests\test_extract_vitals.py: 90 lines
+      - tests\test_models.py: 106 lines
+      - tests\test_pipeline.py: 177 lines
+      - tests\test_ranker_heuristic.py: 327 lines
+      - tests\test_ranker_ml.py: 0 lines
+  [OK] pyproject.toml: 44 lines
+
+Cursor/Grok
+--------------------------------------------------------------------------------
+Expected: Core algorithms, image_extractor, performance_scorer
+
+  [OK] src/core/
+   Files: 3
+   Lines: 294
+      - core\__init__.py: 2 lines
+      - core\image_extractor.py: 225 lines
+      - core\performance_scorer.py: 67 lines
+
+Windsurf/ChatGPT
+--------------------------------------------------------------------------------
+Expected: Specs, schemas, runbooks, QA criteria
+
+  [OK] schemas/
+   Files: 0
+   Lines: 0
+  [OK] docs/
+   Files: 0
+   Lines: 0
+  [OK] QA_CHECKLIST.md: 29 lines
+
+================================================================================
+UNEXPECTED IMPLEMENTATIONS (not in 3x3 model)
+================================================================================
+
+  [WARNING] src/audit/
+   Files: 9
+   Lines: 792
+   WHO SHOULD OWN THIS?
+      - audit\__init__.py: 0 lines
+      - audit\cli.py: 0 lines
+      - audit\lighthouse_runner.py: 0 lines
+      - audit\models.py: 98 lines
+      - audit\parser.py: 183 lines
+      - audit\ranker_base.py: 0 lines
+      - audit\ranker_heuristic.py: 119 lines
+      - audit\ranker_ml.py: 0 lines
+      - audit\report.py: 392 lines
+
+  [--] src/output/ - does not exist
+
+  [--] report_templates/ - does not exist
+
+================================================================================
+SUMMARY BY DOMAIN
+================================================================================
+
+JetBrains/Claude:
+  Total lines implemented: 1492
+  Folders: 2/2 implemented
+  Files: 1/1 implemented
+  Status: HAS IMPLEMENTATION
+
+Cursor/Grok:
+  Total lines implemented: 294
+  Folders: 1/1 implemented
+  Files: 0/0 implemented
+  Status: HAS IMPLEMENTATION
+
+Windsurf/ChatGPT:
+  Total lines implemented: 29
+  Folders: 2/2 implemented
+  Files: 1/1 implemented
+  Status: HAS IMPLEMENTATION
+
+================================================================================
+DOMAIN OWNERSHIP BY CODE VOLUME
+================================================================================
+JetBrains/Claude: 1,492 lines (82.2%)
+  Expected per model: ~40%
+  OVER EXPECTED by 42.2%
+Cursor/Grok: 294 lines (16.2%)
+  Expected per model: ~40%
+Windsurf/ChatGPT: 29 lines (1.6%)
+  Expected per model: ~20%
+
+================================================================================
+ANALYSIS COMPLETE
+================================================================================
