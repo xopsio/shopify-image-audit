@@ -1,0 +1,38 @@
+{
+  "audits": {
+    "largest-contentful-paint-element": {
+      "details": {
+        "items": [
+          {
+            "url": "https://cdn.example.com/hero.webp"
+          }
+        ]
+      }
+    },
+    "image-elements": {
+      "details": {
+        "items": [
+          {
+            "url": "https://cdn.example.com/hero.webp",
+            "resourceSize": 320000,
+            "mimeType": "image/webp",
+            "displayedWidth": 1200,
+            "displayedHeight": 800,
+            "naturalWidth": 2400,
+            "naturalHeight": 1600
+          },
+          {
+            "url": "https://cdn.example.com/logo.png",
+            "resourceSize": 24000,
+            "mimeType": "image/png",
+            "displayedWidth": 200,
+            "displayedHeight": 80,
+            "naturalWidth": 400,
+            "naturalHeight": 160
+          }
+        ]
+      }
+    }
+  }
+}
+
