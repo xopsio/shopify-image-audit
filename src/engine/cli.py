@@ -32,6 +32,7 @@ from rich.console import Console
 from rich.table import Table
 
 from audit.models import AuditResult
+from audit.report import write_html_report
 from engine.audit_orchestrator import run_audit
 
 # --- Exit codes per spec ---------------------------------------------------
@@ -136,8 +137,13 @@ def run(
     if ".." in out_dir_p.parts:
         rprint("[red]Error:[/red] --out-dir must not contain '..' segments.")
         raise typer.Exit(code=EXIT_INVALID_ARGS)
+    # Resolve and check containment using pathlib's safe relative_to()
     resolved_out = Path.cwd().joinpath(out_dir_p).resolve()
-    if not str(resolved_out).startswith(str(Path.cwd().resolve())):
+    cwd_resolved = Path.cwd().resolve()
+
+    try:
+        resolved_out.relative_to(cwd_resolved)
+    except ValueError:
         rprint("[red]Error:[/red] --out-dir resolves outside the working directory.")
         raise typer.Exit(code=EXIT_INVALID_ARGS)
 
@@ -217,11 +223,20 @@ def extract(
 
     from audit.parser import parse
 
-    with open(lighthouse_json, encoding="utf-8") as f:
-        raw = json.load(f)
+    try:
+        with open(lighthouse_json, encoding="utf-8") as f:
+            raw = json.load(f)
+    except json.JSONDecodeError as e:
+        rprint(f"[red]Error:[/red] Invalid JSON in {lighthouse_json}: {e}")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
 
-    images = parse(raw)
-    rprint(json.dumps(images, indent=2))
+    try:
+        images = parse(raw)
+        rprint(json.dumps(images, indent=2))
+    except Exception as e:
+        rprint(f"[red]Error:[/red] Failed to parse Lighthouse data: {e}")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
+
     raise typer.Exit(code=EXIT_OK)
 
 
@@ -240,11 +255,20 @@ def score(
 
     from audit.ranker_heuristic import rank
 
-    with open(audit_input_json, encoding="utf-8") as f:
-        images = json.load(f)
+    try:
+        with open(audit_input_json, encoding="utf-8") as f:
+            images = json.load(f)
+    except json.JSONDecodeError as e:
+        rprint(f"[red]Error:[/red] Invalid JSON in {audit_input_json}: {e}")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
 
-    scored = rank(images)
-    rprint(json.dumps(scored, indent=2))
+    try:
+        scored = rank(images)
+        rprint(json.dumps(scored, indent=2))
+    except Exception as e:
+        rprint(f"[red]Error:[/red] Failed to score images: {e}")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
+
     raise typer.Exit(code=EXIT_OK)
 
 
@@ -262,8 +286,18 @@ def report(
         rprint(f"[red]Error:[/red] File not found: {audit_result_json}")
         raise typer.Exit(code=EXIT_INVALID_ARGS)
 
-    rprint("[yellow]HTML rendering is not yet implemented.[/yellow]")
-    raise typer.Exit(code=EXIT_OK)
+    try:
+        write_html_report(audit_result_json, output)
+        rprint(f"[green]✓[/green] HTML report written to: {output}")
+    except json.JSONDecodeError as e:
+        rprint(f"[red]Error:[/red] Invalid JSON in {audit_result_json}: {e}")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
+    except KeyError as e:
+        rprint(f"[red]Error:[/red] Missing required field in audit result: {e}")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
+    except Exception as e:
+        rprint(f"[red]Error:[/red] Failed to generate report: {e}")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
 
 
 # ---------------------------------------------------------------------------
