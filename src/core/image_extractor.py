@@ -56,7 +56,8 @@ def _extract_lcp_url(lhr: Dict[str, Any]) -> Optional[str]:
     Mirrors Lighthouse v10+ `largest-contentful-paint-element` details structure:
     details.items[0].url OR details.items[0].node.url
     """
-    audits = lhr.get("audits") or {}
+    audits = lhr.get("audits")
+    audits = audits if isinstance(audits, dict) else {}
     lcp_audit = audits.get("largest-contentful-paint-element")
     if not isinstance(lcp_audit, dict):
         return None
@@ -91,7 +92,8 @@ def _collect_image_items(lhr: Dict[str, Any]) -> List[Dict[str, Any]]:
     - audits["image-elements"].details.items
     - audits["resource-summary"].details.items / .nodes
     """
-    audits = lhr.get("audits") or {}
+    audits = lhr.get("audits")
+    audits = audits if isinstance(audits, dict) else {}
     img_audit = audits.get("image-elements") or audits.get("resource-summary")
     if not isinstance(img_audit, dict):
         return []
