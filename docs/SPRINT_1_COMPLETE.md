@@ -5,7 +5,7 @@
 **Status:** End-to-end pipeline verified and tagged.
 
 **Achieved:**
-- Full CLI pipeline (`extract -> score -> report`)
+- Full CLI pipeline (`audit extract → audit score → audit report`)
 - JSON-safe output and Windows-compatible demo flow
 - Report supports both full AuditResult envelope and plain scored-image list
 - Portable demo script (`run_demo.ps1`)
