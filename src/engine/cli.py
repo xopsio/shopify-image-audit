@@ -232,7 +232,7 @@ def extract(
 
     try:
         images = parse(raw)
-        rprint(json.dumps(images, indent=2))
+        print(json.dumps(images, indent=2))
     except Exception as e:
         rprint(f"[red]Error:[/red] Failed to parse Lighthouse data: {e}")
         raise typer.Exit(code=EXIT_INVALID_ARGS)
@@ -264,7 +264,7 @@ def score(
 
     try:
         scored = rank(images)
-        rprint(json.dumps(scored, indent=2))
+        print(json.dumps(scored, indent=2))
     except Exception as e:
         rprint(f"[red]Error:[/red] Failed to score images: {e}")
         raise typer.Exit(code=EXIT_INVALID_ARGS)
@@ -288,7 +288,7 @@ def report(
 
     try:
         write_html_report(audit_result_json, output)
-        rprint(f"[green]✓[/green] HTML report written to: {output}")
+        rprint(f"[green]OK[/green] HTML report written to: {output}")
     except json.JSONDecodeError as e:
         rprint(f"[red]Error:[/red] Invalid JSON in {audit_result_json}: {e}")
         raise typer.Exit(code=EXIT_INVALID_ARGS)
