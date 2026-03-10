@@ -18,6 +18,21 @@ def generate_html_report(audit_result: dict[str, Any]) -> str:
     Returns:
         HTML string ready to be written to a file
     """
+    # Accept a plain scored-image list in addition to the full AuditResult envelope.
+    if isinstance(audit_result, list):
+        audit_result = {
+            "meta": {
+                "url": "N/A",
+                "timestamp_utc": "N/A",
+                "device": "unknown",
+                "runs": 1,
+                "tool": "lighthouse",
+            },
+            "vitals": {"lcp_ms": 0, "cls": 0, "inp_ms": 0, "ttfb_ms": 0},
+            "images": audit_result,
+            "summary": {"top_issues": []},
+        }
+
     meta = audit_result["meta"]
     vitals = audit_result["vitals"]
     images = audit_result["images"]
@@ -383,7 +398,8 @@ def write_html_report(audit_result_path: Path, output_path: Path) -> None:
         audit_result = json.load(f)
 
     # Store source file for footer reference
-    audit_result["_source_file"] = str(audit_result_path)
+    if isinstance(audit_result, dict):
+        audit_result["_source_file"] = str(audit_result_path)
 
     html_content = generate_html_report(audit_result)
 
