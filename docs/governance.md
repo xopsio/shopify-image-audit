@@ -124,7 +124,7 @@ The `src/audit/` folder (792 total lines) was not explicitly assigned in the ori
 **Effective immediately:**
 - `src/audit/` → **JetBrains/Claude** (official current owner)
 - Future work will rebalance toward the 40-40-20 target
-- See `SPRINT_1_RETROSPECTIVE.md` for lessons learned
+- See `docs/SPRINT_1_COMPLETE.md` for Sprint 1 wrap-up and lessons learned
 
 ### Important Clarification: Ownership vs. Authorship
 
@@ -307,3 +307,4 @@ WS-003: Update CLI specification
 ## References
 
 * See `archive/sprint1-analysis/CLAUDE_DOMAIN_REPORT.md` for detailed code analysis
+* See `docs/SPRINT_1_COMPLETE.md` for Sprint 1 completion summary
