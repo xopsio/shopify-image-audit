@@ -1,6 +1,6 @@
  $ErrorActionPreference = "Stop"
- Set-Location D:\shopify-image-audit
- $env:PYTHONPATH = (Resolve-Path .\src).Path
+ Set-Location $PSScriptRoot
+ $env:PYTHONPATH = (Join-Path $PSScriptRoot "src")
 
  $inputJson  = ".\tests\fixtures\extract_input.json"
  $outDir     = ".\demo_out"
