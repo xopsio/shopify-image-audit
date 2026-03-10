@@ -107,7 +107,7 @@
    - API client with rate limiting
    - Fetch LCP, CLS, INP for given URL
    - Return structured metrics
-2. Add CLI command: `python -m engine.cli measure <url>` 
+2. Add CLI command: `audit measure <url>` 
    - Calls PageSpeed API
    - Outputs metrics JSON
 3. Update `generate_html_report()` in `src/audit/report.py` 
@@ -117,13 +117,18 @@
 4. Write tests for API client
    - Mock API responses
    - Test error handling (rate limits, invalid URLs)
+5. Update project dependencies and packaging
+   - Add `requests` to `[project.dependencies]` in `pyproject.toml`
+   - Add `responses` (or equivalent mock library) to `[project.optional-dependencies.dev]`
+   - Verify `pip install -e .[dev]` succeeds with new dependencies
 
 **Dependencies:** None (new integration)
 
 **Acceptance Criteria:**
-- ✅ CLI command `measure <url>` returns live LCP
+- ✅ CLI command `audit measure <url>` returns live LCP
 - ✅ HTML report includes before/after comparison when data available
 - ✅ Tests pass (API client + report generation)
+- ✅ `pyproject.toml` updated with new dependencies (`requests`, test mocks)
 
 ---
 
@@ -142,8 +147,8 @@
    - Parse Lighthouse JSON from API response
    - Fallback to local JSON file if provided
 3. Add CLI workflow: `baseline` and `compare` commands
-   - `python -m engine.cli baseline <url> --save baseline.json` 
-   - `python -m engine.cli compare baseline.json <url> --output comparison.html` 
+   - `audit baseline <url> --save baseline.json` 
+   - `audit compare baseline.json <url> --output comparison.html` 
 4. Test with real Shopify demo store
    - Run baseline measurement
    - Apply manual optimization (e.g., compress hero image)
