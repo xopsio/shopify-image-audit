@@ -12,9 +12,9 @@ so the user invokes:
     audit run https://example.myshopify.com --device mobile --runs 3
 
 Exit codes (spec):
-    0  – success
-    2  – invalid arguments
-    10 – lighthouse failure
+    0   success
+    2   invalid arguments
+    10  lighthouse failure
 """
 
 from __future__ import annotations
@@ -49,12 +49,12 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SCHEMA_PATH = _REPO_ROOT / "schemas" / "audit_result.schema.json"
 
 # ---------------------------------------------------------------------------
-# Top-level app – NO nested "audit" group so that `audit run …` works
+# Top-level app  NO nested "audit" group so that `audit run ` works
 # directly from the console-script named ``audit``.
 # ---------------------------------------------------------------------------
 app = typer.Typer(
     name="audit",
-    help="Shopify store image audit – Lighthouse-based analysis with heuristic and ML scoring.",
+    help="Shopify store image audit  Lighthouse-based analysis with heuristic and ML scoring.",
     add_completion=False,
 )
 
@@ -97,7 +97,7 @@ def _run_lighthouse(
             "--only-categories=performance",
             "--chrome-flags=--headless",
         ]
-        rprint(f"[cyan]Lighthouse run {i}/{runs}…[/cyan]")
+        rprint(f"[cyan]Lighthouse run {i}/{runs}[/cyan]")
         try:
             subprocess.run(cmd, check=True, capture_output=True, text=True)
         except subprocess.CalledProcessError as exc:
@@ -131,7 +131,9 @@ def run(
 
     # --- validate --out-dir safety ---
     out_dir_p = Path(out_dir)
-    if out_dir_p.is_absolute():
+    # Check for Windows-style absolute paths (e.g., C:\path or \server\share)
+    out_dir_str = str(out_dir)
+    if out_dir_p.is_absolute() or out_dir_str.startswith(("C:", "D:", "E:", "F:", "G:", "H:", "I:")) or out_dir_str.startswith("\\") or ":\\" in out_dir_str:
         rprint("[red]Error:[/red] --out-dir must be a relative path.")
         raise typer.Exit(code=EXIT_INVALID_ARGS)
     if ".." in out_dir_p.parts:
@@ -168,7 +170,17 @@ def run(
     # --- run the audit pipeline ---
     try:
         result: AuditResult = run_audit(json_path, url=url, device=device, runs=runs)
+    except ValueError as exc:
+        # ValueError: invalid input data or processing error
+        rprint(f"[red]Audit pipeline error:[/red] {exc}")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
+    except (FileNotFoundError, json.JSONDecodeError) as exc:
+        # FileNotFoundError: lhr file missing (should be caught earlier, but just in case)
+        # JSONDecodeError: invalid JSON in the lighthouse report
+        rprint(f"[red]Audit pipeline error:[/red] {exc}")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
     except Exception as exc:
+        # Other errors (e.g., schema validation) are Lighthouse-related
         rprint(f"[red]Audit pipeline error:[/red] {exc}")
         raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE)
 
@@ -320,4 +332,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
