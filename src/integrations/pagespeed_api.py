@@ -126,6 +126,7 @@ class PageSpeedAPIClient:
         params = {
             "url": url,
             "category": "performance",  # Only fetch performance metrics
+            "strategy": strategy,  # mobile or desktop
         }
         if self.api_key:
             params["key"] = self.api_key
@@ -134,7 +135,6 @@ class PageSpeedAPIClient:
     def _parse_response(self, data: dict, url: str, strategy: str) -> PageSpeedMetrics:
         """Parse API response into structured metrics."""
         lighthouse_result = data.get("lighthouseResult", {})
-        loading_experience = data.get("loadingExperience", {})
         
         # Extract metrics from lighthouseResult
         metrics = lighthouse_result.get("audits", {})

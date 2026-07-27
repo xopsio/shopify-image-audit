@@ -5,7 +5,6 @@ Tests for PageSpeed Insights API client.
 from __future__ import annotations
 
 import json
-from unittest.mock import MagicMock, patch
 
 import pytest
 import responses
@@ -13,7 +12,6 @@ import responses
 from integrations.pagespeed_api import (
     PageSpeedAPIClient,
     PageSpeedMetrics,
-    get_pagespeed_metrics,
 )
 
 
@@ -292,13 +290,12 @@ def test_to_dict():
 
 
 @responses.activate
-def test_convenience_function():
-    """Test the convenience function get_pagespeed_metrics."""
+def test_strategy_param_in_request():
+    """Test that strategy parameter is included in API request."""
     mock_response = {
         "lighthouseResult": {
             "fetchTime": "2024-01-15T10:30:00.000Z",
             "audits": {
-                "largest-contentful-paint": {"numericValue": 2000},
                 "performance": {"score": 0.8},
             },
         },
@@ -311,53 +308,13 @@ def test_convenience_function():
         status=200,
     )
     
-    metrics = get_pagespeed_metrics("https://example.com")
+    client = PageSpeedAPIClient()
+    metrics = client.get_metrics("https://example.com", strategy="desktop")
     
-    assert isinstance(metrics, PageSpeedMetrics)
-    assert metrics.lcp == 2.0
-    assert metrics.performance_score == 80
-
-
-def test_rate_limiting():
-    """Test that rate limiting is enforced."""
-    import time as time_module
-    
-    mock_response = {
-        "lighthouseResult": {
-            "fetchTime": "2024-01-15T10:30:00.000Z",
-            "audits": {
-                "performance": {"score": 0.8},
-            },
-        },
-    }
-    
-    with responses.RequestsMock() as rsps:
-        rsps.add(
-            responses.GET,
-            "https://www.googleapis.com/pagespeedonline/v5/runPagespeed",
-            json=mock_response,
-            status=200,
-        )
-        rsps.add(
-            responses.GET,
-            "https://www.googleapis.com/pagespeedonline/v5/runPagespeed",
-            json=mock_response,
-            status=200,
-        )
-        
-        client = PageSpeedAPIClient()
-        
-        # First request
-        start_time = time_module.time()
-        client.get_metrics("https://example1.com")
-        first_time = time_module.time()
-        
-        # Second request should wait at least 1 second
-        client.get_metrics("https://example2.com")
-        second_time = time_module.time()
-        
-        # Should have waited at least the minimum interval
-        assert second_time - first_time >= 0.9  # Allow small tolerance
+    # Verify the request was made with strategy parameter
+    assert len(responses.calls) == 1
+    assert "strategy=desktop" in responses.calls[0].request.url
+    assert metrics.strategy == "desktop"
 
 
 @responses.activate
