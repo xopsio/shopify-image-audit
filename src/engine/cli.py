@@ -34,6 +34,7 @@ from rich.table import Table
 from audit.models import AuditResult
 from audit.report import write_html_report
 from engine.audit_orchestrator import run_audit
+from integrations.pagespeed_api import PageSpeedAPIClient, get_pagespeed_metrics
 
 # --- Exit codes per spec ---------------------------------------------------
 EXIT_OK = 0
@@ -216,6 +217,56 @@ def run(
     result_file = out_dir_path / "audit_result.json"
     result_file.write_text(result.model_dump_json(indent=2), encoding="utf-8")
     rprint(f"\n[green]Result written to {result_file}[/green]")
+
+    raise typer.Exit(code=EXIT_OK)
+
+
+# ---------------------------------------------------------------------------
+# measure
+# ---------------------------------------------------------------------------
+
+@app.command()
+def measure(
+    url: str = typer.Argument(..., help="URL to measure with PageSpeed Insights."),
+    strategy: str = typer.Option("mobile", "--strategy", help="Strategy: mobile or desktop (default: mobile)."),
+    api_key: Optional[str] = typer.Option(None, "--api-key", help="Google Cloud API key (optional)."),
+    output: Optional[Path] = typer.Option(None, "-o", "--output", help="Output JSON file (default: print to stdout)."),
+) -> None:
+    """Fetch live performance metrics from Google PageSpeed Insights API."""
+    # --- validate URL scheme ---
+    parsed_url = urlparse(url)
+    if parsed_url.scheme not in ("http", "https"):
+        scheme_display = parsed_url.scheme or "(empty)"
+        rprint(f"[red]Error:[/red] URL scheme must be http or https, got '{scheme_display}'.")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
+
+    # --- validate strategy ---
+    if strategy not in ("mobile", "desktop"):
+        rprint(f"[red]Error:[/red] --strategy must be 'mobile' or 'desktop', got '{strategy}'.")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
+
+    # --- fetch metrics ---
+    try:
+        client = PageSpeedAPIClient(api_key=api_key)
+        metrics = client.get_metrics(url, strategy=strategy)
+    except ValueError as exc:
+        rprint(f"[red]Error:[/red] Invalid input: {exc}")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
+    except RuntimeError as exc:
+        rprint(f"[red]Error:[/red] PageSpeed API error: {exc}")
+        raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE)
+    except Exception as exc:
+        rprint(f"[red]Error:[/red] Failed to fetch metrics: {exc}")
+        raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE)
+
+    # --- output ---
+    if output:
+        output_path = Path(output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(json.dumps(metrics.to_dict(), indent=2), encoding="utf-8")
+        rprint(f"[green]Metrics written to {output_path}[/green]")
+    else:
+        print(json.dumps(metrics.to_dict(), indent=2))
 
     raise typer.Exit(code=EXIT_OK)
 
