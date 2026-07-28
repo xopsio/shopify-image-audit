@@ -12,6 +12,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from typing import Optional
+from urllib.parse import urlparse
 
 import requests
 
@@ -139,6 +140,12 @@ class PageSpeedAPIClient:
         # Extract metrics from lighthouseResult
         metrics = lighthouse_result.get("audits", {})
         
+        # Get performance score from categories, not audits
+        categories = lighthouse_result.get("categories", {})
+        performance_category = categories.get("performance", {})
+        performance_score_raw = performance_category.get("score")
+        performance_score = int(float(performance_score_raw) * 100) if performance_score_raw is not None else 0
+        
         def get_metric_value(name: str, default: float = 0.0) -> float:
             """Extract a metric value from audits."""
             audit = metrics.get(name, {})
@@ -147,16 +154,6 @@ class PageSpeedAPIClient:
             numeric_value = audit.get("numericValue")
             if numeric_value is not None:
                 return float(numeric_value)
-            return default
-        
-        def get_score(name: str, default: int = 0) -> int:
-            """Extract a score value from audits."""
-            audit = metrics.get(name, {})
-            if not audit:
-                return default
-            score = audit.get("score")
-            if score is not None:
-                return int(float(score) * 100)
             return default
         
         # Get fetch time
@@ -183,9 +180,6 @@ class PageSpeedAPIClient:
         tti = get_metric_value("interactive", 0.0) / 1000
         tbt = get_metric_value("total-blocking-time", 0.0)  # already in ms
         
-        # Performance score (0-100)
-        performance_score = get_score("performance", 0)
-        
         return PageSpeedMetrics(
             url=url,
             strategy=strategy,
@@ -200,6 +194,35 @@ class PageSpeedAPIClient:
             total_blocking_time=tbt,
             performance_score=performance_score,
         )
+    
+    def _validate_url(self, url: str) -> str:
+        """Validate and normalize URL. Raises ValueError for invalid URLs."""
+        if not url or not url.strip():
+            raise ValueError("URL cannot be empty")
+        
+        url = url.strip()
+        parsed = urlparse(url)
+        
+        # If scheme is provided, it must be http or https
+        if parsed.scheme and parsed.scheme not in ("http", "https"):
+            raise ValueError(f"URL scheme must be http or https, got '{parsed.scheme}'")
+        
+        # For scheme-less URLs, we need a non-empty string that's not just a path
+        # (e.g., "example.com" is valid, "/path" or "https://" is not)
+        if not parsed.scheme:
+            # Must have something that looks like a hostname
+            if not url or url.startswith('/') or '://' in url:
+                raise ValueError("URL must include a hostname")
+        else:
+            # For URLs with scheme, must have a netloc (hostname)
+            if not parsed.netloc:
+                raise ValueError("URL must include a hostname")
+        
+        # Normalize scheme-less URLs
+        if not parsed.scheme:
+            url = f"https://{url}"
+        
+        return url
     
     def get_metrics(
         self,
@@ -222,16 +245,11 @@ class PageSpeedAPIClient:
             RuntimeError: If the API returns an error or rate limit is hit.
         """
         # Validate inputs
-        if not url:
-            raise ValueError("URL cannot be empty")
-        
         if strategy not in ("mobile", "desktop"):
             raise ValueError(f"Strategy must be 'mobile' or 'desktop', got '{strategy}'")
         
-        # Normalize URL
-        url = url.strip()
-        if not url.startswith(("http://", "https://")):
-            url = f"https://{url}"
+        # Validate and normalize URL
+        url = self._validate_url(url)
         
         # Rate limiting
         self._wait_for_rate_limit()
@@ -250,14 +268,24 @@ class PageSpeedAPIClient:
                     timeout=self.timeout,
                 )
                 
-                # Check for rate limiting (HTTP 429 or 503)
-                if response.status_code in (429, 503):
+                # Check for rate limiting (HTTP 429)
+                if response.status_code == 429:
                     if attempt < self.max_retries - 1:
                         time.sleep(self.retry_delay * (attempt + 1))
                         continue
                     raise RuntimeError(
                         f"PageSpeed API rate limit exceeded. Status: {response.status_code}. "
                         f"Please wait before making more requests."
+                    )
+                
+                # Check for service unavailable (HTTP 503)
+                if response.status_code == 503:
+                    if attempt < self.max_retries - 1:
+                        time.sleep(self.retry_delay * (attempt + 1))
+                        continue
+                    raise RuntimeError(
+                        f"PageSpeed API service unavailable. Status: {response.status_code}. "
+                        f"Please try again later."
                     )
                 
                 # Check for other errors
