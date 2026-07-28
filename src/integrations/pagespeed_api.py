@@ -250,14 +250,24 @@ class PageSpeedAPIClient:
                     timeout=self.timeout,
                 )
                 
-                # Check for rate limiting (HTTP 429 or 503)
-                if response.status_code in (429, 503):
+                # Check for rate limiting (HTTP 429)
+                if response.status_code == 429:
                     if attempt < self.max_retries - 1:
                         time.sleep(self.retry_delay * (attempt + 1))
                         continue
                     raise RuntimeError(
                         f"PageSpeed API rate limit exceeded. Status: {response.status_code}. "
                         f"Please wait before making more requests."
+                    )
+                
+                # Check for service unavailable (HTTP 503)
+                if response.status_code == 503:
+                    if attempt < self.max_retries - 1:
+                        time.sleep(self.retry_delay * (attempt + 1))
+                        continue
+                    raise RuntimeError(
+                        f"PageSpeed API service unavailable. Status: {response.status_code}. "
+                        f"Please try again later."
                     )
                 
                 # Check for other errors

@@ -4,8 +4,6 @@ Tests for PageSpeed Insights API client.
 
 from __future__ import annotations
 
-import json
-
 import pytest
 import responses
 
@@ -223,6 +221,21 @@ def test_get_metrics_rate_limit():
 
 
 @responses.activate
+def test_get_metrics_service_unavailable():
+    """Test handling of service unavailable (HTTP 503)."""
+    responses.add(
+        responses.GET,
+        "https://www.googleapis.com/pagespeedonline/v5/runPagespeed",
+        status=503,
+    )
+    
+    client = PageSpeedAPIClient(max_retries=1)  # Only 1 attempt
+    
+    with pytest.raises(RuntimeError, match="service unavailable"):
+        client.get_metrics("https://example.com")
+
+
+@responses.activate
 def test_get_metrics_server_error():
     """Test handling of server error (HTTP 500)."""
     responses.add(
@@ -374,5 +387,5 @@ def test_retry_exhausted():
     
     client = PageSpeedAPIClient(max_retries=3, retry_delay=0.1)
     
-    with pytest.raises(RuntimeError, match="rate limit exceeded"):
+    with pytest.raises(RuntimeError, match="service unavailable"):
         client.get_metrics("https://example.com")
