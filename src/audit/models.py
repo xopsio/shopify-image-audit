@@ -8,9 +8,28 @@ No extra="allow", no fallbacks, no hacks.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
+
+
+class _ExcludeNoneModel(BaseModel):
+    """Base model that omits ``None``-valued optional fields on serialization.
+
+    The JSON schema (``schemas/audit_result.schema.json``) declares optional
+    fields as plain ``integer``/``string`` (no ``null``). Pydantic v2 does not
+    honour ``exclude_none`` as a ``model_config`` key, so we enable it by
+    default at the serialization boundary. ``model_validate`` is unaffected:
+    missing keys remain optional and default to ``None``.
+    """
+
+    def model_dump(self, **kwargs: Any) -> dict[str, Any]:  # type: ignore[override]
+        kwargs.setdefault("exclude_none", True)
+        return super().model_dump(**kwargs)
+
+    def model_dump_json(self, **kwargs: Any) -> str:  # type: ignore[override]
+        kwargs.setdefault("exclude_none", True)
+        return super().model_dump_json(**kwargs)
 
 
 # ---------- enums ----------
@@ -35,7 +54,7 @@ class ImageRole(str, Enum):
 
 # ---------- nested models ----------
 
-class Meta(BaseModel):
+class Meta(_ExcludeNoneModel):
     """meta object – additionalProperties: false"""
     model_config = {"extra": "forbid"}
 
@@ -47,7 +66,7 @@ class Meta(BaseModel):
     notes: Optional[str] = None
 
 
-class Vitals(BaseModel):
+class Vitals(_ExcludeNoneModel):
     """vitals object – additionalProperties: false"""
     model_config = {"extra": "forbid"}
 
@@ -57,8 +76,16 @@ class Vitals(BaseModel):
     ttfb_ms: float = Field(..., ge=0)
 
 
-class ImageItem(BaseModel):
-    """Single image entry – additionalProperties: false"""
+class ImageItem(_ExcludeNoneModel):
+    """Single image entry – additionalProperties: false.
+
+    ``exclude_none=True`` is inherited from ``_ExcludeNoneModel`` so
+    serialization omits optional fields whose value is None (e.g.
+    ``natural_width``). The JSON schema declares these as plain
+    ``integer``/``string`` (no ``null``), so emitting ``null`` would violate
+    the contract. Round-trip via ``model_validate`` is unaffected: missing keys
+    are optional and default to None.
+    """
     model_config = {"extra": "forbid"}
 
     src: str = Field(..., min_length=1)
@@ -75,7 +102,7 @@ class ImageItem(BaseModel):
     recommendation: Optional[str] = None
 
 
-class Summary(BaseModel):
+class Summary(_ExcludeNoneModel):
     """summary object – additionalProperties: false"""
     model_config = {"extra": "forbid"}
 
@@ -84,7 +111,7 @@ class Summary(BaseModel):
 
 # ---------- top-level ----------
 
-class AuditResult(BaseModel):
+class AuditResult(_ExcludeNoneModel):
     """
     Top-level audit result – maps 1-to-1 to audit_result.schema.json.
     additionalProperties: false
@@ -95,4 +122,3 @@ class AuditResult(BaseModel):
     vitals: Vitals
     images: list[ImageItem]
     summary: Summary
-
