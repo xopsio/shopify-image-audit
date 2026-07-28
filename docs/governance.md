@@ -1,145 +1,100 @@
 # Governance & Domain Ownership
 
-**Last updated:** 2026-03-08 (Post Sprint 1 Analysis)  
-**Project:** shopify-image-audit  
-**Model:** 3×3 Multi-Agent Development
+**Last updated:** 2026-07-29 (Sprint 2 kickoff — Claude/PyCharm exit)
+**Project:** shopify-image-audit
+**Model:** Multi-agent development with a coordinator
 
 ---
 
 ## Overview
 
-This project uses a multi-agent development model where three AI assistants work in parallel, each owning specific domains. This document defines ownership boundaries, responsibilities, and integration protocols.
+This project is developed by multiple AI agents working in parallel, each owning
+specific domains. **ZCode acts as coordinator** and also owns the backend /
+engine / test domains. This document defines ownership boundaries,
+responsibilities, and integration protocols.
+
+> **Sprint 2 governance change:** Claude/PyCharm is no longer on the project.
+> Its domains (`src/engine/`, `tests/`, `pyproject.toml`, `src/audit/models.py`)
+> are absorbed by **ZCode (coordinator)**. The three remaining worker agents
+> continue with their core domains. See Sprint 1 post-mortem below for the
+> historical authorship picture.
 
 ---
 
 ## Domain Ownership
 
-### JetBrains/Claude (Primary: Backend Integration & Testing)
+### ZCode (Coordinator + Backend & Testing)
 
-**Assigned Domains:**
-- `src/engine/` - Orchestration, CLI, pipeline integration
-- `tests/` - All test files, test harness, fixtures
-- `pyproject.toml` - Packaging, dependencies, build configuration
+**Role:** Coordinator of the whole project; merges PRs, writes issues, keeps the
+build green, integrates components from the worker agents.
 
-**Sprint 1 Expansion (Formally Recognized):**
-- `src/audit/models.py` - Pydantic data models (unassigned → implemented by necessity)
-- `src/audit/report.py` - HTML report generation (unassigned → implemented by necessity)
-
-**Current Ownership (Post Sprint 1):**
-- All of `src/audit/` directory (effective governance v1.1)
-- This includes files originally authored by other domains
+**Owned Domains:**
+- `src/engine/` — Orchestration, CLI, pipeline integration
+- `src/audit/models.py` — Pydantic v2 data models (the serialization contract)
+- `tests/` — All test files, test harness, fixtures (single-writer for determinism)
+- `pyproject.toml` — Packaging, dependencies, build configuration
 
 **Responsibilities:**
 - Orchestrator pipeline implementation
-- CLI interface (run, extract, score, report commands)
-- Data model validation (Pydantic v2)
-- Test suite ownership (single-writer for determinism)
+- CLI interface (run, extract, score, report, measure, baseline, compare)
+- Data model validation and the schema ↔ Pydantic contract
+- Single-writer test suite (determinism / reproducibility)
 - Integration of core components from other domains
-- Packaging and deployment configuration
-
-**Actual Sprint 1 Output:** 1,982 lines (82.2% of codebase)
+- Packaging, CI, and release configuration
+- Reviewing and merging PRs; splitting work into issues
 
 ---
 
-### Cursor/Grok (Primary: Core Algorithms)
+### Cursor/Grok (Core Algorithms)
 
-**Assigned Domains:**
-- `src/core/` - Core algorithms, extractors, scorers (Phase 2)
-
-**Sprint 1 Authorship:**
-- `src/audit/parser.py` - Lighthouse JSON parser (183 lines)
-- `src/audit/ranker_heuristic.py` - Heuristic scoring algorithm (119 lines)
-
-**Current Ownership:**
-- No files under `src/audit/` are Cursor-owned after governance v1.1
-- Ownership returns to Cursor when parser/ranker are migrated to `src/core/`
-
-**Note:** Originally planned for `src/core/`, implemented in `src/audit/` during Sprint 1. Folder naming diverged from the initial plan.
+**Owned Domains:**
+- `src/core/` — Core algorithms, extractors, scorers
+- `src/audit/parser.py` — Lighthouse JSON parser (migrating to `src/core/`)
+- `src/audit/ranker_heuristic.py` — Heuristic scoring algorithm
+- New scoring modules (e.g. baseline manager, comparison engine)
 
 **Responsibilities:**
 - Image extraction from Lighthouse JSON
-- Performance scoring algorithms (heuristic v1, ML-based planned)
+- Performance scoring algorithms (heuristic v1, ML-based planned for Phase 3)
 - Feature engineering for scoring
+- Baseline capture / delta calculation / before-after comparison engine
 - Algorithm optimization
-
-**Actual Sprint 1 Authorship:** 302 lines (via parser + ranker in `src/audit/`)
+- Provide fixtures + expected outputs for all code paths
 
 ---
 
-### Windsurf/ChatGPT (Primary: Specification & Documentation)
+### Windsurf/ChatGPT (Specification & Documentation)
 
-**Assigned Domains:**
-- `schemas/` - JSON schemas, data contracts
-- `docs/` - Specifications, runbooks, documentation
-- `QA_CHECKLIST.md` - Quality gates, acceptance criteria
+**Owned Domains:**
+- `schemas/` — JSON schemas, data contracts
+- `docs/` — Specifications, runbooks, documentation
+- `QA_CHECKLIST.md` — Quality gates, acceptance criteria
+- `src/audit/report.py` — HTML report generation (shared with coordinator)
 
 **Responsibilities:**
 - Schema definitions (`audit_result.schema.json`)
-- CLI specifications
-- Measurement protocols
-- Quality assurance criteria
-- Documentation maintenance
-
-**Actual Sprint 1 Output:** Complete (schemas, docs, QA checklist)
+- CLI specifications and runbooks
+- Measurement protocols and determinism rules
+- Quality assurance criteria and release gates
+- Customer-facing documentation (report templates, onboarding guides)
 
 ---
 
 ## Single-Writer Rule
 
-**Critical Principle:** Each folder/file has exactly ONE domain as the "truth owner."
+**Critical Principle:** Each folder/file has exactly ONE owner.
 
 ### Why This Matters
-- **Determinism:** Tests must be reproducible (JetBrains-only)
+- **Determinism:** Tests must be reproducible (ZCode is the single test-writer)
 - **Conflict Avoidance:** No merge conflicts within a domain
 - **Clear Accountability:** Each domain owns its outputs
 
 ### How It Works
-1. Domain A implements a feature in its folder
-2. Domain A creates a PR with the implementation
-3. Domain B integrates via import/API (no direct editing)
-4. If Domain B needs changes → PR to Domain A, not direct edit
-
----
-
-## Sprint 1 Post-Mortem Analysis
-
-### Planned vs. Actual Domain Distribution
-
-| Domain | Planned | Actual Sprint 1 | Variance |
-|--------|---------|-----------------|----------|
-| Claude/JetBrains | ~40% | 82.2% (1,982 lines) | +42.2% |
-| Cursor/Grok | ~40% | 16.2% (302 lines via `src/audit/`) | -23.8% |
-| Windsurf/ChatGPT | ~20% | 1.6% | -18.4% |
-
-### Root Cause: `src/audit/` Was Unassigned
-
-The `src/audit/` folder (792 total lines) was not explicitly assigned in the original 3×3 model:
-- `models.py` (98 lines) - Claude authored (needed for pipeline)
-- `report.py` (392 lines) - Claude authored (needed for MVP)
-- `parser.py` (183 lines) - Cursor authored (should be in `src/core/`)
-- `ranker_heuristic.py` (119 lines) - Cursor authored (should be in `src/core/`)
-
-### Decision: Accept Reality, Formalize Ownership
-
-**Effective immediately:**
-- `src/audit/` → **JetBrains/Claude** (official current owner)
-- Future work will rebalance toward the 40-40-20 target
-- See `docs/SPRINT_1_COMPLETE.md` for Sprint 1 wrap-up and lessons learned
-
-### Important Clarification: Ownership vs. Authorship
-
-**Ownership and authorship are not the same thing:**
-
-- **Ownership** = who has the right to modify and maintain the file going forward
-- **Authorship** = who originally implemented the file in Sprint 1
-
-**For Sprint 1 retrospective purposes:**
-- `parser.py` and `ranker_heuristic.py` were authored by Cursor/Grok
-- `models.py` and `report.py` were authored by JetBrains/Claude
-
-**For current governance purposes:**
-- `src/audit/` is owned by JetBrains/Claude until parser/ranker are migrated to `src/core/`
-- This maintains the single-writer rule at the folder level
+1. Domain owner implements a feature in its folder, on a feature branch
+2. Domain owner opens a PR with the implementation
+3. ZCode (coordinator) reviews, writes/integrates tests, merges
+4. If another agent needs changes → open an issue against the owning domain,
+   do **not** edit directly
 
 ---
 
@@ -147,43 +102,40 @@ The `src/audit/` folder (792 total lines) was not explicitly assigned in the ori
 
 ### Cross-Domain Dependencies
 
-**Example: Claude integrates Cursor-authored parser**
+**Example: ZCode integrates Cursor-authored parser**
 ```python
-# src/engine/audit_orchestrator.py (Claude domain)
-from audit.parser import parse  # Cursor-authored, Claude-owned
+# src/engine/audit_orchestrator.py (ZCode domain)
+from audit.parser import parse  # Cursor-owned
 
 def run_audit(lh_json):
     images = parse(lh_json)
-    # ... Claude's orchestration logic
+    # ... ZCode's orchestration logic
 ```
 
 **Rule:** Import and use, don't modify.
 
 ### Pull Request (PR) Model
 
-When Cursor/Grok creates parser/ranker logic:
+When an agent creates new logic:
 
-1. Cursor implements in a separate branch (for example `dev/cursor-parser`)
-2. Cursor creates a PR with:
-
-   * Implementation code
-   * Expected input/output examples (fixtures)
-   * Unit test specifications (not actual test files)
-3. JetBrains reviews, writes tests, integrates
-4. JetBrains merges when tests pass
+1. Implement on a feature branch (`feat/<agent>-<ticket>` or `fix/<topic>`)
+2. Open a PR with:
+   - Implementation code
+   - Expected input/output examples (fixtures)
+   - Unit test specifications (ZCode writes the actual test files)
+3. ZCode reviews, writes/updates tests, integrates
+4. ZCode merges when tests pass
 
 ### Fixture Handoff
 
-**Cursor/Grok provides:**
-
+**Worker agent provides:**
 ```text
 fixtures/
 ├── bad_hero_lcp.json
 └── expected_output_bad_hero.json
 ```
 
-**JetBrains/Claude writes:**
-
+**ZCode writes:**
 ```python
 # tests/test_parser.py
 def test_parser_bad_hero():
@@ -201,20 +153,26 @@ def test_parser_bad_hero():
 ```text
 shopify-image-audit/
 ├── src/
-│   ├── audit/                    # Current owner: JetBrains/Claude
-│   │                             # Historical authorship includes Cursor work (parser/ranker)
-│   │   ├── models.py             # Claude-authored, Claude-owned
-│   │   ├── parser.py             # Cursor-authored, Claude-owned
-│   │   ├── ranker_heuristic.py   # Cursor-authored, Claude-owned
-│   │   └── report.py             # Claude-authored, Claude-owned
-│   └── engine/                   # Claude-owned (orchestration)
-│       ├── cli.py
-│       └── audit_orchestrator.py
-├── tests/                        # Claude ONLY (single-writer)
-├── schemas/                      # Windsurf-owned (data contracts)
-├── docs/                         # Windsurf-owned (specs, runbooks)
+│   ├── audit/                    # Mixed ownership
+│   │   ├── models.py             # ZCode-owned
+│   │   ├── parser.py             # Cursor/Grok-owned
+│   │   ├── ranker_heuristic.py   # Cursor/Grok-owned
+│   │   ├── ranker_ml.py          # Cursor/Grok (Phase 3 placeholder)
+│   │   ├── lighthouse_runner.py  # ZCode-owned (reserved for refactor)
+│   │   └── report.py             # Windsurf/ChatGPT + ZCode
+│   ├── core/                     # Cursor/Grok-owned
+│   │   ├── image_extractor.py
+│   │   └── performance_scorer.py
+│   ├── engine/                   # ZCode-owned
+│   │   ├── cli.py
+│   │   └── audit_orchestrator.py
+│   └── integrations/             # ZCode-owned
+│       └── pagespeed_api.py
+├── tests/                        # ZCode ONLY (single-writer)
+├── schemas/                      # Windsurf/ChatGPT-owned
+├── docs/                         # Windsurf/ChatGPT-owned
 ├── fixtures/                     # Shared (creator owns authored fixture content)
-└── pyproject.toml                # Claude-owned (packaging)
+└── pyproject.toml                # ZCode-owned
 ```
 
 ---
@@ -223,88 +181,87 @@ shopify-image-audit/
 
 ### Before Merge to Main
 
-**JetBrains/Claude Checklist:**
-
-* [ ] All tests pass (103/103 currently)
-* [ ] Pydantic models validate against schema
-* [ ] CLI commands work end-to-end
-* [ ] Security fixes applied (no Qodo blockers)
-* [ ] Code coverage maintained
+**ZCode (coordinator) Checklist:**
+- [ ] All tests pass (currently 143/143)
+- [ ] Pydantic models validate against `schemas/audit_result.schema.json`
+- [ ] CLI commands work end-to-end
+- [ ] Code coverage maintained
+- [ ] No regressions
 
 **Cursor/Grok Checklist:**
-
-* [ ] Fixtures provided for all code paths
-* [ ] Expected outputs documented
-* [ ] Algorithm performance benchmarked
+- [ ] Fixtures provided for all code paths
+- [ ] Expected outputs documented
+- [ ] Algorithm performance benchmarked
 
 **Windsurf/ChatGPT Checklist:**
-
-* [ ] Schema updated if the data model changed
-* [ ] Documentation reflects current behavior
-* [ ] `QA_CHECKLIST.md` updated with new gates
+- [ ] Schema updated if the data model changed
+- [ ] Documentation reflects current behavior
+- [ ] `QA_CHECKLIST.md` updated with new gates
 
 ---
 
 ## Communication Protocol
 
 ### Branch Naming
-
-* `dev/jetbrains-<ticket>` - Claude work
-* `dev/cursor-<ticket>` - Grok work
-* `dev/windsurf-<ticket>` - ChatGPT work
+- `feat/zcode-<ticket>` / `fix/<topic>` — ZCode work
+- `feat/cursor-<ticket>` — Cursor/Grok work
+- `feat/windsurf-<ticket>` — Windsurf/ChatGPT work
 
 ### Commit Messages
-
 ```text
 <DOMAIN>-<TICKET>: <description>
 
-JB-001: Add HTML report generation
-CU-002: Implement ML-based ranker
-WS-003: Update CLI specification
+CU-003: Implement baseline manager
+WS-004: Add customer report template
 ```
 
 ### When Domains Conflict
-
-1. Raise an issue in project discussion
+1. Raise an issue in the project discussion
 2. Document the decision in this file
 3. Update ownership if boundaries change
 
 ---
 
-## Phase 2 Planning
+## Sprint 1 Post-Mortem (Historical)
 
-### Goal: Rebalance toward 40-40-20
+The original 3×3 model assigned work to Claude/JetBrains, Cursor/Grok, and
+Windsurf/ChatGPT. In practice Sprint 1 skewed heavily toward Claude/JetBrains
+(82.2% of the codebase) because `src/audit/` was unassigned and Claude filled it
+by necessity. As of Sprint 2, Claude/PyCharm has exited; ZCode absorbs its
+domains. The historical authorship record is preserved below for traceability.
 
-**Cursor/Grok expansion (+24% target):**
+| Domain | Planned | Actual Sprint 1 | Note |
+|--------|---------|-----------------|------|
+| Claude/JetBrains | ~40% | 82.2% (1,982 lines) | Exited Sprint 2 → ZCode |
+| Cursor/Grok | ~40% | 16.2% (302 lines) | Continues |
+| Windsurf/ChatGPT | ~20% | 1.6% | Continues |
 
-* Move parser/ranker to `src/core/` (restore direct ownership)
-* Add ML-based scoring (~400-600 lines)
-* Implement image optimization recommendations
+---
 
-**Windsurf/ChatGPT expansion (+18% target):**
+## Phase 2 (Sprint 2) Plan
 
-* Report theming system
-* Multi-format exports (PDF, CSV)
-* Enhanced documentation
+**Goal:** Complete Phase 1 business validation and begin Phase 2 integrations.
+See `docs/SPRINT_2_PLAN.md` for the full breakdown.
 
-**Claude/JetBrains (maintenance mode):**
-
-* Bug fixes only
-* Integration testing
-* Performance optimization
+### Ownership rebalance
+- ZCode (coordinator): engine, tests, models — maintenance + new CLI commands
+- Cursor/Grok (+24% target): baseline manager, before/after workflow, live store support
+- Windsurf/ChatGPT (+18% target): customer report templates, onboarding docs, multi-format exports
 
 ---
 
 ## Version History
 
-| Version | Date       | Changes                                                                                                     |
-| ------- | ---------- | ----------------------------------------------------------------------------------------------------------- |
-| 1.0     | 2026-03-01 | Initial 3×3 model definition                                                                                |
-| 1.1     | 2026-03-08 | Post Sprint 1 update: formalize `src/audit/` ownership, clarify ownership vs. authorship, document variance |
+| Version | Date       | Changes                                                                                       |
+| ------- | ---------- | --------------------------------------------------------------------------------------------- |
+| 1.0     | 2026-03-01 | Initial 3×3 model definition                                                                  |
+| 1.1     | 2026-03-08 | Post Sprint 1: formalize `src/audit/` ownership, clarify ownership vs. authorship             |
+| 1.2     | 2026-07-29 | Sprint 2: Claude/PyCharm exit; ZCode becomes coordinator + absorbs engine/tests/models domain |
 
 ---
 
 ## References
 
-* See `archive/sprint1-analysis/CLAUDE_DOMAIN_REPORT.md` for detailed code analysis
-* See `docs/SPRINT_1_COMPLETE.md` for Sprint 1 completion summary
+- See `archive/sprint1-analysis/CLAUDE_DOMAIN_REPORT.md` for detailed code analysis
+- See `docs/SPRINT_1_COMPLETE.md` for Sprint 1 completion summary
+- See `docs/SPRINT_2_PLAN.md` for the active sprint plan
