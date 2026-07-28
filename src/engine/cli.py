@@ -12,14 +12,15 @@ so the user invokes:
     audit run https://example.myshopify.com --device mobile --runs 3
 
 Exit codes (spec):
-    0  – success
-    2  – invalid arguments
-    10 – lighthouse failure
+    0 - success
+    2 - invalid arguments
+    10 - lighthouse failure
 """
 
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -34,6 +35,7 @@ from rich.table import Table
 from audit.models import AuditResult
 from audit.report import write_html_report
 from engine.audit_orchestrator import run_audit
+from integrations.pagespeed_api import PageSpeedAPIClient
 
 # --- Exit codes per spec ---------------------------------------------------
 EXIT_OK = 0
@@ -48,13 +50,61 @@ console = Console()
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SCHEMA_PATH = _REPO_ROOT / "schemas" / "audit_result.schema.json"
 
+
 # ---------------------------------------------------------------------------
-# Top-level app – NO nested "audit" group so that `audit run …` works
+# Path validation helper (reused by run and measure commands)
+# ---------------------------------------------------------------------------
+
+def _is_windows_absolute_path(path_str: str) -> bool:
+    """Check if path is a Windows absolute path (any drive letter)."""
+    if os.name != 'nt':
+        return False
+    # Check for drive letter pattern: X: or X:\
+    return len(path_str) >= 2 and path_str[1:2] == ':'
+
+
+def _validate_out_path(out_path: Path) -> Path:
+    """Validate that output path is safe (relative, no traversal, within cwd).
+    
+    Raises typer.Exit(code=2) if path is invalid.
+    """
+    out_path_p = Path(out_path)
+    out_path_str = str(out_path)
+    
+    # Check for absolute paths (Unix and Windows)
+    if out_path_p.is_absolute():
+        rprint("[red]Error:[/red] --output must be a relative path.")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
+    
+    # Check for Windows-style absolute paths (all drive letters)
+    if _is_windows_absolute_path(out_path_str) or out_path_str.startswith("\\") or ":\\" in out_path_str:
+        rprint("[red]Error:[/red] --output must be a relative path.")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
+    
+    if ".." in out_path_p.parts:
+        rprint("[red]Error:[/red] --output must not contain '..' segments.")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
+    
+    # Resolve and check containment
+    resolved_out = Path.cwd().joinpath(out_path_p).resolve()
+    cwd_resolved = Path.cwd().resolve()
+    
+    try:
+        resolved_out.relative_to(cwd_resolved)
+    except ValueError:
+        rprint("[red]Error:[/red] --output resolves outside the working directory.")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
+    
+    return out_path_p
+
+
+# ---------------------------------------------------------------------------
+# Top-level app - NO nested "audit" group so that `audit run` works
 # directly from the console-script named ``audit``.
 # ---------------------------------------------------------------------------
 app = typer.Typer(
     name="audit",
-    help="Shopify store image audit – Lighthouse-based analysis with heuristic and ML scoring.",
+    help="Shopify store image audit - Lighthouse-based analysis with heuristic and ML scoring.",
     add_completion=False,
 )
 
@@ -97,7 +147,7 @@ def _run_lighthouse(
             "--only-categories=performance",
             "--chrome-flags=--headless",
         ]
-        rprint(f"[cyan]Lighthouse run {i}/{runs}…[/cyan]")
+        rprint(f"[cyan]Lighthouse run {i}/{runs}[/cyan]")
         try:
             subprocess.run(cmd, check=True, capture_output=True, text=True)
         except subprocess.CalledProcessError as exc:
@@ -107,6 +157,38 @@ def _run_lighthouse(
 
     assert best_path is not None
     return best_path
+
+
+# ---------------------------------------------------------------------------
+# URL validation helpers
+# ---------------------------------------------------------------------------
+
+def _validate_run_url(url: str) -> None:
+    """Validate URL for run command - requires explicit http/https scheme."""
+    parsed_url = urlparse(url)
+    if parsed_url.scheme not in ("http", "https"):
+        scheme_display = parsed_url.scheme or "(empty)"
+        rprint(f"[red]Error:[/red] URL scheme must be http or https, got '{scheme_display}'.")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
+
+
+def _validate_measure_url(url: str) -> None:
+    """Validate URL for measure command - allows scheme-less for API normalization.
+    
+    Only rejects if scheme is present and not http/https, or if no hostname.
+    """
+    parsed_url = urlparse(url)
+    
+    # If scheme is provided, it must be http or https
+    if parsed_url.scheme and parsed_url.scheme not in ("http", "https"):
+        scheme_display = parsed_url.scheme
+        rprint(f"[red]Error:[/red] URL scheme must be http or https, got '{scheme_display}'.")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
+    
+    # Must have a hostname (rejects things like "https://")
+    if not parsed_url.netloc and not parsed_url.path:
+        rprint("[red]Error:[/red] URL must include a hostname.")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
 
 
 # ---------------------------------------------------------------------------
@@ -123,20 +205,24 @@ def run(
 ) -> None:
     """Run Lighthouse audit on <url>, analyse images, and write results."""
     # --- validate URL scheme ---
-    parsed_url = urlparse(url)
-    if parsed_url.scheme not in ("http", "https"):
-        scheme_display = parsed_url.scheme or "(empty)"
-        rprint(f"[red]Error:[/red] URL scheme must be http or https, got '{scheme_display}'.")
-        raise typer.Exit(code=EXIT_INVALID_ARGS)
+    _validate_run_url(url)
 
     # --- validate --out-dir safety ---
     out_dir_p = Path(out_dir)
+    out_dir_str = str(out_dir)
+    
     if out_dir_p.is_absolute():
         rprint("[red]Error:[/red] --out-dir must be a relative path.")
         raise typer.Exit(code=EXIT_INVALID_ARGS)
+    
+    if _is_windows_absolute_path(out_dir_str) or out_dir_str.startswith("\\") or ":\\" in out_dir_str:
+        rprint("[red]Error:[/red] --out-dir must be a relative path.")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
+    
     if ".." in out_dir_p.parts:
         rprint("[red]Error:[/red] --out-dir must not contain '..' segments.")
         raise typer.Exit(code=EXIT_INVALID_ARGS)
+    
     # Resolve and check containment using pathlib's safe relative_to()
     resolved_out = Path.cwd().joinpath(out_dir_p).resolve()
     cwd_resolved = Path.cwd().resolve()
@@ -168,7 +254,17 @@ def run(
     # --- run the audit pipeline ---
     try:
         result: AuditResult = run_audit(json_path, url=url, device=device, runs=runs)
+    except (FileNotFoundError, json.JSONDecodeError) as exc:
+        # FileNotFoundError: lhr file missing (should be caught earlier, but just in case)
+        # JSONDecodeError: invalid JSON in the lighthouse report
+        rprint(f"[red]Audit pipeline error:[/red] {exc}")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
+    except ValueError as exc:
+        # ValueError: invalid input data or processing error
+        rprint(f"[red]Audit pipeline error:[/red] {exc}")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
     except Exception as exc:
+        # Other errors (e.g., schema validation) are Lighthouse-related
         rprint(f"[red]Audit pipeline error:[/red] {exc}")
         raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE)
 
@@ -204,6 +300,56 @@ def run(
     result_file = out_dir_path / "audit_result.json"
     result_file.write_text(result.model_dump_json(indent=2), encoding="utf-8")
     rprint(f"\n[green]Result written to {result_file}[/green]")
+
+    raise typer.Exit(code=EXIT_OK)
+
+
+# ---------------------------------------------------------------------------
+# measure
+# ---------------------------------------------------------------------------
+
+@app.command()
+def measure(
+    url: str = typer.Argument(..., help="URL to measure with PageSpeed Insights."),
+    strategy: str = typer.Option("mobile", "--strategy", help="Strategy: mobile or desktop (default: mobile)."),
+    api_key: Optional[str] = typer.Option(None, "--api-key", help="Google Cloud API key (optional)."),
+    output: Optional[Path] = typer.Option(None, "-o", "--output", help="Output JSON file (default: print to stdout)."),
+) -> None:
+    """Fetch live performance metrics from Google PageSpeed Insights API."""
+    # --- validate URL (allow scheme-less for normalization by API) ---
+    _validate_measure_url(url)
+
+    # --- validate strategy ---
+    if strategy not in ("mobile", "desktop"):
+        rprint(f"[red]Error:[/red] --strategy must be 'mobile' or 'desktop', got '{strategy}'.")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
+
+    # --- validate output path safety ---
+    if output is not None:
+        _validate_out_path(output)
+
+    # --- fetch metrics ---
+    try:
+        client = PageSpeedAPIClient(api_key=api_key)
+        metrics = client.get_metrics(url, strategy=strategy)
+    except ValueError as exc:
+        rprint(f"[red]Error:[/red] Invalid input: {exc}")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
+    except RuntimeError as exc:
+        rprint(f"[red]Error:[/red] PageSpeed API error: {exc}")
+        raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE)
+    except Exception as exc:
+        rprint(f"[red]Error:[/red] Failed to fetch metrics: {exc}")
+        raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE)
+
+    # --- output ---
+    if output:
+        output_path = Path(output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(json.dumps(metrics.to_dict(), indent=2), encoding="utf-8")
+        rprint(f"[green]Metrics written to {output_path}[/green]")
+    else:
+        print(json.dumps(metrics.to_dict(), indent=2))
 
     raise typer.Exit(code=EXIT_OK)
 
@@ -320,4 +466,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
