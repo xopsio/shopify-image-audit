@@ -6,5 +6,19 @@ __pycache__/
 *.pyc
 *.pyo
 
+# Virtual environments
+.venv/
+venv/
+
+# Build artifacts / egg-info
+*.egg-info/
+build/
+dist/
+
+# Test / coverage caches
+.pytest_cache/
+.coverage
+htmlcov/
+
 # Demo output
 demo_out/
