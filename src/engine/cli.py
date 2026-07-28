@@ -12,9 +12,9 @@ so the user invokes:
     audit run https://example.myshopify.com --device mobile --runs 3
 
 Exit codes (spec):
-    0  – success
-    2  – invalid arguments
-    10 – lighthouse failure
+    0 - success
+    2 - invalid arguments
+    10 - lighthouse failure
 """
 
 from __future__ import annotations
@@ -34,6 +34,7 @@ from rich.table import Table
 from audit.models import AuditResult
 from audit.report import write_html_report
 from engine.audit_orchestrator import run_audit
+from integrations.pagespeed_api import PageSpeedAPIClient
 
 # --- Exit codes per spec ---------------------------------------------------
 EXIT_OK = 0
@@ -49,12 +50,12 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SCHEMA_PATH = _REPO_ROOT / "schemas" / "audit_result.schema.json"
 
 # ---------------------------------------------------------------------------
-# Top-level app – NO nested "audit" group so that `audit run …` works
+# Top-level app - NO nested "audit" group so that `audit run` works
 # directly from the console-script named ``audit``.
 # ---------------------------------------------------------------------------
 app = typer.Typer(
     name="audit",
-    help="Shopify store image audit – Lighthouse-based analysis with heuristic and ML scoring.",
+    help="Shopify store image audit - Lighthouse-based analysis with heuristic and ML scoring.",
     add_completion=False,
 )
 
@@ -97,7 +98,7 @@ def _run_lighthouse(
             "--only-categories=performance",
             "--chrome-flags=--headless",
         ]
-        rprint(f"[cyan]Lighthouse run {i}/{runs}…[/cyan]")
+        rprint(f"[cyan]Lighthouse run {i}/{runs}[/cyan]")
         try:
             subprocess.run(cmd, check=True, capture_output=True, text=True)
         except subprocess.CalledProcessError as exc:
@@ -131,7 +132,9 @@ def run(
 
     # --- validate --out-dir safety ---
     out_dir_p = Path(out_dir)
-    if out_dir_p.is_absolute():
+    # Check for Windows-style absolute paths (e.g., C:\path or \server\share)
+    out_dir_str = str(out_dir)
+    if out_dir_p.is_absolute() or out_dir_str.startswith(("C:", "D:", "E:", "F:", "G:", "H:", "I:")) or out_dir_str.startswith("\\") or ":\\" in out_dir_str:
         rprint("[red]Error:[/red] --out-dir must be a relative path.")
         raise typer.Exit(code=EXIT_INVALID_ARGS)
     if ".." in out_dir_p.parts:
@@ -168,7 +171,17 @@ def run(
     # --- run the audit pipeline ---
     try:
         result: AuditResult = run_audit(json_path, url=url, device=device, runs=runs)
+    except ValueError as exc:
+        # ValueError: invalid input data or processing error
+        rprint(f"[red]Audit pipeline error:[/red] {exc}")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
+    except (FileNotFoundError, json.JSONDecodeError) as exc:
+        # FileNotFoundError: lhr file missing (should be caught earlier, but just in case)
+        # JSONDecodeError: invalid JSON in the lighthouse report
+        rprint(f"[red]Audit pipeline error:[/red] {exc}")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
     except Exception as exc:
+        # Other errors (e.g., schema validation) are Lighthouse-related
         rprint(f"[red]Audit pipeline error:[/red] {exc}")
         raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE)
 
@@ -204,6 +217,56 @@ def run(
     result_file = out_dir_path / "audit_result.json"
     result_file.write_text(result.model_dump_json(indent=2), encoding="utf-8")
     rprint(f"\n[green]Result written to {result_file}[/green]")
+
+    raise typer.Exit(code=EXIT_OK)
+
+
+# ---------------------------------------------------------------------------
+# measure
+# ---------------------------------------------------------------------------
+
+@app.command()
+def measure(
+    url: str = typer.Argument(..., help="URL to measure with PageSpeed Insights."),
+    strategy: str = typer.Option("mobile", "--strategy", help="Strategy: mobile or desktop (default: mobile)."),
+    api_key: Optional[str] = typer.Option(None, "--api-key", help="Google Cloud API key (optional)."),
+    output: Optional[Path] = typer.Option(None, "-o", "--output", help="Output JSON file (default: print to stdout)."),
+) -> None:
+    """Fetch live performance metrics from Google PageSpeed Insights API."""
+    # --- validate URL scheme ---
+    parsed_url = urlparse(url)
+    if parsed_url.scheme not in ("http", "https"):
+        scheme_display = parsed_url.scheme or "(empty)"
+        rprint(f"[red]Error:[/red] URL scheme must be http or https, got '{scheme_display}'.")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
+
+    # --- validate strategy ---
+    if strategy not in ("mobile", "desktop"):
+        rprint(f"[red]Error:[/red] --strategy must be 'mobile' or 'desktop', got '{strategy}'.")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
+
+    # --- fetch metrics ---
+    try:
+        client = PageSpeedAPIClient(api_key=api_key)
+        metrics = client.get_metrics(url, strategy=strategy)
+    except ValueError as exc:
+        rprint(f"[red]Error:[/red] Invalid input: {exc}")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
+    except RuntimeError as exc:
+        rprint(f"[red]Error:[/red] PageSpeed API error: {exc}")
+        raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE)
+    except Exception as exc:
+        rprint(f"[red]Error:[/red] Failed to fetch metrics: {exc}")
+        raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE)
+
+    # --- output ---
+    if output:
+        output_path = Path(output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(json.dumps(metrics.to_dict(), indent=2), encoding="utf-8")
+        rprint(f"[green]Metrics written to {output_path}[/green]")
+    else:
+        print(json.dumps(metrics.to_dict(), indent=2))
 
     raise typer.Exit(code=EXIT_OK)
 
@@ -320,4 +383,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
