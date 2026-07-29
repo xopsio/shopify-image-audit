@@ -44,3 +44,7 @@ line-length = 120
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B"]
+# B008: Typer's official pattern is typer.Option()/typer.Argument() in default
+# arguments — this is how Typer documents CLI definition, so the lint is a
+# false positive for this framework.
+ignore = ["B008"]

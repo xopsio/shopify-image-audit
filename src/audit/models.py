@@ -7,7 +7,7 @@ No extra="allow", no fallbacks, no hacks.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -34,16 +34,16 @@ class _ExcludeNoneModel(BaseModel):
 
 # ---------- enums ----------
 
-class Device(str, Enum):
+class Device(StrEnum):
     mobile = "mobile"
     desktop = "desktop"
 
 
-class Tool(str, Enum):
+class Tool(StrEnum):
     lighthouse = "lighthouse"
 
 
-class ImageRole(str, Enum):
+class ImageRole(StrEnum):
     hero = "hero"
     above_fold = "above_fold"
     product_primary = "product_primary"

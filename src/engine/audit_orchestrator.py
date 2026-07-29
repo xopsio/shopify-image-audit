@@ -8,14 +8,13 @@ AuditResult (validated via Pydantic v2).
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from audit.models import AuditResult, ImageRole
 from audit.parser import parse
 from audit.ranker_heuristic import rank
-
 
 # ---------------------------------------------------------------------------
 # helpers
@@ -167,7 +166,7 @@ def run_audit(
     resolved_url = url or (sanitised[0]["src"] if sanitised else raw.get("requestedUrl", "https://unknown"))
     meta = {
         "url": resolved_url,
-        "timestamp_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "timestamp_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "device": device,
         "runs": runs,
         "tool": "lighthouse",

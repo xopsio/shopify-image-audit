@@ -12,7 +12,6 @@ from integrations.pagespeed_api import (
     PageSpeedMetrics,
 )
 
-
 # --- Helper for mock responses -------------------------------------------------
 
 def _make_mock_response(performance_score: float = 0.75) -> dict:
@@ -51,10 +50,10 @@ def test_get_metrics_success():
         json=_make_mock_response(0.75),
         status=200,
     )
-    
+
     client = PageSpeedAPIClient()
     metrics = client.get_metrics("https://example.com", strategy="mobile")
-    
+
     assert isinstance(metrics, PageSpeedMetrics)
     assert metrics.url == "https://example.com"
     assert metrics.strategy == "mobile"
@@ -83,17 +82,17 @@ def test_get_metrics_performance_score_from_categories():
             "audits": {},
         },
     }
-    
+
     responses.add(
         responses.GET,
         "https://www.googleapis.com/pagespeedonline/v5/runPagespeed",
         json=mock_response,
         status=200,
     )
-    
+
     client = PageSpeedAPIClient()
     metrics = client.get_metrics("https://example.com")
-    
+
     assert metrics.performance_score == 85
 
 
@@ -111,17 +110,17 @@ def test_get_metrics_missing_metrics():
             "audits": {},
         },
     }
-    
+
     responses.add(
         responses.GET,
         "https://www.googleapis.com/pagespeedonline/v5/runPagespeed",
         json=mock_response,
         status=200,
     )
-    
+
     client = PageSpeedAPIClient()
     metrics = client.get_metrics("https://example.com")
-    
+
     # Missing metrics should have default values
     assert metrics.lcp == 0.0
     assert metrics.cls == 0.0
@@ -145,17 +144,17 @@ def test_get_metrics_desktop_strategy():
             },
         },
     }
-    
+
     responses.add(
         responses.GET,
         "https://www.googleapis.com/pagespeedonline/v5/runPagespeed",
         json=mock_response,
         status=200,
     )
-    
+
     client = PageSpeedAPIClient()
     metrics = client.get_metrics("https://example.com", strategy="desktop")
-    
+
     assert metrics.strategy == "desktop"
     assert metrics.lcp == 1.5
     assert metrics.performance_score == 90
@@ -164,7 +163,7 @@ def test_get_metrics_desktop_strategy():
 def test_get_metrics_invalid_url():
     """Test error handling for invalid URL."""
     client = PageSpeedAPIClient()
-    
+
     with pytest.raises(ValueError, match="URL cannot be empty"):
         client.get_metrics("")
 
@@ -172,7 +171,7 @@ def test_get_metrics_invalid_url():
 def test_get_metrics_hostless_url():
     """Test error handling for hostless URL."""
     client = PageSpeedAPIClient()
-    
+
     with pytest.raises(ValueError, match="URL must include a hostname"):
         client.get_metrics("https://")
 
@@ -180,7 +179,7 @@ def test_get_metrics_hostless_url():
 def test_get_metrics_invalid_strategy():
     """Test error handling for invalid strategy."""
     client = PageSpeedAPIClient()
-    
+
     with pytest.raises(ValueError, match="Strategy must be"):
         client.get_metrics("https://example.com", strategy="tablet")
 
@@ -194,11 +193,11 @@ def test_get_metrics_url_normalization():
         json=_make_mock_response(0.8),
         status=200,
     )
-    
+
     client = PageSpeedAPIClient()
     # URL without scheme should be normalized
     metrics = client.get_metrics("example.com")
-    
+
     # Check that the URL was normalized
     assert metrics.url == "https://example.com"
     assert metrics.performance_score == 80
@@ -213,16 +212,16 @@ def test_get_metrics_api_error():
             "message": "Invalid URL",
         }
     }
-    
+
     responses.add(
         responses.GET,
         "https://www.googleapis.com/pagespeedonline/v5/runPagespeed",
         json=error_response,
         status=400,
     )
-    
+
     client = PageSpeedAPIClient()
-    
+
     with pytest.raises(RuntimeError, match="PageSpeed API error"):
         client.get_metrics("https://example.com")
 
@@ -235,9 +234,9 @@ def test_get_metrics_rate_limit():
         "https://www.googleapis.com/pagespeedonline/v5/runPagespeed",
         status=429,
     )
-    
+
     client = PageSpeedAPIClient(max_retries=1)  # Only 1 attempt
-    
+
     with pytest.raises(RuntimeError, match="rate limit exceeded"):
         client.get_metrics("https://example.com")
 
@@ -250,9 +249,9 @@ def test_get_metrics_service_unavailable():
         "https://www.googleapis.com/pagespeedonline/v5/runPagespeed",
         status=503,
     )
-    
+
     client = PageSpeedAPIClient(max_retries=1)  # Only 1 attempt
-    
+
     with pytest.raises(RuntimeError, match="service unavailable"):
         client.get_metrics("https://example.com")
 
@@ -266,9 +265,9 @@ def test_get_metrics_server_error():
         status=500,
         body="Internal Server Error",
     )
-    
+
     client = PageSpeedAPIClient(max_retries=1)
-    
+
     with pytest.raises(RuntimeError, match="PageSpeed API error"):
         client.get_metrics("https://example.com")
 
@@ -287,17 +286,17 @@ def test_get_metrics_with_api_key():
             "audits": {},
         },
     }
-    
+
     responses.add(
         responses.GET,
         "https://www.googleapis.com/pagespeedonline/v5/runPagespeed",
         json=mock_response,
         status=200,
     )
-    
+
     client = PageSpeedAPIClient(api_key="test-api-key")
     metrics = client.get_metrics("https://example.com")
-    
+
     # Verify the API key was sent in the request
     assert len(responses.calls) == 1
     assert "key=test-api-key" in responses.calls[0].request.url
@@ -320,9 +319,9 @@ def test_to_dict():
         total_blocking_time=150,
         performance_score=75,
     )
-    
+
     result = metrics.to_dict()
-    
+
     assert result["url"] == "https://example.com"
     assert result["strategy"] == "mobile"
     assert result["metrics"]["lcp"] == 2.5
@@ -339,10 +338,10 @@ def test_strategy_param_in_request():
         json=_make_mock_response(0.8),
         status=200,
     )
-    
+
     client = PageSpeedAPIClient()
     metrics = client.get_metrics("https://example.com", strategy="desktop")
-    
+
     # Verify the request was made with strategy parameter
     assert len(responses.calls) == 1
     assert "strategy=desktop" in responses.calls[0].request.url
@@ -369,10 +368,10 @@ def test_retry_on_failure():
         json=_make_mock_response(0.8),
         status=200,
     )
-    
+
     client = PageSpeedAPIClient(max_retries=3, retry_delay=0.1)
     metrics = client.get_metrics("https://example.com")
-    
+
     assert metrics.performance_score == 80
 
 
@@ -394,8 +393,8 @@ def test_retry_exhausted():
         "https://www.googleapis.com/pagespeedonline/v5/runPagespeed",
         status=503,
     )
-    
+
     client = PageSpeedAPIClient(max_retries=3, retry_delay=0.1)
-    
+
     with pytest.raises(RuntimeError, match="service unavailable"):
         client.get_metrics("https://example.com")

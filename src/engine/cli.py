@@ -66,7 +66,7 @@ def _is_windows_absolute_path(path_str: str) -> bool:
 
 def _validate_out_path(out_path: Path) -> Path:
     """Validate that output path is safe (relative, no traversal, within cwd).
-    
+
     Raises typer.Exit(code=2) if path is invalid.
     """
     out_path_p = Path(out_path)
@@ -75,16 +75,16 @@ def _validate_out_path(out_path: Path) -> Path:
     # Check for absolute paths (Unix and Windows)
     if out_path_p.is_absolute():
         rprint("[red]Error:[/red] --output must be a relative path.")
-        raise typer.Exit(code=EXIT_INVALID_ARGS)
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
     # Check for Windows-style absolute paths (all drive letters)
     if _is_windows_absolute_path(out_path_str) or out_path_str.startswith("\\") or ":\\" in out_path_str:
         rprint("[red]Error:[/red] --output must be a relative path.")
-        raise typer.Exit(code=EXIT_INVALID_ARGS)
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
     if ".." in out_path_p.parts:
         rprint("[red]Error:[/red] --output must not contain '..' segments.")
-        raise typer.Exit(code=EXIT_INVALID_ARGS)
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
     # Resolve and check containment
     resolved_out = Path.cwd().joinpath(out_path_p).resolve()
@@ -94,7 +94,7 @@ def _validate_out_path(out_path: Path) -> Path:
         resolved_out.relative_to(cwd_resolved)
     except ValueError:
         rprint("[red]Error:[/red] --output resolves outside the working directory.")
-        raise typer.Exit(code=EXIT_INVALID_ARGS)
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
     return out_path_p
 
@@ -128,7 +128,7 @@ def _run_lighthouse(
     lh_bin = shutil.which("lighthouse")
     if lh_bin is None:
         rprint("[red]Error:[/red] `lighthouse` CLI not found on PATH. Install with: npm i -g lighthouse")
-        raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE)
+        raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE) from None
 
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -153,7 +153,7 @@ def _run_lighthouse(
             subprocess.run(cmd, check=True, capture_output=True, text=True)
         except subprocess.CalledProcessError as exc:
             rprint(f"[red]Lighthouse failed (run {i}):[/red] {exc.stderr[:500]}")
-            raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE)
+            raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE) from None
         best_path = out_file  # simple: use the last successful run
 
     assert best_path is not None
@@ -170,12 +170,12 @@ def _validate_run_url(url: str) -> None:
     if parsed_url.scheme not in ("http", "https"):
         scheme_display = parsed_url.scheme or "(empty)"
         rprint(f"[red]Error:[/red] URL scheme must be http or https, got '{scheme_display}'.")
-        raise typer.Exit(code=EXIT_INVALID_ARGS)
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
 
 def _validate_measure_url(url: str) -> None:
     """Validate URL for measure command - allows scheme-less for API normalization.
-    
+
     Only rejects if scheme is present and not http/https, or if no hostname.
     """
     parsed_url = urlparse(url)
@@ -184,12 +184,12 @@ def _validate_measure_url(url: str) -> None:
     if parsed_url.scheme and parsed_url.scheme not in ("http", "https"):
         scheme_display = parsed_url.scheme
         rprint(f"[red]Error:[/red] URL scheme must be http or https, got '{scheme_display}'.")
-        raise typer.Exit(code=EXIT_INVALID_ARGS)
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
     # Must have a hostname (rejects things like "https://")
     if not parsed_url.netloc and not parsed_url.path:
         rprint("[red]Error:[/red] URL must include a hostname.")
-        raise typer.Exit(code=EXIT_INVALID_ARGS)
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
 
 # ---------------------------------------------------------------------------
@@ -214,15 +214,15 @@ def run(
 
     if out_dir_p.is_absolute():
         rprint("[red]Error:[/red] --out-dir must be a relative path.")
-        raise typer.Exit(code=EXIT_INVALID_ARGS)
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
     if _is_windows_absolute_path(out_dir_str) or out_dir_str.startswith("\\") or ":\\" in out_dir_str:
         rprint("[red]Error:[/red] --out-dir must be a relative path.")
-        raise typer.Exit(code=EXIT_INVALID_ARGS)
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
     if ".." in out_dir_p.parts:
         rprint("[red]Error:[/red] --out-dir must not contain '..' segments.")
-        raise typer.Exit(code=EXIT_INVALID_ARGS)
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
     # Resolve and check containment using pathlib's safe relative_to()
     resolved_out = Path.cwd().joinpath(out_dir_p).resolve()
@@ -232,22 +232,22 @@ def run(
         resolved_out.relative_to(cwd_resolved)
     except ValueError:
         rprint("[red]Error:[/red] --out-dir resolves outside the working directory.")
-        raise typer.Exit(code=EXIT_INVALID_ARGS)
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
     # --- validate args ---
     if device not in ("mobile", "desktop"):
         rprint(f"[red]Error:[/red] --device must be 'mobile' or 'desktop', got '{device}'.")
-        raise typer.Exit(code=EXIT_INVALID_ARGS)
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
     if runs < 1:
         rprint("[red]Error:[/red] --runs must be >= 1.")
-        raise typer.Exit(code=EXIT_INVALID_ARGS)
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
     # --- obtain LHR JSON ---
     if lhr is not None:
         if not lhr.exists():
             rprint(f"[red]Error:[/red] File not found: {lhr}")
-            raise typer.Exit(code=EXIT_INVALID_ARGS)
+            raise typer.Exit(code=EXIT_INVALID_ARGS) from None
         json_path = lhr
     else:
         json_path = _run_lighthouse(url, device=device, runs=runs, out_dir=out_dir)
@@ -259,15 +259,15 @@ def run(
         # FileNotFoundError: lhr file missing (should be caught earlier, but just in case)
         # JSONDecodeError: invalid JSON in the lighthouse report
         rprint(f"[red]Audit pipeline error:[/red] {exc}")
-        raise typer.Exit(code=EXIT_INVALID_ARGS)
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
     except ValueError as exc:
         # ValueError: invalid input data or processing error
         rprint(f"[red]Audit pipeline error:[/red] {exc}")
-        raise typer.Exit(code=EXIT_INVALID_ARGS)
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
     except Exception as exc:
         # Other errors (e.g., schema validation) are Lighthouse-related
         rprint(f"[red]Audit pipeline error:[/red] {exc}")
-        raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE)
+        raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE) from None
 
     # --- pretty table ---
     table = Table(title="Image Audit Results")
@@ -302,7 +302,7 @@ def run(
     result_file.write_text(result.model_dump_json(indent=2), encoding="utf-8")
     rprint(f"\n[green]Result written to {result_file}[/green]")
 
-    raise typer.Exit(code=EXIT_OK)
+    raise typer.Exit(code=EXIT_OK) from None
 
 
 # ---------------------------------------------------------------------------
@@ -323,7 +323,7 @@ def measure(
     # --- validate strategy ---
     if strategy not in ("mobile", "desktop"):
         rprint(f"[red]Error:[/red] --strategy must be 'mobile' or 'desktop', got '{strategy}'.")
-        raise typer.Exit(code=EXIT_INVALID_ARGS)
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
     # --- validate output path safety ---
     if output is not None:
@@ -335,13 +335,13 @@ def measure(
         metrics = client.get_metrics(url, strategy=strategy)
     except ValueError as exc:
         rprint(f"[red]Error:[/red] Invalid input: {exc}")
-        raise typer.Exit(code=EXIT_INVALID_ARGS)
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
     except RuntimeError as exc:
         rprint(f"[red]Error:[/red] PageSpeed API error: {exc}")
-        raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE)
+        raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE) from None
     except Exception as exc:
         rprint(f"[red]Error:[/red] Failed to fetch metrics: {exc}")
-        raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE)
+        raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE) from None
 
     # --- output ---
     if output:
@@ -352,7 +352,7 @@ def measure(
     else:
         print(json.dumps(metrics.to_dict(), indent=2))
 
-    raise typer.Exit(code=EXIT_OK)
+    raise typer.Exit(code=EXIT_OK) from None
 
 
 # ---------------------------------------------------------------------------
@@ -366,7 +366,7 @@ def extract(
     """Extract image + LCP-related features into an intermediate JSON."""
     if not lighthouse_json.exists():
         rprint(f"[red]Error:[/red] File not found: {lighthouse_json}")
-        raise typer.Exit(code=EXIT_INVALID_ARGS)
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
     from audit.parser import parse
 
@@ -375,16 +375,16 @@ def extract(
             raw = json.load(f)
     except json.JSONDecodeError as e:
         rprint(f"[red]Error:[/red] Invalid JSON in {lighthouse_json}: {e}")
-        raise typer.Exit(code=EXIT_INVALID_ARGS)
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
     try:
         images = parse(raw)
         print(json.dumps(images, indent=2))
     except Exception as e:
         rprint(f"[red]Error:[/red] Failed to parse Lighthouse data: {e}")
-        raise typer.Exit(code=EXIT_INVALID_ARGS)
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
-    raise typer.Exit(code=EXIT_OK)
+    raise typer.Exit(code=EXIT_OK) from None
 
 
 # ---------------------------------------------------------------------------
@@ -398,7 +398,7 @@ def score(
     """Assign role, score (0-100), and recommendations to each image."""
     if not audit_input_json.exists():
         rprint(f"[red]Error:[/red] File not found: {audit_input_json}")
-        raise typer.Exit(code=EXIT_INVALID_ARGS)
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
     from audit.ranker_heuristic import rank
 
@@ -407,16 +407,16 @@ def score(
             images = json.load(f)
     except json.JSONDecodeError as e:
         rprint(f"[red]Error:[/red] Invalid JSON in {audit_input_json}: {e}")
-        raise typer.Exit(code=EXIT_INVALID_ARGS)
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
     try:
         scored = rank(images)
         print(json.dumps(scored, indent=2))
     except Exception as e:
         rprint(f"[red]Error:[/red] Failed to score images: {e}")
-        raise typer.Exit(code=EXIT_INVALID_ARGS)
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
-    raise typer.Exit(code=EXIT_OK)
+    raise typer.Exit(code=EXIT_OK) from None
 
 
 # ---------------------------------------------------------------------------
@@ -431,20 +431,20 @@ def report(
     """Render an audit result JSON to an HTML report."""
     if not audit_result_json.exists():
         rprint(f"[red]Error:[/red] File not found: {audit_result_json}")
-        raise typer.Exit(code=EXIT_INVALID_ARGS)
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
     try:
         write_html_report(audit_result_json, output)
         rprint(f"[green]OK[/green] HTML report written to: {output}")
     except json.JSONDecodeError as e:
         rprint(f"[red]Error:[/red] Invalid JSON in {audit_result_json}: {e}")
-        raise typer.Exit(code=EXIT_INVALID_ARGS)
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
     except KeyError as e:
         rprint(f"[red]Error:[/red] Missing required field in audit result: {e}")
-        raise typer.Exit(code=EXIT_INVALID_ARGS)
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
     except Exception as e:
         rprint(f"[red]Error:[/red] Failed to generate report: {e}")
-        raise typer.Exit(code=EXIT_INVALID_ARGS)
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
 
 # ---------------------------------------------------------------------------
@@ -461,11 +461,11 @@ def baseline(
     """Run an audit on <lhr_json> and store it as a reusable baseline."""
     if not lhr_json.exists():
         rprint(f"[red]Error:[/red] File not found: {lhr_json}")
-        raise typer.Exit(code=EXIT_INVALID_ARGS)
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
     if device not in ("mobile", "desktop"):
         rprint(f"[red]Error:[/red] --device must be 'mobile' or 'desktop', got '{device}'.")
-        raise typer.Exit(code=EXIT_INVALID_ARGS)
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
     # --- validate --save path safety ---
     _validate_out_path(save)
@@ -474,16 +474,16 @@ def baseline(
         result: AuditResult = run_audit(lhr_json, url=url, device=device)
     except (FileNotFoundError, json.JSONDecodeError, ValueError) as exc:
         rprint(f"[red]Audit pipeline error:[/red] {exc}")
-        raise typer.Exit(code=EXIT_INVALID_ARGS)
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
     except Exception as exc:
         rprint(f"[red]Audit pipeline error:[/red] {exc}")
-        raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE)
+        raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE) from None
 
     save_baseline(result, save)
     rprint(f"[green]Baseline saved to {save}[/green]")
     rprint(f"  URL: {result.meta.url} | LCP: {result.vitals.lcp_ms:.0f}ms | "
           f"images: {len(result.images)} | {sum(i.bytes for i in result.images) / 1024:.0f} KB")
-    raise typer.Exit(code=EXIT_OK)
+    raise typer.Exit(code=EXIT_OK) from None
 
 
 # ---------------------------------------------------------------------------
@@ -495,7 +495,7 @@ def compare(
     baseline_json: Path = typer.Argument(..., help="Path to a baseline audit_result.json (from `audit baseline`)."),
     current_json: Path = typer.Argument(..., help="Path to the current audit_result.json to compare against."),
     output: Path | None = typer.Option(None, "-o", "--output",
-                                          help="Write an HTML before/after report to this file (default: stdout JSON)."),
+                                          help="Write an HTML before/after report here (default: stdout JSON)."),
     json_out: Path | None = typer.Option(None, "--json",
                                             help="Also write the comparison result JSON to this file."),
 ) -> None:
@@ -509,7 +509,7 @@ def compare(
     for label, path in (("baseline", baseline_json), ("current", current_json)):
         if not path.exists():
             rprint(f"[red]Error:[/red] {label} file not found: {path}")
-            raise typer.Exit(code=EXIT_INVALID_ARGS)
+            raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
     # --- validate output path safety ---
     if output is not None:
@@ -531,13 +531,13 @@ def compare(
         comparison = compare_audits(before, after)
     except (json.JSONDecodeError, ValueError) as exc:
         rprint(f"[red]Error:[/red] Invalid input: {exc}")
-        raise typer.Exit(code=EXIT_INVALID_ARGS)
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
     except FileNotFoundError as exc:
         rprint(f"[red]Error:[/red] {exc}")
-        raise typer.Exit(code=EXIT_INVALID_ARGS)
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
     except Exception as exc:
         rprint(f"[red]Error:[/red] Failed to compare audits: {exc}")
-        raise typer.Exit(code=EXIT_INVALID_ARGS)
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
     # --- pretty table ---
     table = Table(title="Before / After Comparison")
@@ -585,7 +585,7 @@ def compare(
         Path(json_out).write_text(comparison.model_dump_json(indent=2), encoding="utf-8")
         rprint(f"[green]Comparison JSON written to {json_out}[/green]")
 
-    raise typer.Exit(code=EXIT_OK)
+    raise typer.Exit(code=EXIT_OK) from None
 
 
 # ---------------------------------------------------------------------------

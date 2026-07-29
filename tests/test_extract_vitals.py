@@ -3,8 +3,9 @@ Tests for the null-safe _extract_vitals function in audit_orchestrator.
 Verifies that None values do not raise TypeError (bug #2 fix).
 """
 from __future__ import annotations
-import pytest
+
 from engine.audit_orchestrator import _extract_vitals
+
 
 class TestExtractVitals:
     def test_empty_data_returns_zeros(self) -> None:
