@@ -258,19 +258,76 @@ class TestRenderRoleDistribution:
 
 
 # ---------------------------------------------------------------------------
-# _render_comparison_section (the #20 extension point)
+# _render_comparison_section (before/after — #18/#20)
 # ---------------------------------------------------------------------------
 
-class TestComparisonSection:
-    def test_returns_empty_by_default(self) -> None:
-        """The before/after section is a no-op until #18 lands its data contract."""
-        assert _render_comparison_section(_minimal_result()) == ""
+def _sample_comparison():
+    """A minimal ComparisonResult-shaped dict for section tests."""
+    return {
+        "before": {"url": "https://before.example.com", "timestamp_utc": "2026-01-01T00:00:00Z"},
+        "after": {"url": "https://after.example.com", "timestamp_utc": "2026-01-02T00:00:00Z"},
+        "vitals": {
+            "lcp": {"before": 4200.0, "after": 1800.0, "delta": -2400.0, "delta_pct": -57.14, "status": "improved"},
+            "cls": {"before": 0.18, "after": 0.04, "delta": -0.14, "delta_pct": -77.78, "status": "improved"},
+            "inp": {"before": 320.0, "after": 180.0, "delta": -140.0, "delta_pct": -43.75, "status": "improved"},
+            "ttfb": {"before": 900.0, "after": 620.0, "delta": -280.0, "delta_pct": -31.11, "status": "improved"},
+        },
+        "images": {
+            "before_count": 3, "after_count": 3, "count_delta": 0,
+            "before_total_bytes": 1625000, "after_total_bytes": 139100, "total_bytes_delta": -1485900,
+            "before_total_waste": 1570400, "after_total_waste": 84500, "total_waste_delta": -1485900,
+            "before_avg_score": 10.0, "after_avg_score": 57.0, "avg_score_delta": 47.0,
+        },
+        "summary": {
+            "top_improvements": ["LCP 4200ms → 1800ms (-57%)"],
+            "top_regressions": [],
+            "roi_estimate": "Estimated ~24% conversion uplift.",
+        },
+    }
 
-    def test_returns_empty_even_with_arbitrary_keys(self) -> None:
-        # Must not crash on dicts that happen to carry unrelated keys.
-        payload = _minimal_result()
-        payload["comparison"] = {"foo": "bar"}
-        assert _render_comparison_section(payload) == ""
+
+class TestComparisonSection:
+    def test_returns_empty_when_none(self) -> None:
+        """No comparison argument -> no section (back-compat with single-audit reports)."""
+        assert _render_comparison_section(None) == ""
+
+    def test_renders_section_when_provided(self) -> None:
+        out = _render_comparison_section(_sample_comparison())
+        assert "Before / After Comparison" in out
+        assert "before.example.com" in out
+        assert "after.example.com" in out
+
+    def test_renders_vital_rows(self) -> None:
+        out = _render_comparison_section(_sample_comparison())
+        # LCP before/after values present
+        assert "4200ms" in out
+        assert "1800ms" in out
+
+    def test_marks_improvements_green(self) -> None:
+        out = _render_comparison_section(_sample_comparison())
+        assert 'class="delta improved"' in out
+
+    def test_marks_regressions_red(self) -> None:
+        comp = _sample_comparison()
+        # Flip LCP to a regression
+        comp["vitals"]["lcp"] = {
+            "before": 1000.0, "after": 2500.0, "delta": 1500.0,
+            "delta_pct": 150.0, "status": "regressed",
+        }
+        out = _render_comparison_section(comp)
+        assert 'class="delta regressed"' in out
+
+    def test_includes_roi_estimate(self) -> None:
+        out = _render_comparison_section(_sample_comparison())
+        assert "ROI estimate" in out
+        assert "24% conversion uplift" in out
+
+    def test_accepts_comparisonresult_model(self) -> None:
+        """The renderer should accept a Pydantic ComparisonResult, not just a dict."""
+        from audit.models import ComparisonResult
+        comp = ComparisonResult.model_validate(_sample_comparison())
+        out = _render_comparison_section(comp)
+        assert "Before / After Comparison" in out
 
 
 # ---------------------------------------------------------------------------
@@ -297,29 +354,23 @@ class TestGenerateHtmlReport:
         assert "a.jpg" in html
         assert "N/A" in html  # synthesised meta
 
-    def test_comparison_section_does_not_add_content_yet(self) -> None:
-        """No comparison *content/section* should leak until #18 lands.
-
-        The reserved CSS rule + its comment are allowed (pre-declared styling),
-        but no actual ``<section class="comparison">`` / ``<div class="comparison">``
-        markup or before/after text must be emitted yet.
-        """
-        import re
+    def test_no_comparison_section_by_default(self) -> None:
+        """Without a comparison arg, no Before/After section is emitted."""
         html = generate_html_report(_minimal_result())
-        # Strip the CSS rule and its comment so only body markup is inspected.
-        body_only = re.sub(r"\.comparison \{[^}]*\}", "", html)
-        body_only = re.sub(r"/\* Reserved styling[\s\S]*?\*/", "", body_only)
-        # No element should carry the comparison class as actual markup.
-        assert 'class="comparison"' not in body_only
-        assert "class='comparison'" not in body_only
-        # No before/after text emitted yet.
-        assert "Before" not in body_only
-        assert "After" not in body_only
+        assert "Before / After Comparison" not in html
 
-    def test_reserved_css_class_present(self) -> None:
-        """The .comparison CSS is pre-declared so #18 can use it without a CSS diff."""
+    def test_comparison_section_when_provided(self) -> None:
+        """When a comparison is passed, the Before/After section appears."""
+        html = generate_html_report(_minimal_result(), comparison=_sample_comparison())
+        assert "Before / After Comparison" in html
+        assert "ROI estimate" in html
+
+    def test_comparison_css_classes_present(self) -> None:
+        """The before/after CSS (delta states, roi-box) is pre-declared."""
         html = generate_html_report(_minimal_result())
-        assert ".comparison {" in html
+        assert ".delta.improved" in html
+        assert ".delta.regressed" in html
+        assert ".roi-box" in html
 
 
 # ---------------------------------------------------------------------------
@@ -331,17 +382,15 @@ FIXTURES = REPO_ROOT / "fixtures"
 
 
 class TestRefactorEquivalence:
-    """Pin the refactor to produce structurally equivalent output.
+    """Regression guard for the report refactor + comparison feature.
 
-    The refactor split generate_html_report into _render_* functions. The only
-    intended, additive change is the pre-declared ``.comparison`` CSS block.
-    Everything else must match the fixture-driven output byte-for-byte after
-    normalising the volatile timestamp.
+    The report was split into _render_* functions (#21) and the before/after
+    comparison section was implemented (#18/#20). These tests pin the
+    invariants that must hold for a single-audit report (no comparison arg).
     """
 
     @pytest.mark.parametrize("fixture", ["bad_hero_lcp.json", "optimized_shopify.json"])
-    def test_output_unchanged_after_refactor(self, fixture: str) -> None:
-        import re
+    def test_single_audit_report_structure(self, fixture: str) -> None:
         import sys
 
         sys.path.insert(0, str(REPO_ROOT / "src"))
@@ -353,12 +402,9 @@ class TestRefactorEquivalence:
 
         # Structural sanity: well-formed document with all sections.
         assert "<!DOCTYPE html>" in html
+        assert html.rstrip().endswith("</html>")
         assert html.count('class="vital-card') == 4
         # Cards must remain separated (regression from the refactor).
         assert "</div>            <div" not in html
-        # Reserved comparison CSS present (the only intended additive change).
-        assert ".comparison {" in html
-        # No comparison content emitted yet.
-        stripped = re.sub(r"\.comparison \{[^}]*\}", "", html)
-        stripped = re.sub(r"/\* Reserved styling[\s\S]*?\*/", "", stripped)
-        assert "comparison" not in stripped.lower().replace("margin: 20px 0; }", "")
+        # No Before/After section when no comparison is supplied.
+        assert "Before / After Comparison" not in html

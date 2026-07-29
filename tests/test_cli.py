@@ -4,6 +4,9 @@ Verifies that invalid inputs produce exit code 2.
 """
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 from typer.testing import CliRunner
 
@@ -47,8 +50,9 @@ class TestReportCommand:
 
     def test_report_missing_file(self, tmp_path):
         """report should exit with code 2 if input file doesn't exist."""
-        from engine.cli import app
         from typer.testing import CliRunner
+
+        from engine.cli import app
 
         runner = CliRunner()
         result = runner.invoke(app, ["report", "nonexistent.json"])
@@ -57,8 +61,9 @@ class TestReportCommand:
 
     def test_report_invalid_json(self, tmp_path):
         """report should exit with code 2 if input is not valid JSON."""
-        from engine.cli import app
         from typer.testing import CliRunner
+
+        from engine.cli import app
 
         bad_json = tmp_path / "bad.json"
         bad_json.write_text("{invalid json}")
@@ -71,8 +76,10 @@ class TestReportCommand:
     def test_report_success(self, tmp_path):
         """report should generate HTML successfully with valid input."""
         import json
-        from engine.cli import app
+
         from typer.testing import CliRunner
+
+        from engine.cli import app
 
         # Create a valid audit_result.json
         audit_result = {
@@ -127,8 +134,9 @@ class TestExtractCommand:
 
     def test_extract_invalid_json(self, tmp_path):
         """extract should exit with code 2 if input is not valid JSON."""
-        from engine.cli import app
         from typer.testing import CliRunner
+
+        from engine.cli import app
 
         bad_json = tmp_path / "bad_lh.json"
         bad_json.write_text("{not valid json}")
@@ -144,8 +152,9 @@ class TestScoreCommand:
 
     def test_score_invalid_json(self, tmp_path):
         """score should exit with code 2 if input is not valid JSON."""
-        from engine.cli import app
         from typer.testing import CliRunner
+
+        from engine.cli import app
 
         bad_json = tmp_path / "bad_audit.json"
         bad_json.write_text("{not valid json}")
@@ -161,8 +170,9 @@ class TestOutDirSecurity:
 
     def test_prefix_bypass_rejected(self):
         """Reject paths that look like prefix but escape containment."""
-        from engine.cli import app
         from typer.testing import CliRunner
+
+        from engine.cli import app
 
         runner = CliRunner()
 
@@ -179,8 +189,10 @@ class TestReportSecurity:
     def test_report_escapes_xss_in_url(self, tmp_path):
         """HTML report must escape XSS payloads in URL field."""
         import json
-        from engine.cli import app
+
         from typer.testing import CliRunner
+
+        from engine.cli import app
 
         # Malicious audit_result with XSS payload
         audit_result = {
@@ -231,4 +243,168 @@ class TestReportSecurity:
 
         # Verify legitimate content still present (escaped)
         assert "alert" in html_content  # The word "alert" should still appear (escaped)
+
+
+class TestBaselineCommand:
+    """Test the `audit baseline` command."""
+
+    def test_baseline_success(self, tmp_path, monkeypatch):
+        """baseline should save a valid AuditResult JSON."""
+        from typer.testing import CliRunner
+
+        from engine.cli import app
+
+        # Copy fixture into tmp_path so --save can use a relative path within cwd.
+        monkeypatch.chdir(tmp_path)
+        runner = CliRunner()
+        result = runner.invoke(app, [
+            "baseline", "baseline_lcp.json", "--save", "out/baseline.json",
+        ])
+
+        # Create the fixture in the cwd.
+        (tmp_path / "baseline_lcp.json").write_text(json.dumps({
+            "lcp_ms": 4000, "cls": 0.1, "inp_ms": 300, "ttfb_ms": 800,
+            "images": [{"url": "hero.jpg", "resourceSize": 500000,
+                        "mimeType": "image/jpeg", "displayedWidth": 800, "displayedHeight": 600}],
+        }))
+        result = runner.invoke(app, [
+            "baseline", "baseline_lcp.json", "--save", "out/baseline.json",
+        ])
+        assert result.exit_code == 0, result.stdout
+        assert (tmp_path / "out" / "baseline.json").exists()
+        # Saved file must be a valid AuditResult
+        saved = json.loads((tmp_path / "out" / "baseline.json").read_text())
+        assert saved["vitals"]["lcp_ms"] == 4000
+
+    def test_baseline_missing_file(self, tmp_path, monkeypatch):
+        from typer.testing import CliRunner
+
+        from engine.cli import app
+        monkeypatch.chdir(tmp_path)
+        runner = CliRunner()
+        result = runner.invoke(app, ["baseline", "nope.json", "--save", "out.json"])
+        assert result.exit_code == 2
+
+    def test_baseline_rejects_absolute_save_path(self, tmp_path, monkeypatch):
+        from typer.testing import CliRunner
+
+        from engine.cli import app
+        monkeypatch.chdir(tmp_path)
+        runner = CliRunner()
+        result = runner.invoke(app, ["baseline", "x.json", "--save", "/tmp/x.json"])
+        assert result.exit_code == 2
+
+    def test_baseline_invalid_device(self, tmp_path, monkeypatch):
+        from typer.testing import CliRunner
+
+        from engine.cli import app
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "f.json").write_text(json.dumps({"images": []}))
+        runner = CliRunner()
+        result = runner.invoke(app, ["baseline", "f.json", "--save", "out.json", "--device", "tablet"])
+        assert result.exit_code == 2
+
+
+class TestCompareCommand:
+    """Test the `audit compare` command (before/after)."""
+
+    @pytest.fixture
+    def before_after_files(self, tmp_path, monkeypatch):
+        """Create before/after fixtures in cwd and return their relative paths."""
+        monkeypatch.chdir(tmp_path)
+        before = {
+            "lcp_ms": 4200, "cls": 0.18, "inp_ms": 320, "ttfb_ms": 900,
+            "images": [{"url": "hero.jpg", "resourceSize": 1200000, "mimeType": "image/jpeg",
+                        "displayedWidth": 1200, "displayedHeight": 600}],
+        }
+        after = {
+            "lcp_ms": 1800, "cls": 0.04, "inp_ms": 180, "ttfb_ms": 620,
+            "images": [{"url": "hero.webp", "resourceSize": 95000, "mimeType": "image/webp",
+                        "displayedWidth": 1200, "displayedHeight": 600}],
+        }
+        (tmp_path / "before.json").write_text(json.dumps(before))
+        (tmp_path / "after.json").write_text(json.dumps(after))
+        return "before.json", "after.json"
+
+    def test_compare_success_stdout_json(self, before_after_files):
+        from typer.testing import CliRunner
+
+        from engine.cli import app
+        before, after = before_after_files
+        runner = CliRunner()
+        result = runner.invoke(app, ["compare", before, after])
+        assert result.exit_code == 0, result.stdout
+        # JSON comparison payload printed to stdout
+        assert "vitals" in result.stdout
+        assert "improved" in result.stdout
+
+    def test_compare_writes_html_report(self, before_after_files):
+        from typer.testing import CliRunner
+
+        from engine.cli import app
+        before, after = before_after_files
+        runner = CliRunner()
+        result = runner.invoke(app, ["compare", before, after, "-o", "report.html"])
+        assert result.exit_code == 0, result.stdout
+        html = Path("report.html").read_text(encoding="utf-8")
+        assert "Before / After Comparison" in html
+        assert "ROI estimate" in html
+
+    def test_compare_writes_json_too(self, before_after_files):
+        from typer.testing import CliRunner
+
+        from engine.cli import app
+        before, after = before_after_files
+        runner = CliRunner()
+        result = runner.invoke(app, ["compare", before, after, "--json", "cmp.json"])
+        assert result.exit_code == 0, result.stdout
+        cmp = json.loads(Path("cmp.json").read_text())
+        assert cmp["vitals"]["lcp"]["status"] == "improved"
+
+    def test_compare_missing_file(self, tmp_path, monkeypatch):
+        from typer.testing import CliRunner
+
+        from engine.cli import app
+        monkeypatch.chdir(tmp_path)
+        runner = CliRunner()
+        result = runner.invoke(app, ["compare", "nope1.json", "nope2.json"])
+        assert result.exit_code == 2
+        assert "not found" in result.stdout.lower()
+
+    def test_compare_rejects_absolute_output(self, before_after_files):
+        from typer.testing import CliRunner
+
+        from engine.cli import app
+        before, after = before_after_files
+        runner = CliRunner()
+        result = runner.invoke(app, ["compare", before, after, "-o", "/tmp/x.html"])
+        assert result.exit_code == 2
+
+    def test_compare_works_with_saved_baseline(self, tmp_path, monkeypatch):
+        """End-to-end: baseline then compare using the saved AuditResult file."""
+        from typer.testing import CliRunner
+
+        from engine.cli import app
+        monkeypatch.chdir(tmp_path)
+        raw = {
+            "lcp_ms": 4200, "cls": 0.18, "inp_ms": 320, "ttfb_ms": 900,
+            "images": [{"url": "hero.jpg", "resourceSize": 1200000, "mimeType": "image/jpeg",
+                        "displayedWidth": 1200, "displayedHeight": 600}],
+        }
+        (tmp_path / "raw.json").write_text(json.dumps(raw))
+        after = {
+            "lcp_ms": 1800, "cls": 0.04, "inp_ms": 180, "ttfb_ms": 620,
+            "images": [{"url": "hero.webp", "resourceSize": 95000, "mimeType": "image/webp",
+                        "displayedWidth": 1200, "displayedHeight": 600}],
+        }
+        (tmp_path / "after.json").write_text(json.dumps(after))
+
+        runner = CliRunner()
+        # 1. save a baseline
+        r1 = runner.invoke(app, ["baseline", "raw.json", "--save", "base.json"])
+        assert r1.exit_code == 0
+        # 2. compare saved baseline against raw after fixture
+        r2 = runner.invoke(app, ["compare", "base.json", "after.json"])
+        assert r2.exit_code == 0, r2.stdout
+        assert "improved" in r2.stdout
 

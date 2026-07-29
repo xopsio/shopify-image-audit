@@ -8,7 +8,7 @@ No extra="allow", no fallbacks, no hacks.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -63,7 +63,7 @@ class Meta(_ExcludeNoneModel):
     device: Device
     runs: int = Field(..., ge=1)
     tool: Tool
-    notes: Optional[str] = None
+    notes: str | None = None
 
 
 class Vitals(_ExcludeNoneModel):
@@ -93,13 +93,13 @@ class ImageItem(_ExcludeNoneModel):
     score: int = Field(..., ge=0, le=100)
     bytes: int = Field(..., ge=0)
     mime: str = Field(..., min_length=1)
-    displayed_width: Optional[int] = Field(default=None, ge=0)
-    displayed_height: Optional[int] = Field(default=None, ge=0)
-    natural_width: Optional[int] = Field(default=None, ge=0)
-    natural_height: Optional[int] = Field(default=None, ge=0)
-    is_lcp_candidate: Optional[bool] = None
-    waste_bytes_est: Optional[int] = Field(default=None, ge=0)
-    recommendation: Optional[str] = None
+    displayed_width: int | None = Field(default=None, ge=0)
+    displayed_height: int | None = Field(default=None, ge=0)
+    natural_width: int | None = Field(default=None, ge=0)
+    natural_height: int | None = Field(default=None, ge=0)
+    is_lcp_candidate: bool | None = None
+    waste_bytes_est: int | None = Field(default=None, ge=0)
+    recommendation: str | None = None
 
 
 class Summary(_ExcludeNoneModel):
@@ -122,3 +122,86 @@ class AuditResult(_ExcludeNoneModel):
     vitals: Vitals
     images: list[ImageItem]
     summary: Summary
+
+
+# ===========================================================================
+# Before/After comparison models (Sprint 2, #18 + #20)
+#
+# These are a SEPARATE data contract from audit_result.schema.json. They
+# describe deltas computed by core.baseline_manager.compare() and consumed by
+# the `audit compare` CLI command and the HTML report's comparison section.
+# Units: ms for LCP/INP/TTFB, unitless for CLS (mirrors the Vitals model).
+# ===========================================================================
+
+
+class MetricDelta(_ExcludeNoneModel):
+    """Delta for a single metric (before -> after).
+
+    ``delta`` is ``after - before``: a negative value is an *improvement*
+    for LCP/INP/TTFB/CLS (lower is better). ``delta_pct`` is relative to the
+    before value (None when before is 0). ``status`` is the derived verdict.
+    """
+    model_config = {"extra": "forbid"}
+
+    before: float
+    after: float
+    delta: float
+    delta_pct: float | None = None
+    status: str = Field(..., pattern="^(improved|regressed|unchanged)$")
+
+
+class VitalsDelta(_ExcludeNoneModel):
+    """Deltas for the Core Web Vitals suite."""
+    model_config = {"extra": "forbid"}
+
+    lcp: MetricDelta
+    cls: MetricDelta
+    inp: MetricDelta
+    ttfb: MetricDelta
+
+
+class ImageStatsDelta(_ExcludeNoneModel):
+    """Aggregate image-level changes (cohort level, not per-image)."""
+    model_config = {"extra": "forbid"}
+
+    before_count: int = Field(..., ge=0)
+    after_count: int = Field(..., ge=0)
+    count_delta: int
+
+    before_total_bytes: int = Field(..., ge=0)
+    after_total_bytes: int = Field(..., ge=0)
+    total_bytes_delta: int
+
+    before_total_waste: int = Field(..., ge=0)
+    after_total_waste: int = Field(..., ge=0)
+    total_waste_delta: int
+
+    before_avg_score: float = Field(..., ge=0, le=100)
+    after_avg_score: float = Field(..., ge=0, le=100)
+    avg_score_delta: float
+
+
+class ComparisonSummary(_ExcludeNoneModel):
+    """Human-readable roll-up of a comparison."""
+    model_config = {"extra": "forbid"}
+
+    top_improvements: list[str]
+    top_regressions: list[str]
+    roi_estimate: str
+
+
+class ComparisonResult(_ExcludeNoneModel):
+    """Top-level result of comparing two AuditResults.
+
+    ``before_meta`` / ``after_meta`` keep just the identifying metadata (url,
+    timestamp) so the report can label the two sides without carrying full
+    AuditResults around.
+    """
+    model_config = {"extra": "forbid"}
+
+    before: dict[str, str]
+    after: dict[str, str]
+    vitals: VitalsDelta
+    images: ImageStatsDelta
+    summary: ComparisonSummary
+
