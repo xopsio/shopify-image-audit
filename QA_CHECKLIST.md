@@ -1,13 +1,16 @@
 
-# QA Checklist (Sprint 1 + JB-002 + Sprint 2 kickoff)
+# QA Checklist (Sprint 1 + JB-002 + Sprint 2 single-agent)
 
 **Single source of truth:** `docs/`, `schemas/`, and this `QA_CHECKLIST.md` define the contracts and rules; code must conform.
 
 > Sprint 1 (completed, tag `v0.1.0-sprint1`) + JB-001 ValueError fix + JB-002 PageSpeed API integration merged from `origin/fix/jb001-cli-valueerror-final`.
 >
-> **Sprint 2 (2026-07-29):** Claude/PyCharm exited. ZCode is now coordinator and
-> owns `src/engine/`, `tests/`, `src/audit/models.py`, `pyproject.toml`. See
-> `docs/governance.md` v1.2. Schema-validation regression fixed (143/143 tests).
+> **Sprint 2 (2026-07-29):** Claude/PyCharm exited. ZCode became coordinator.
+>
+> **Sprint 2 (2026-07-30):** Single-agent model — Cursor/Grok and Windsurf/ChatGPT
+> also exited. **ZCode now owns the entire project** (governance v1.3).
+> Schema-validation regression fixed (143/143); report.py refactor landed (#21,
+> 179/179).
 
 ## Repo integrity
 - [x] Single-writer rules followed (no cross-domain edits)
