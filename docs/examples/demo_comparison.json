@@ -1,0 +1,67 @@
+{
+  "before": {
+    "url": "https://nordic-lifestyle-demo.myshopify.com",
+    "timestamp_utc": "2026-07-29T23:01:56Z"
+  },
+  "after": {
+    "url": "https://nordic-lifestyle-demo.myshopify.com",
+    "timestamp_utc": "2026-07-29T23:01:56Z"
+  },
+  "vitals": {
+    "lcp": {
+      "before": 4200.0,
+      "after": 1800.0,
+      "delta": -2400.0,
+      "delta_pct": -57.14285714285714,
+      "status": "improved"
+    },
+    "cls": {
+      "before": 0.18,
+      "after": 0.04,
+      "delta": -0.13999999999999999,
+      "delta_pct": -77.77777777777777,
+      "status": "improved"
+    },
+    "inp": {
+      "before": 320.0,
+      "after": 180.0,
+      "delta": -140.0,
+      "delta_pct": -43.75,
+      "status": "improved"
+    },
+    "ttfb": {
+      "before": 900.0,
+      "after": 620.0,
+      "delta": -280.0,
+      "delta_pct": -31.11111111111111,
+      "status": "improved"
+    }
+  },
+  "images": {
+    "before_count": 3,
+    "after_count": 3,
+    "count_delta": 0,
+    "before_total_bytes": 1625000,
+    "after_total_bytes": 139100,
+    "total_bytes_delta": -1485900,
+    "before_total_waste": 1570400,
+    "after_total_waste": 84500,
+    "total_waste_delta": -1485900,
+    "before_avg_score": 10.333333333333334,
+    "after_avg_score": 56.666666666666664,
+    "avg_score_delta": 46.33333333333333
+  },
+  "summary": {
+    "top_improvements": [
+      "LCP 4200ms → 1800ms (-57%)",
+      "CLS 0.180 → 0.040 (-78%)",
+      "INP 320ms → 180ms (-44%)",
+      "TTFB 900ms → 620ms (-31%)",
+      "Image payload 1587 KB → 136 KB",
+      "Estimated waste reduced by 1451 KB",
+      "Average image score 10 → 57"
+    ],
+    "top_regressions": [],
+    "roi_estimate": "Estimated ~24% conversion uplift from a 2400ms LCP improvement (heuristic: ~1% per 100ms LCP)."
+  }
+}

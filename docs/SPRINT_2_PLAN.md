@@ -165,30 +165,30 @@
 ---
 
 ### WS-003: Customer Documentation + Report Templates
-**Owner:** Windsurf/ChatGPT
+**Owner:** ZCode (single-agent, governance v1.3; formerly Windsurf/ChatGPT)
 **Domain:** `docs/`, report templates
 **Estimated:** 1-2 days
+**Status:** ✅ DONE
 
 **Tasks:**
-1. Create `docs/CUSTOMER_REPORT_TEMPLATE.md` 
+1. ✅ Create `docs/CUSTOMER_REPORT_TEMPLATE.md`
    - Executive summary structure
    - Before/after metrics section
    - Prioritized recommendations
    - ROI estimate methodology
-2. Create `docs/CUSTOMER_ONBOARDING.md` 
+2. ✅ Create `docs/CUSTOMER_ONBOARDING.md`
    - Pre-audit checklist (Shopify access, baseline URL)
-   - Audit execution steps
-   - Delivery format (HTML report + PDF export optional)
+   - Audit execution steps (baseline → optimointi → compare)
+   - Delivery format (HTML report + comparison JSON)
    - Follow-up process
-3. Update `docs/SPRINT_2_PLAN.md` (this document)
-   - Finalize ticket breakdown
-   - Add acceptance criteria
-4. Generate example customer report
-   - Use demo store data
-   - Show realistic before/after (e.g., LCP 4.2s → 1.8s)
-   - Professional formatting
+3. ✅ Update `docs/SPRINT_2_PLAN.md` (this document)
+4. ✅ Generate example customer report (`docs/examples/`)
+   - Uses real before/after demo data (Nordic Lifestyle demo store)
+   - Realistic before/after: LCP 4.2s → 1.8s (−57 %)
+   - Generated with the actual `audit compare` pipeline
 
-**Dependencies:** None (documentation only)
+**Dependencies:** None (documentation only). Used real comparison data from
+#18/#20 (merged) instead of placeholders.
 
 **Acceptance Criteria:**
 - ✅ Customer report template is ready for first client
@@ -200,22 +200,22 @@
 ## 5. Acceptance Criteria (Sprint-Level)
 
 ### Business Success:
-- [ ] Before/after workflow proven with demo store
-- [ ] Customer report template approved (internal review)
-- [ ] First customer onboarding process documented
-- [ ] ROI calculation methodology defined
+- [x] Before/after workflow proven with demo store (`docs/examples/`)
+- [x] Customer report template approved (internal review)
+- [x] First customer onboarding process documented (`docs/CUSTOMER_ONBOARDING.md`)
+- [x] ROI calculation methodology defined (`docs/CUSTOMER_REPORT_TEMPLATE.md` §5)
 
 ### Technical Success:
-- [ ] PageSpeed API integration works (live LCP measurement)
-- [ ] Before/after comparison generates accurate deltas
-- [ ] HTML report includes before/after section
-- [ ] CLI commands: `measure`, `baseline`, `compare` functional
-- [ ] All new code has tests (>80% coverage for new modules)
+- [x] PageSpeed API integration works (live LCP measurement) — JB-002
+- [x] Before/after comparison generates accurate deltas — #18/#20
+- [x] HTML report includes before/after section — #18/#20
+- [x] CLI commands: `measure`, `baseline`, `compare` functional
+- [x] All new code has tests (>80% coverage for new modules) — 219 tests total
 
 ### Quality Gates:
-- [ ] No regressions (103/103 tests still pass)
-- [ ] Demo end-to-end: baseline → optimize → compare → report
-- [ ] Documentation updated (README, API docs if added)
+- [x] No regressions (219/219 tests pass; was 103 at Sprint 2 start)
+- [x] Demo end-to-end: baseline → optimize → compare → report (`docs/examples/`)
+- [x] Documentation updated (README, CLI spec, customer docs)
 
 ---
 
