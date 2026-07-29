@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shopify Image Audit Report</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h1 {
+            font-size: 2em;
+            margin-bottom: 10px;
+            color: #1a1a1a;
+        }
+        h2 {
+            font-size: 1.5em;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 5px;
+        }
+        h3 {
+            font-size: 1.2em;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            color: #34495e;
+        }
+        .meta {
+            background: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .meta p {
+            margin: 5px 0;
+        }
+        .meta strong {
+            color: #2c3e50;
+        }
+        .vitals {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .vital-card {
+            background: white;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            text-align: center;
+        }
+        .vital-card.good { border-color: #27ae60; }
+        .vital-card.needs-improvement { border-color: #f39c12; }
+        .vital-card.poor { border-color: #e74c3c; }
+        .vital-name {
+            font-size: 0.9em;
+            color: #7f8c8d;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .vital-value {
+            font-size: 2em;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .vital-card.good .vital-value { color: #27ae60; }
+        .vital-card.needs-improvement .vital-value { color: #f39c12; }
+        .vital-card.poor .vital-value { color: #e74c3c; }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-box {
+            background: #3498db;
+            color: white;
+            padding: 20px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+        }
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+            margin-top: 5px;
+        }
+        .issues {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .issues ul {
+            margin-left: 20px;
+            margin-top: 10px;
+        }
+        .issues li {
+            margin: 5px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background: #34495e;
+            color: white;
+            font-weight: 600;
+        }
+        tr:hover {
+            background: #f8f9fa;
+        }
+        .score {
+            font-weight: bold;
+            padding: 4px 8px;
+            border-radius: 3px;
+        }
+        .score.high { background: #d4edda; color: #155724; }
+        .score.medium { background: #fff3cd; color: #856404; }
+        .score.low { background: #f8d7da; color: #721c24; }
+        .role {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+        .role.hero { background: #e8f5e9; color: #2e7d32; }
+        .role.above_fold { background: #e3f2fd; color: #1565c0; }
+        .role.product_primary { background: #f3e5f5; color: #6a1b9a; }
+        .role.product_secondary { background: #fff3e0; color: #e65100; }
+        .role.decorative { background: #fce4ec; color: #c2185b; }
+        .role.unknown { background: #eceff1; color: #455a64; }
+        .bytes {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        .lcp-badge {
+            display: inline-block;
+            background: #ff9800;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.75em;
+            font-weight: bold;
+        }
+        .recommendation {
+            font-size: 0.9em;
+            color: #555;
+            font-style: italic;
+        }
+        footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            text-align: center;
+            color: #7f8c8d;
+            font-size: 0.9em;
+        }
+        /* Before/after comparison section (#18/#20). */
+        .comparison {
+            margin: 20px 0;
+        }
+        .delta {
+            font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+        .delta.improved { background: #d4edda; color: #155724; }
+        .delta.regressed { background: #f8d7da; color: #721c24; }
+        .delta.unchanged { background: #e2e3e5; color: #383d41; }
+        .roi-box {
+            background: #e8f4fd;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🖼️ Shopify Image Audit Report</h1>
+
+        <div class="meta">
+            <p><strong>URL:</strong> https://nordic-lifestyle-demo.myshopify.com</p>
+            <p><strong>Timestamp:</strong> 2026-07-29T23:01:56Z</p>
+            <p><strong>Device:</strong> Mobile</p>
+            <p><strong>Runs:</strong> 1</p>
+            <p><strong>Tool:</strong> Lighthouse</p>
+            
+        </div>
+
+        <h2>📊 Core Web Vitals</h2>
+        <div class="vitals">
+            <div class="vital-card good">
+                <div class="vital-name">LCP</div>
+                <div class="vital-value">1800ms</div>
+                <div class="vital-status">Good</div>
+            </div>
+            <div class="vital-card good">
+                <div class="vital-name">CLS</div>
+                <div class="vital-value">0.040</div>
+                <div class="vital-status">Good</div>
+            </div>
+            <div class="vital-card good">
+                <div class="vital-name">INP</div>
+                <div class="vital-value">180ms</div>
+                <div class="vital-status">Good</div>
+            </div>
+            <div class="vital-card good">
+                <div class="vital-name">TTFB</div>
+                <div class="vital-value">620ms</div>
+                <div class="vital-status">Good</div>
+            </div>
+        </div>
+
+        <h2>📈 Image Summary</h2>
+        <div class="stats-grid">
+            <div class="stat-box">
+                <div class="stat-value">3</div>
+                <div class="stat-label">Total Images</div>
+            </div>
+            <div class="stat-box" style="background: #9b59b6;">
+                <div class="stat-value">0.13 MB</div>
+                <div class="stat-label">Total Size</div>
+            </div>
+            <div class="stat-box" style="background: #e74c3c;">
+                <div class="stat-value">83 KB</div>
+                <div class="stat-label">Est. Waste</div>
+            </div>
+            <div class="stat-box" style="background: #27ae60;">
+                <div class="stat-value">57</div>
+                <div class="stat-label">Avg Score</div>
+            </div>
+        </div>
+
+        <div class="issues">
+            <h3>⚠️ Top Issues</h3>
+            <ul>
+                <li>LCP image score is below 70 – optimise for faster paint</li>
+            </ul>
+        </div>
+
+        <div class="comparison">
+            <h2>🔄 Before / After Comparison</h2>
+            <p><strong>Before:</strong> https://nordic-lifestyle-demo.myshopify.com &nbsp; → &nbsp; <strong>After:</strong> https://nordic-lifestyle-demo.myshopify.com</p>
+            <h3>Core Web Vitals</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Before</th>
+                        <th>After</th>
+                        <th>Change</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <tr>
+                    <td>LCP</td>
+                    <td class="bytes">4200ms</td>
+                    <td class="bytes">1800ms</td>
+                    <td><span class="delta improved">2400ms (-57%)</span></td>
+                </tr>
+                <tr>
+                    <td>CLS</td>
+                    <td class="bytes">0.180</td>
+                    <td class="bytes">0.040</td>
+                    <td><span class="delta improved">0.140 (-78%)</span></td>
+                </tr>
+                <tr>
+                    <td>INP</td>
+                    <td class="bytes">320ms</td>
+                    <td class="bytes">180ms</td>
+                    <td><span class="delta improved">140ms (-44%)</span></td>
+                </tr>
+                <tr>
+                    <td>TTFB</td>
+                    <td class="bytes">900ms</td>
+                    <td class="bytes">620ms</td>
+                    <td><span class="delta improved">280ms (-31%)</span></td>
+                </tr>
+                </tbody>
+            </table>
+            <h3>Image Optimisation</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Before</th>
+                        <th>After</th>
+                        <th>Change</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <tr>
+                    <td>Total image bytes</td>
+                    <td class="bytes">1625000</td>
+                    <td class="bytes">139100</td>
+                    <td><span class="delta improved">1485900</span></td>
+                </tr>
+                <tr>
+                    <td>Estimated waste</td>
+                    <td class="bytes">1570400</td>
+                    <td class="bytes">84500</td>
+                    <td><span class="delta improved">1485900</span></td>
+                </tr>
+                <tr>
+                    <td>Avg image score</td>
+                    <td class="bytes">10.3</td>
+                    <td class="bytes">56.7</td>
+                    <td><span class="delta regressed">+46.3</span></td>
+                </tr>
+                </tbody>
+            </table>
+            <h3 style="color:#27ae60;">✅ Improvements</h3>
+            <ul><li>LCP 4200ms → 1800ms (-57%)</li><li>CLS 0.180 → 0.040 (-78%)</li><li>INP 320ms → 180ms (-44%)</li><li>TTFB 900ms → 620ms (-31%)</li><li>Image payload 1587 KB → 136 KB</li><li>Estimated waste reduced by 1451 KB</li><li>Average image score 10 → 57</li></ul>
+            
+            <div class="roi-box">
+                <strong>ROI estimate:</strong> Estimated ~24% conversion uplift from a 2400ms LCP improvement (heuristic: ~1% per 100ms LCP).
+            </div>
+        </div>
+
+        <h2>🖼️ Image Details</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Source</th>
+                    <th>Role</th>
+                    <th>Score</th>
+                    <th>Size</th>
+                    <th>Dimensions</th>
+                    <th>Waste</th>
+                    <th>Recommendation</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="bytes" title="https://cdn.shopify.com/s/files/1/0123/4567/files/hero-optimized.webp"><span class="lcp-badge">LCP</span> .com/s/files/1/0123/4567/files/hero-optimized.webp</td>
+                    <td><span class="role hero">hero</span></td>
+                    <td><span class="score medium">50</span></td>
+                    <td class="bytes">92.8 KB</td>
+                    <td>1200×600<br><small style='color:#888;'>(1200×600)</small></td>
+                    <td class="bytes">57.6 KB</td>
+                    <td class="recommendation">Improve LCP: reduce size or use responsive srcset</td>
+                </tr>
+                <tr>
+                    <td class="bytes" title="https://cdn.shopify.com/s/files/1/0123/4567/files/product-a.webp">opify.com/s/files/1/0123/4567/files/product-a.webp</td>
+                    <td><span class="role unknown">unknown</span></td>
+                    <td><span class="score medium">70</span></td>
+                    <td class="bytes">41.0 KB</td>
+                    <td>600×600<br><small style='color:#888;'>(N/A×N/A)</small></td>
+                    <td class="bytes">23.4 KB</td>
+                    <td class="recommendation">Review size and format for better performance</td>
+                </tr>
+                <tr>
+                    <td class="bytes" title="https://cdn.shopify.com/s/files/1/0123/4567/files/logo.svg">cdn.shopify.com/s/files/1/0123/4567/files/logo.svg</td>
+                    <td><span class="role decorative">decorative</span></td>
+                    <td><span class="score medium">50</span></td>
+                    <td class="bytes">2.1 KB</td>
+                    <td>200×60<br><small style='color:#888;'>(N/A×N/A)</small></td>
+                    <td class="bytes">1.5 KB</td>
+                    <td class="recommendation">Review size and format for better performance</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>📋 Role Distribution</h2>
+        <ul>
+            <li><span class="role decorative">decorative</span>: 1 image</li>
+            <li><span class="role hero">hero</span>: 1 image</li>
+            <li><span class="role unknown">unknown</span>: 1 image</li>
+        </ul>
+
+        <footer>
+            <p>Generated by shopify-image-audit v0.1</p>
+            <p>Report generated from: after_lcp.json</p>
+        </footer>
+    </div>
+</body>
+</html>
