@@ -8,6 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from audit.models import AuditResult, ImageItem, ImageRole, Meta, Vitals
 from audit.parser import parse_file
@@ -68,7 +69,7 @@ class TestMeta:
         assert m.url == "https://example.com"
 
     def test_rejects_extra_fields(self) -> None:
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             Meta(url="https://x.com", timestamp_utc="2026-03-06T00", device="mobile",
                  runs=1, tool="lighthouse", bogus="nope")
 
@@ -79,7 +80,7 @@ class TestVitals:
         assert v.lcp_ms == 1200.0
 
     def test_rejects_negative(self) -> None:
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             Vitals(lcp_ms=-1, cls=0, inp_ms=0, ttfb_ms=0)
 
 
@@ -90,15 +91,16 @@ class TestImageItem:
         assert img.role == ImageRole.hero
 
     def test_rejects_score_over_100(self) -> None:
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             ImageItem(src="x", role="hero", score=101, bytes=0, mime="image/jpeg")
 
 
 class TestAuditResult:
     def test_rejects_extra_top_level(self) -> None:
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             AuditResult.model_validate({
-                "meta": {"url": "x", "timestamp_utc": "2026-03-06T00", "device": "mobile", "runs": 1, "tool": "lighthouse"},
+                "meta": {"url": "x", "timestamp_utc": "2026-03-06T00",
+                         "device": "mobile", "runs": 1, "tool": "lighthouse"},
                 "vitals": {"lcp_ms": 0, "cls": 0, "inp_ms": 0, "ttfb_ms": 0},
                 "images": [],
                 "summary": {"top_issues": []},

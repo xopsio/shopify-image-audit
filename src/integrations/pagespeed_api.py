@@ -11,11 +11,9 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Optional
 from urllib.parse import urlparse
 
 import requests
-
 
 # --- Constants ---------------------------------------------------------------
 
@@ -33,27 +31,27 @@ RETRY_DELAY = 2  # seconds between retries
 @dataclass
 class PageSpeedMetrics:
     """Structured metrics from PageSpeed Insights API."""
-    
+
     # Core Web Vitals
     lcp: float  # Largest Contentful Paint (seconds)
     cls: float  # Cumulative Layout Shift (score 0-1)
-    inp: Optional[float]  # Interaction to Next Paint (seconds) - may be None for some runs
-    
+    inp: float | None  # Interaction to Next Paint (seconds) - may be None for some runs
+
     # Additional performance metrics
     first_contentful_paint: float  # FCP (seconds)
-    first_meaningful_paint: Optional[float]  # FMP (seconds)
+    first_meaningful_paint: float | None  # FMP (seconds)
     speed_index: float  # Speed Index (seconds)
     time_to_interactive: float  # TTI (seconds)
     total_blocking_time: float  # TBT (milliseconds)
-    
+
     # Score (0-100)
     performance_score: int
-    
+
     # Metadata
     url: str
     strategy: str  # "mobile" or "desktop"
     fetch_time: str  # ISO timestamp of when the test was run
-    
+
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
         return {
@@ -80,25 +78,25 @@ class PageSpeedMetrics:
 class PageSpeedAPIClient:
     """
     Client for Google PageSpeed Insights API.
-    
+
     Handles rate limiting, retries, and error responses.
-    
+
     Example:
         client = PageSpeedAPIClient()
         metrics = client.get_metrics("https://example.myshopify.com", strategy="mobile")
         print(f"LCP: {metrics.lcp}s")
     """
-    
+
     def __init__(
         self,
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
         timeout: int = DEFAULT_TIMEOUT,
         max_retries: int = DEFAULT_RETRIES,
         retry_delay: float = RETRY_DELAY,
     ):
         """
         Initialize the PageSpeed API client.
-        
+
         Args:
             api_key: Optional Google Cloud API key. Not required for basic use.
             timeout: Request timeout in seconds.
@@ -110,18 +108,18 @@ class PageSpeedAPIClient:
         self.max_retries = max_retries
         self.retry_delay = retry_delay
         self._last_request_time: float = 0
-        
+
         # Rate limiting: Google recommends at least 1 second between requests
         # Without API key: ~20 requests per minute limit
         # With API key: higher limits
         self._min_request_interval = 1.0  # seconds
-    
+
     def _wait_for_rate_limit(self) -> None:
         """Wait if necessary to respect rate limits."""
         elapsed = time.time() - self._last_request_time
         if elapsed < self._min_request_interval:
             time.sleep(self._min_request_interval - elapsed)
-    
+
     def _build_params(self, url: str, strategy: str = "mobile") -> dict:
         """Build query parameters for the API request."""
         params = {
@@ -132,20 +130,20 @@ class PageSpeedAPIClient:
         if self.api_key:
             params["key"] = self.api_key
         return params
-    
+
     def _parse_response(self, data: dict, url: str, strategy: str) -> PageSpeedMetrics:
         """Parse API response into structured metrics."""
         lighthouse_result = data.get("lighthouseResult", {})
-        
+
         # Extract metrics from lighthouseResult
         metrics = lighthouse_result.get("audits", {})
-        
+
         # Get performance score from categories, not audits
         categories = lighthouse_result.get("categories", {})
         performance_category = categories.get("performance", {})
         performance_score_raw = performance_category.get("score")
         performance_score = int(float(performance_score_raw) * 100) if performance_score_raw is not None else 0
-        
+
         def get_metric_value(name: str, default: float = 0.0) -> float:
             """Extract a metric value from audits."""
             audit = metrics.get(name, {})
@@ -155,10 +153,10 @@ class PageSpeedAPIClient:
             if numeric_value is not None:
                 return float(numeric_value)
             return default
-        
+
         # Get fetch time
         fetch_time = lighthouse_result.get("fetchTime", "")
-        
+
         # Core Web Vitals (in seconds, except CLS which is unitless 0-1)
         lcp = get_metric_value("largest-contentful-paint", 0.0) / 1000  # ms to s
         cls = get_metric_value("cumulative-layout-shift", 0.0)
@@ -167,7 +165,7 @@ class PageSpeedAPIClient:
             inp = inp / 1000  # ms to s
         else:
             inp = None
-        
+
         # Additional metrics
         fcp = get_metric_value("first-contentful-paint", 0.0) / 1000
         fmp = get_metric_value("first-meaningful-paint")
@@ -175,11 +173,11 @@ class PageSpeedAPIClient:
             fmp = fmp / 1000
         else:
             fmp = None
-        
+
         speed_index = get_metric_value("speed-index", 0.0) / 1000
         tti = get_metric_value("interactive", 0.0) / 1000
         tbt = get_metric_value("total-blocking-time", 0.0)  # already in ms
-        
+
         return PageSpeedMetrics(
             url=url,
             strategy=strategy,
@@ -194,19 +192,19 @@ class PageSpeedAPIClient:
             total_blocking_time=tbt,
             performance_score=performance_score,
         )
-    
+
     def _validate_url(self, url: str) -> str:
         """Validate and normalize URL. Raises ValueError for invalid URLs."""
         if not url or not url.strip():
             raise ValueError("URL cannot be empty")
-        
+
         url = url.strip()
         parsed = urlparse(url)
-        
+
         # If scheme is provided, it must be http or https
         if parsed.scheme and parsed.scheme not in ("http", "https"):
             raise ValueError(f"URL scheme must be http or https, got '{parsed.scheme}'")
-        
+
         # For scheme-less URLs, we need a non-empty string that's not just a path
         # (e.g., "example.com" is valid, "/path" or "https://" is not)
         if not parsed.scheme:
@@ -217,13 +215,13 @@ class PageSpeedAPIClient:
             # For URLs with scheme, must have a netloc (hostname)
             if not parsed.netloc:
                 raise ValueError("URL must include a hostname")
-        
+
         # Normalize scheme-less URLs
         if not parsed.scheme:
             url = f"https://{url}"
-        
+
         return url
-    
+
     def get_metrics(
         self,
         url: str,
@@ -231,14 +229,14 @@ class PageSpeedAPIClient:
     ) -> PageSpeedMetrics:
         """
         Fetch PageSpeed metrics for a given URL.
-        
+
         Args:
             url: The URL to analyze (e.g., "https://example.myshopify.com")
             strategy: "mobile" or "desktop"
-            
+
         Returns:
             PageSpeedMetrics with all performance data.
-            
+
         Raises:
             ValueError: If the URL is invalid or strategy is not supported.
             requests.exceptions.RequestException: If the API request fails.
@@ -247,18 +245,18 @@ class PageSpeedAPIClient:
         # Validate inputs
         if strategy not in ("mobile", "desktop"):
             raise ValueError(f"Strategy must be 'mobile' or 'desktop', got '{strategy}'")
-        
+
         # Validate and normalize URL
         url = self._validate_url(url)
-        
+
         # Rate limiting
         self._wait_for_rate_limit()
-        
+
         # Build request
         params = self._build_params(url, strategy)
-        
+
         # Make request with retries
-        last_exception: Optional[Exception] = None
+        last_exception: Exception | None = None
         for attempt in range(self.max_retries):
             try:
                 self._last_request_time = time.time()
@@ -267,7 +265,7 @@ class PageSpeedAPIClient:
                     params=params,
                     timeout=self.timeout,
                 )
-                
+
                 # Check for rate limiting (HTTP 429)
                 if response.status_code == 429:
                     if attempt < self.max_retries - 1:
@@ -277,7 +275,7 @@ class PageSpeedAPIClient:
                         f"PageSpeed API rate limit exceeded. Status: {response.status_code}. "
                         f"Please wait before making more requests."
                     )
-                
+
                 # Check for service unavailable (HTTP 503)
                 if response.status_code == 503:
                     if attempt < self.max_retries - 1:
@@ -287,24 +285,24 @@ class PageSpeedAPIClient:
                         f"PageSpeed API service unavailable. Status: {response.status_code}. "
                         f"Please try again later."
                     )
-                
+
                 # Check for other errors
                 if response.status_code != 200:
                     error_msg = self._get_error_message(response)
                     raise RuntimeError(
                         f"PageSpeed API error: {response.status_code} - {error_msg}"
                     )
-                
+
                 # Parse response
                 data = response.json()
-                
+
                 # Check for API-specific errors
                 if "error" in data:
                     error_msg = data["error"].get("message", "Unknown error")
                     raise RuntimeError(f"PageSpeed API error: {error_msg}")
-                
+
                 return self._parse_response(data, url, strategy)
-                
+
             except requests.exceptions.Timeout:
                 last_exception = requests.exceptions.Timeout(
                     f"Request timed out after {self.timeout} seconds"
@@ -312,20 +310,20 @@ class PageSpeedAPIClient:
                 if attempt < self.max_retries - 1:
                     time.sleep(self.retry_delay)
                     continue
-                raise last_exception
-                
+                raise last_exception from None
+
             except requests.exceptions.RequestException as e:
                 last_exception = e
                 if attempt < self.max_retries - 1:
                     time.sleep(self.retry_delay)
                     continue
                 raise
-        
+
         # Should not reach here, but just in case
         if last_exception:
             raise last_exception
         raise RuntimeError("Unexpected error in PageSpeed API request")
-    
+
     def _get_error_message(self, response: requests.Response) -> str:
         """Extract error message from response."""
         try:
@@ -343,19 +341,19 @@ class PageSpeedAPIClient:
 def get_pagespeed_metrics(
     url: str,
     strategy: str = "mobile",
-    api_key: Optional[str] = None,
+    api_key: str | None = None,
 ) -> PageSpeedMetrics:
     """
     Convenience function to fetch PageSpeed metrics.
-    
+
     Args:
         url: The URL to analyze.
         strategy: "mobile" or "desktop".
         api_key: Optional Google Cloud API key.
-        
+
     Returns:
         PageSpeedMetrics with all performance data.
-        
+
     Example:
         metrics = get_pagespeed_metrics("https://example.myshopify.com")
         print(f"LCP: {metrics.lcp:.2f}s, Performance Score: {metrics.performance_score}")

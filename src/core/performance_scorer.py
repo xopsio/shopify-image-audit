@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict
-
+from typing import Any
 
 MODERN_MIME_HINTS = ("image/webp", "image/avif", "image/jxl")
 
@@ -12,7 +11,7 @@ def _is_modern_format(mime: str) -> bool:
     return any(hint in lower for hint in MODERN_MIME_HINTS)
 
 
-def calculate_score(image: Dict[str, Any]) -> int:
+def calculate_score(image: dict[str, Any]) -> int:
     """
     Heuristic performance score for a single image (0–100).
 

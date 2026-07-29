@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from audit.ranker_heuristic import (
     _assign_role,
     _displayed_area,
