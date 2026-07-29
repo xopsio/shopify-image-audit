@@ -244,9 +244,24 @@ _CSS = """        * { box-sizing: border-box; margin: 0; padding: 0; }
             color: #7f8c8d;
             font-size: 0.9em;
         }
-        /* Reserved styling for the before/after comparison section (#20). */
+        /* Before/after comparison section (#18/#20). */
         .comparison {
             margin: 20px 0;
+        }
+        .delta {
+            font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+        .delta.improved { background: #d4edda; color: #155724; }
+        .delta.regressed { background: #f8d7da; color: #721c24; }
+        .delta.unchanged { background: #e2e3e5; color: #383d41; }
+        .roi-box {
+            background: #e8f4fd;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            margin: 15px 0;
         }"""
 
 
@@ -351,15 +366,127 @@ def _render_issues(summary: dict[str, Any]) -> str:
 """
 
 
-def _render_comparison_section(audit_result: dict[str, Any]) -> str:
+def _render_comparison_delta_row(label: str, before: float, after: float, delta: float,
+                                 delta_pct, fmt: str) -> str:
+    """Render one before/after metric row in the comparison table."""
+    if delta_pct is not None:
+        pct_str = f" ({delta_pct:+.0f}%)"
+    else:
+        pct_str = ""
+
+    # lower is better for every metric we compare
+    if abs(delta) <= 1e-6:
+        status = "unchanged"
+    elif delta < 0:
+        status = "improved"
+    else:
+        status = "regressed"
+
+    sign = "+" if delta > 0 else ""
+    delta_display = fmt.format(abs(delta)) if status == "improved" else fmt.format(delta)
+    return f"""                <tr>
+                    <td>{escape(label)}</td>
+                    <td class="bytes">{fmt.format(before)}</td>
+                    <td class="bytes">{fmt.format(after)}</td>
+                    <td><span class="delta {status}">{sign}{delta_display}{pct_str}</span></td>
+                </tr>
+"""
+
+
+def _render_comparison_section(comparison) -> str:
     """Render the before/after comparison section.
 
-    Reserved for Sprint 2 before/after reporting (issue #20). Returns an empty
-    string until the comparison data contract is finalised in #18. When
-    comparison data becomes available it will be read from a well-known key
-    (TBD with #18) and rendered here; do not lock the shape prematurely.
+    Returns an empty string when ``comparison`` is None (the default, so
+    existing single-audit reports are unaffected). Accepts a
+    ``ComparisonResult`` model or its dict form.
     """
-    return ""
+    if comparison is None:
+        return ""
+    # Normalise to a plain dict so this works with a model or a dict.
+    if hasattr(comparison, "model_dump"):
+        comparison = comparison.model_dump()
+
+    before_url = escape(str(comparison.get("before", {}).get("url", "")))
+    after_url = escape(str(comparison.get("after", {}).get("url", "")))
+    vitals = comparison["vitals"]
+    img_stats = comparison["images"]
+    summary = comparison.get("summary", {})
+
+    # Vital metric rows: (label, vital_key, format)
+    rows = ""
+    for label, key, fmt in (
+        ("LCP", "lcp", "{:.0f}ms"),
+        ("CLS", "cls", "{:.3f}"),
+        ("INP", "inp", "{:.0f}ms"),
+        ("TTFB", "ttfb", "{:.0f}ms"),
+    ):
+        d = vitals[key]
+        rows += _render_comparison_delta_row(label, d["before"], d["after"], d["delta"], d.get("delta_pct"), fmt)
+
+    # Image-level aggregate rows
+    img_rows = ""
+    img_rows += _render_comparison_delta_row(
+        "Total image bytes", img_stats["before_total_bytes"], img_stats["after_total_bytes"],
+        img_stats["total_bytes_delta"], None, "{:.0f}"
+    )
+    img_rows += _render_comparison_delta_row(
+        "Estimated waste", img_stats["before_total_waste"], img_stats["after_total_waste"],
+        img_stats["total_waste_delta"], None, "{:.0f}"
+    )
+    img_rows += _render_comparison_delta_row(
+        "Avg image score", img_stats["before_avg_score"], img_stats["after_avg_score"],
+        img_stats["avg_score_delta"], None, "{:.1f}"
+    )
+
+    improvements = summary.get("top_improvements", [])
+    regressions = summary.get("top_regressions", [])
+    roi = summary.get("roi_estimate", "")
+
+    improvement_items = "".join(f"<li>{escape(i)}</li>" for i in improvements)
+    regression_items = "".join(f"<li>{escape(i)}</li>" for i in regressions)
+    regressions_block = (
+        f'<h3 style="color:#c0392b;">⚠️ Regressions</h3><ul>{regression_items}</ul>'
+        if regressions else ""
+    )
+
+    return f"""        <div class="comparison">
+            <h2>🔄 Before / After Comparison</h2>
+            <p><strong>Before:</strong> {before_url} &nbsp; → &nbsp; <strong>After:</strong> {after_url}</p>
+            <h3>Core Web Vitals</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Before</th>
+                        <th>After</th>
+                        <th>Change</th>
+                    </tr>
+                </thead>
+                <tbody>
+{rows}                </tbody>
+            </table>
+            <h3>Image Optimisation</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Before</th>
+                        <th>After</th>
+                        <th>Change</th>
+                    </tr>
+                </thead>
+                <tbody>
+{img_rows}                </tbody>
+            </table>
+            <h3 style="color:#27ae60;">✅ Improvements</h3>
+            <ul>{improvement_items}</ul>
+            {regressions_block}
+            <div class="roi-box">
+                <strong>ROI estimate:</strong> {escape(roi)}
+            </div>
+        </div>
+
+"""
 
 
 def _render_image_row(img: dict[str, Any]) -> str:
@@ -437,12 +564,16 @@ def _render_footer(audit_result: dict[str, Any]) -> str:
 # Public API
 # ---------------------------------------------------------------------------
 
-def generate_html_report(audit_result: dict[str, Any]) -> str:
+def generate_html_report(audit_result: dict[str, Any], comparison=None) -> str:
     """
     Generate an HTML report from an audit result dictionary.
 
     Args:
         audit_result: Validated audit result dictionary matching the schema
+        comparison: Optional before/after comparison. A ``ComparisonResult``
+            model or its dict form. When provided, a "Before / After Comparison"
+            section is rendered after the top-issues block. Defaults to None
+            (no comparison section — original behaviour).
 
     Returns:
         HTML string ready to be written to a file
@@ -473,7 +604,7 @@ def generate_html_report(audit_result: dict[str, Any]) -> str:
     html += _render_vitals(vitals)
     html += _render_stats(stats)
     html += _render_issues(summary)
-    html += _render_comparison_section(audit_result)
+    html += _render_comparison_section(comparison)
     html += _render_image_table(images)
     html += _render_role_distribution(stats["role_counts"])
     html += _render_footer(audit_result)

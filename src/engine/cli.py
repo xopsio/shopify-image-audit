@@ -24,7 +24,6 @@ import os
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Optional
 from urllib.parse import urlparse
 
 import typer
@@ -33,7 +32,9 @@ from rich.console import Console
 from rich.table import Table
 
 from audit.models import AuditResult
-from audit.report import write_html_report
+from audit.report import generate_html_report, write_html_report
+from core.baseline_manager import compare as compare_audits
+from core.baseline_manager import load_baseline, save_baseline
 from engine.audit_orchestrator import run_audit
 from integrations.pagespeed_api import PageSpeedAPIClient
 
@@ -70,31 +71,31 @@ def _validate_out_path(out_path: Path) -> Path:
     """
     out_path_p = Path(out_path)
     out_path_str = str(out_path)
-    
+
     # Check for absolute paths (Unix and Windows)
     if out_path_p.is_absolute():
         rprint("[red]Error:[/red] --output must be a relative path.")
         raise typer.Exit(code=EXIT_INVALID_ARGS)
-    
+
     # Check for Windows-style absolute paths (all drive letters)
     if _is_windows_absolute_path(out_path_str) or out_path_str.startswith("\\") or ":\\" in out_path_str:
         rprint("[red]Error:[/red] --output must be a relative path.")
         raise typer.Exit(code=EXIT_INVALID_ARGS)
-    
+
     if ".." in out_path_p.parts:
         rprint("[red]Error:[/red] --output must not contain '..' segments.")
         raise typer.Exit(code=EXIT_INVALID_ARGS)
-    
+
     # Resolve and check containment
     resolved_out = Path.cwd().joinpath(out_path_p).resolve()
     cwd_resolved = Path.cwd().resolve()
-    
+
     try:
         resolved_out.relative_to(cwd_resolved)
     except ValueError:
         rprint("[red]Error:[/red] --output resolves outside the working directory.")
         raise typer.Exit(code=EXIT_INVALID_ARGS)
-    
+
     return out_path_p
 
 
@@ -178,13 +179,13 @@ def _validate_measure_url(url: str) -> None:
     Only rejects if scheme is present and not http/https, or if no hostname.
     """
     parsed_url = urlparse(url)
-    
+
     # If scheme is provided, it must be http or https
     if parsed_url.scheme and parsed_url.scheme not in ("http", "https"):
         scheme_display = parsed_url.scheme
         rprint(f"[red]Error:[/red] URL scheme must be http or https, got '{scheme_display}'.")
         raise typer.Exit(code=EXIT_INVALID_ARGS)
-    
+
     # Must have a hostname (rejects things like "https://")
     if not parsed_url.netloc and not parsed_url.path:
         rprint("[red]Error:[/red] URL must include a hostname.")
@@ -201,7 +202,7 @@ def run(
     device: str = typer.Option("mobile", "--device", help="Device type: mobile or desktop."),
     runs: int = typer.Option(3, "--runs", help="Number of Lighthouse runs (default 3)."),
     out_dir: Path = typer.Option("artifacts", "--out-dir", help="Directory for output artifacts."),
-    lhr: Optional[Path] = typer.Option(None, "--lhr", help="Use an existing Lighthouse JSON instead of running live."),
+    lhr: Path | None = typer.Option(None, "--lhr", help="Use an existing Lighthouse JSON instead of running live."),
 ) -> None:
     """Run Lighthouse audit on <url>, analyse images, and write results."""
     # --- validate URL scheme ---
@@ -210,19 +211,19 @@ def run(
     # --- validate --out-dir safety ---
     out_dir_p = Path(out_dir)
     out_dir_str = str(out_dir)
-    
+
     if out_dir_p.is_absolute():
         rprint("[red]Error:[/red] --out-dir must be a relative path.")
         raise typer.Exit(code=EXIT_INVALID_ARGS)
-    
+
     if _is_windows_absolute_path(out_dir_str) or out_dir_str.startswith("\\") or ":\\" in out_dir_str:
         rprint("[red]Error:[/red] --out-dir must be a relative path.")
         raise typer.Exit(code=EXIT_INVALID_ARGS)
-    
+
     if ".." in out_dir_p.parts:
         rprint("[red]Error:[/red] --out-dir must not contain '..' segments.")
         raise typer.Exit(code=EXIT_INVALID_ARGS)
-    
+
     # Resolve and check containment using pathlib's safe relative_to()
     resolved_out = Path.cwd().joinpath(out_dir_p).resolve()
     cwd_resolved = Path.cwd().resolve()
@@ -312,8 +313,8 @@ def run(
 def measure(
     url: str = typer.Argument(..., help="URL to measure with PageSpeed Insights."),
     strategy: str = typer.Option("mobile", "--strategy", help="Strategy: mobile or desktop (default: mobile)."),
-    api_key: Optional[str] = typer.Option(None, "--api-key", help="Google Cloud API key (optional)."),
-    output: Optional[Path] = typer.Option(None, "-o", "--output", help="Output JSON file (default: print to stdout)."),
+    api_key: str | None = typer.Option(None, "--api-key", help="Google Cloud API key (optional)."),
+    output: Path | None = typer.Option(None, "-o", "--output", help="Output JSON file (default: print to stdout)."),
 ) -> None:
     """Fetch live performance metrics from Google PageSpeed Insights API."""
     # --- validate URL (allow scheme-less for normalization by API) ---
@@ -444,6 +445,147 @@ def report(
     except Exception as e:
         rprint(f"[red]Error:[/red] Failed to generate report: {e}")
         raise typer.Exit(code=EXIT_INVALID_ARGS)
+
+
+# ---------------------------------------------------------------------------
+# baseline
+# ---------------------------------------------------------------------------
+
+@app.command()
+def baseline(
+    lhr_json: Path = typer.Argument(..., help="Path to a Lighthouse JSON / fixture report to use as the baseline."),
+    save: Path = typer.Option(..., "--save", help="Where to write the baseline audit_result.json."),
+    url: str | None = typer.Option(None, "--url", help="Override the store URL in the baseline meta."),
+    device: str = typer.Option("mobile", "--device", help="Device type: mobile or desktop."),
+) -> None:
+    """Run an audit on <lhr_json> and store it as a reusable baseline."""
+    if not lhr_json.exists():
+        rprint(f"[red]Error:[/red] File not found: {lhr_json}")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
+
+    if device not in ("mobile", "desktop"):
+        rprint(f"[red]Error:[/red] --device must be 'mobile' or 'desktop', got '{device}'.")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
+
+    # --- validate --save path safety ---
+    _validate_out_path(save)
+
+    try:
+        result: AuditResult = run_audit(lhr_json, url=url, device=device)
+    except (FileNotFoundError, json.JSONDecodeError, ValueError) as exc:
+        rprint(f"[red]Audit pipeline error:[/red] {exc}")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
+    except Exception as exc:
+        rprint(f"[red]Audit pipeline error:[/red] {exc}")
+        raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE)
+
+    save_baseline(result, save)
+    rprint(f"[green]Baseline saved to {save}[/green]")
+    rprint(f"  URL: {result.meta.url} | LCP: {result.vitals.lcp_ms:.0f}ms | "
+          f"images: {len(result.images)} | {sum(i.bytes for i in result.images) / 1024:.0f} KB")
+    raise typer.Exit(code=EXIT_OK)
+
+
+# ---------------------------------------------------------------------------
+# compare
+# ---------------------------------------------------------------------------
+
+@app.command()
+def compare(
+    baseline_json: Path = typer.Argument(..., help="Path to a baseline audit_result.json (from `audit baseline`)."),
+    current_json: Path = typer.Argument(..., help="Path to the current audit_result.json to compare against."),
+    output: Path | None = typer.Option(None, "-o", "--output",
+                                          help="Write an HTML before/after report to this file (default: stdout JSON)."),
+    json_out: Path | None = typer.Option(None, "--json",
+                                            help="Also write the comparison result JSON to this file."),
+) -> None:
+    """Compare a baseline audit against a current audit (before/after).
+
+    Each input may be either a saved ``audit_result.json`` (from ``audit
+    baseline``) or a raw Lighthouse / fixture report — the latter is run
+    through the audit pipeline first. This makes ``compare`` usable directly
+    on fixtures without a separate ``baseline`` step.
+    """
+    for label, path in (("baseline", baseline_json), ("current", current_json)):
+        if not path.exists():
+            rprint(f"[red]Error:[/red] {label} file not found: {path}")
+            raise typer.Exit(code=EXIT_INVALID_ARGS)
+
+    # --- validate output path safety ---
+    if output is not None:
+        _validate_out_path(output)
+    if json_out is not None:
+        _validate_out_path(json_out)
+
+    def _load_or_audit(path: Path) -> AuditResult:
+        """Load a saved AuditResult, or run the audit pipeline on a raw report."""
+        try:
+            return load_baseline(path)
+        except Exception:
+            # Not a valid AuditResult payload — treat it as a raw LHR/fixture.
+            return run_audit(path)
+
+    try:
+        before = _load_or_audit(baseline_json)
+        after = _load_or_audit(current_json)
+        comparison = compare_audits(before, after)
+    except (json.JSONDecodeError, ValueError) as exc:
+        rprint(f"[red]Error:[/red] Invalid input: {exc}")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
+    except FileNotFoundError as exc:
+        rprint(f"[red]Error:[/red] {exc}")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
+    except Exception as exc:
+        rprint(f"[red]Error:[/red] Failed to compare audits: {exc}")
+        raise typer.Exit(code=EXIT_INVALID_ARGS)
+
+    # --- pretty table ---
+    table = Table(title="Before / After Comparison")
+    table.add_column("Metric", style="cyan")
+    table.add_column("Before", justify="right")
+    table.add_column("After", justify="right")
+    table.add_column("Δ", justify="right")
+    for label, key, fmt in (
+        ("LCP", "lcp", "{:.0f}ms"),
+        ("CLS", "cls", "{:.3f}"),
+        ("INP", "inp", "{:.0f}ms"),
+        ("TTFB", "ttfb", "{:.0f}ms"),
+    ):
+        d = getattr(comparison.vitals, key)
+        sign = "+" if d.delta > 0 else ""
+        colour = "green" if d.status == "improved" else "red" if d.status == "regressed" else "dim"
+        table.add_row(label, fmt.format(d.before), fmt.format(d.after),
+                      f"[{colour}]{sign}{fmt.format(d.delta)}[/{colour}]")
+
+    console.print(table)
+
+    rprint("\n[bold]Improvements:[/bold]")
+    for item in comparison.summary.top_improvements:
+        rprint(f"  [green]✓[/green] {item}")
+    if comparison.summary.top_regressions:
+        rprint("\n[bold]Regressions:[/bold]")
+        for item in comparison.summary.top_regressions:
+            rprint(f"  [red]✗[/red] {item}")
+    rprint(f"\n[blue]ROI:[/blue] {comparison.summary.roi_estimate}")
+
+    # --- optional HTML report ---
+    if output:
+        # Render the current audit with the comparison section attached.
+        current_payload = json.loads(after.model_dump_json())
+        current_payload["_source_file"] = str(current_json)
+        html = generate_html_report(current_payload, comparison=comparison)
+        Path(output).parent.mkdir(parents=True, exist_ok=True)
+        Path(output).write_text(html, encoding="utf-8")
+        rprint(f"\n[green]HTML report written to {output}[/green]")
+    else:
+        print(json.dumps(comparison.model_dump(), indent=2))
+
+    if json_out:
+        Path(json_out).parent.mkdir(parents=True, exist_ok=True)
+        Path(json_out).write_text(comparison.model_dump_json(indent=2), encoding="utf-8")
+        rprint(f"[green]Comparison JSON written to {json_out}[/green]")
+
+    raise typer.Exit(code=EXIT_OK)
 
 
 # ---------------------------------------------------------------------------
