@@ -23,6 +23,7 @@ from typing import Any
 
 from audit.models import (
     AuditResult,
+    ComparisonRecommendation,
     ComparisonResult,
     ComparisonSummary,
     ImageDelta,
@@ -71,6 +72,80 @@ _LOWER_IS_BETTER = {"lcp", "cls", "inp", "ttfb"}
 # Absolute tolerance: deltas within this band are "unchanged". Tuned to avoid
 # float noise flipping a status for tiny real-world changes.
 _UNCHANGED_TOLERANCE = 1e-6
+
+# ---------------------------------------------------------------------------
+# ROI scoring weights (Sprint 4, TD-3)
+#
+# Each category gets a multiplier that converts a "raw" metric change into an
+# ROI sort key. The sort key estimates relative conversion-uplift impact so
+# that the most valuable recommendations appear first. These are heuristics,
+# not precise measurements — see the docstring on ComparisonRecommendation.
+# ---------------------------------------------------------------------------
+
+#: Weight applied to each metric's absolute delta when computing the ROI
+#: sort key. Higher weight = higher estimated conversion impact.
+_ROI_WEIGHTS: dict[str, float] = {
+    "lcp": 10.0,         # Direct LCP impact (highest conversion correlation)
+    "ttfb": 5.0,         # TTFB correlates with LCP ~50%
+    "cls": 1000.0,       # 0.1 CLS change → 100 sort key units
+    "inp": 2.0,          # INP responsiveness, weaker conversion link
+    "image_payload": 0.5,   # Per-KB payload change
+    "image_waste": 1.0,     # Per-KB waste reduction (higher signal)
+    "image_score": 3.0,     # Per-point average score change
+}
+
+#: Estimated LCP impact (ms) per unit of metric change. Used to populate
+#: ``ComparisonRecommendation.estimated_lcp_impact_ms``.
+_LCP_MULTIPLIERS: dict[str, float] = {
+    "lcp": 1.0,          # Direct — 1ms LCP = 1ms estimated impact
+    "ttfb": 0.6,         # ~60% of TTFB change reflects in LCP
+    "cls": 200.0,        # 0.1 CLS ≈ 20ms perceived LCP impact
+    "inp": 0.5,          # Weak LCP correlation
+    "image_payload": 0.8,    # Per-KB: reducing bytes helps LCP
+    "image_waste": 2.0,      # Per-KB: waste is "easy fix" bytes
+    "image_score": 5.0,      # Per-point: weak but existing signal
+}
+
+
+def _roi_sort_key(category: str, raw_delta: float, *, lower_is_better: bool) -> float:
+    """Compute the ROI sort key for a single metric change.
+
+    Returns a positive value for *improvements* and a negative value for
+    *regressions*, with larger absolute values = higher impact.
+    """
+    weight = _ROI_WEIGHTS.get(category, 1.0)
+    magnitude = abs(raw_delta) * weight
+
+    if magnitude == 0.0:
+        return 0.0
+
+    # Determine if the change is an improvement.
+    is_improvement: bool
+    if lower_is_better:
+        is_improvement = raw_delta < 0
+    else:
+        is_improvement = raw_delta > 0
+
+    return magnitude if is_improvement else -magnitude
+
+
+def _lcp_impact_estimate(category: str, raw_delta: float) -> float:
+    """Estimate LCP impact in ms from a raw metric delta.
+
+    Returns a non-negative value (magnitude only). The caller adds direction
+    context.
+    """
+    mul = _LCP_MULTIPLIERS.get(category, 0.0)
+    return abs(raw_delta) * mul
+
+
+#: Categories that use "lower is better" semantics (negative delta = improvement).
+_LOWER_IS_BETTER_CATEGORIES = frozenset({
+    "lcp", "cls", "inp", "ttfb", "image_payload", "image_waste",
+})
+
+#: Categories that use "higher is better" (positive delta = improvement).
+_HIGHER_IS_BETTER_CATEGORIES = frozenset({"image_score"})
 
 
 def _delta(before: float, after: float, *, lower_is_better: bool) -> MetricDelta:
@@ -386,45 +461,89 @@ _VITAL_LABELS = (
 
 
 def _build_summary(vitals: VitalsDelta, images: ImageStatsDelta) -> ComparisonSummary:
-    """Produce human-readable improvement/regression lines + ROI estimate."""
-    improvements: list[str] = []
-    regressions: list[str] = []
+    """Produce human-readable improvement/regression lines + ROI estimate.
+
+    Recommendations are sorted by ROI ``sort_key`` (descending for improvements,
+    ascending for regressions) so the most impactful items appear first.
+    ``top_improvements`` and ``top_regressions`` are derived from the sorted
+    lists for backward compatibility.
+    """
+    recs: list[ComparisonRecommendation] = []
 
     for label, key, fmt in _VITAL_LABELS:
         delta_obj: MetricDelta = getattr(vitals, key)
         if delta_obj.status == "unchanged":
             continue
         pct = f" ({delta_obj.delta_pct:+.0f}%)" if delta_obj.delta_pct is not None else ""
-        line = f"{label} {fmt.format(delta_obj.before)} → {fmt.format(delta_obj.after)}{pct}"
-        (improvements if delta_obj.status == "improved" else regressions).append(line)
+        text = f"{label} {fmt.format(delta_obj.before)} → {fmt.format(delta_obj.after)}{pct}"
 
-    # Image payload improvements (lower bytes/waste = better)
-    if images.total_bytes_delta < 0:
-        improvements.append(
+        recs.append(ComparisonRecommendation(
+            text=text,
+            category=key,
+            estimated_lcp_impact_ms=_lcp_impact_estimate(key, delta_obj.delta),
+            sort_key=_roi_sort_key(key, delta_obj.delta, lower_is_better=True),
+        ))
+
+    # Image payload change (lower total bytes = improvement)
+    if images.total_bytes_delta != 0:
+        text = (
             f"Image payload {images.before_total_bytes / 1024:.0f} KB → "
             f"{images.after_total_bytes / 1024:.0f} KB"
         )
-    elif images.total_bytes_delta > 0:
-        regressions.append(
-            f"Image payload {images.before_total_bytes / 1024:.0f} KB → "
-            f"{images.after_total_bytes / 1024:.0f} KB"
-        )
+        recs.append(ComparisonRecommendation(
+            text=text,
+            category="image_payload",
+            estimated_lcp_impact_ms=_lcp_impact_estimate("image_payload", images.total_bytes_delta),
+            sort_key=_roi_sort_key("image_payload", images.total_bytes_delta, lower_is_better=True),
+        ))
 
-    if images.total_waste_delta < 0:
-        improvements.append(f"Estimated waste reduced by {abs(images.total_waste_delta) / 1024:.0f} KB")
-    elif images.total_waste_delta > 0:
-        regressions.append(f"Estimated waste increased by {images.total_waste_delta / 1024:.0f} KB")
+    # Image waste change (lower waste = improvement)
+    if images.total_waste_delta != 0:
+        direction = "reduced" if images.total_waste_delta < 0 else "increased"
+        text = f"Estimated waste {direction} by {abs(images.total_waste_delta) / 1024:.0f} KB"
+        recs.append(ComparisonRecommendation(
+            text=text,
+            category="image_waste",
+            estimated_lcp_impact_ms=_lcp_impact_estimate("image_waste", images.total_waste_delta),
+            sort_key=_roi_sort_key("image_waste", images.total_waste_delta, lower_is_better=True),
+        ))
 
-    if images.avg_score_delta > 0:
-        improvements.append(f"Average image score {images.before_avg_score:.0f} → {images.after_avg_score:.0f}")
-    elif images.avg_score_delta < 0:
-        regressions.append(f"Average image score {images.before_avg_score:.0f} → {images.after_avg_score:.0f}")
+    # Average image score change (higher score = improvement)
+    if images.avg_score_delta != 0:
+        direction = "improved" if images.avg_score_delta > 0 else "declined"
+        text = f"Average image score {images.before_avg_score:.0f} → {images.after_avg_score:.0f} ({direction})"
+        recs.append(ComparisonRecommendation(
+            text=text,
+            category="image_score",
+            estimated_lcp_impact_ms=_lcp_impact_estimate("image_score", images.avg_score_delta),
+            sort_key=_roi_sort_key("image_score", images.avg_score_delta, lower_is_better=False),
+        ))
 
-    if not improvements and not regressions:
-        improvements.append("No measurable changes between the two audits.")
+    # Split into improvements and regressions, each sorted by ROI.
+    improvements = sorted(
+        [r for r in recs if r.sort_key > 0],
+        key=lambda r: r.sort_key,
+        reverse=True,
+    )
+    regressions = sorted(
+        [r for r in recs if r.sort_key < 0],
+        key=lambda r: r.sort_key,  # most negative first (worst regression)
+    )
+
+    top_improvements = [r.text for r in improvements]
+    top_regressions = [r.text for r in regressions]
+
+    if not top_improvements and not top_regressions:
+        top_improvements.append("No measurable changes between the two audits.")
+
+    # Combine improvements + regressions into a single ordered list for
+    # the ``recommendations`` field. We list improvements first (descending
+    # ROI), then regressions (ascending ROI = worst first).
+    all_ordered = improvements + regressions
 
     return ComparisonSummary(
-        top_improvements=improvements,
-        top_regressions=regressions,
+        top_improvements=top_improvements,
+        top_regressions=top_regressions,
         roi_estimate=_roi_estimate(vitals, images),
+        recommendations=all_ordered,
     )

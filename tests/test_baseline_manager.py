@@ -15,14 +15,16 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from audit.models import AuditResult, ComparisonResult
+from audit.models import AuditResult, ComparisonRecommendation, ComparisonResult
 from core.baseline_manager import (
     _delta,
     _image_key,
+    _lcp_impact_estimate,
     _match_images,
     _per_image_recommendation,
     _per_image_status,
     _roi_estimate,
+    _roi_sort_key,
     _strip_query_params,
     compare,
     load_baseline,
@@ -234,6 +236,201 @@ class TestRoiEstimate:
         )
         msg = _roi_estimate(vd, isd)
         assert "No significant LCP change" in msg
+
+
+# ---------------------------------------------------------------------------
+# ROI sort key (Sprint 4, TD-3)
+# ---------------------------------------------------------------------------
+
+class TestRoiSortKey:
+    def test_lcp_improvement_positive(self) -> None:
+        key = _roi_sort_key("lcp", -2400.0, lower_is_better=True)
+        assert key > 0
+        assert key == 2400.0 * 10  # weight 10
+
+    def test_lcp_regression_negative(self) -> None:
+        key = _roi_sort_key("lcp", 500.0, lower_is_better=True)
+        assert key < 0
+        assert key == -(500.0 * 10)
+
+    def test_cls_improvement(self) -> None:
+        key = _roi_sort_key("cls", -0.15, lower_is_better=True)
+        assert key > 0
+        assert key == 0.15 * 1000.0
+
+    def test_ttfb_regression(self) -> None:
+        key = _roi_sort_key("ttfb", 300.0, lower_is_better=True)
+        assert key < 0
+        assert key == -(300.0 * 5.0)
+
+    def test_image_score_improvement_higher_is_better(self) -> None:
+        key = _roi_sort_key("image_score", 15.0, lower_is_better=False)
+        assert key > 0
+        assert key == 15.0 * 3.0
+
+    def test_image_score_decline_negative(self) -> None:
+        key = _roi_sort_key("image_score", -10.0, lower_is_better=False)
+        assert key < 0
+
+    def test_zero_delta_returns_zero(self) -> None:
+        key = _roi_sort_key("lcp", 0.0, lower_is_better=True)
+        assert key == 0.0
+
+    def test_unknown_category_defaults_to_weight_1(self) -> None:
+        key = _roi_sort_key("unknown_metric", -100.0, lower_is_better=True)
+        assert key == 100.0  # weight=1
+
+    def test_image_payload_reduction_positive(self) -> None:
+        key = _roi_sort_key("image_payload", -500_000.0, lower_is_better=True)
+        assert key > 0
+        assert key == 500_000.0 * 0.5  # weight 0.5
+
+    def test_image_waste_increase_negative(self) -> None:
+        key = _roi_sort_key("image_waste", 200_000.0, lower_is_better=True)
+        assert key < 0
+
+
+class TestLcpImpactEstimate:
+    def test_lcp_direct(self) -> None:
+        assert _lcp_impact_estimate("lcp", -2400.0) == 2400.0
+
+    def test_ttfb_partial(self) -> None:
+        assert _lcp_impact_estimate("ttfb", -500.0) == 300.0  # * 0.6
+
+    def test_cls_conversion(self) -> None:
+        assert _lcp_impact_estimate("cls", -0.1) == 20.0  # * 200
+
+    def test_image_bytes_contribution(self) -> None:
+        impact = _lcp_impact_estimate("image_payload", -500_000.0)
+        assert impact == 500_000.0 * 0.8
+
+    def test_unknown_category_returns_zero(self) -> None:
+        assert _lcp_impact_estimate("unknown", 100.0) == 0.0
+
+    def test_positive_delta_magnitude_only(self) -> None:
+        """Impact estimate ignores direction — uses magnitude."""
+        pos = _lcp_impact_estimate("lcp", 500.0)  # regression
+        neg = _lcp_impact_estimate("lcp", -500.0)  # improvement
+        assert pos == neg == 500.0
+
+
+class TestComparisonRecommendationModel:
+    def test_minimal_fields(self) -> None:
+        rec = ComparisonRecommendation(
+            text="LCP improved 4200ms → 1800ms",
+            category="lcp",
+            sort_key=2400.0,
+        )
+        assert rec.text == "LCP improved 4200ms → 1800ms"
+        assert rec.category == "lcp"
+        assert rec.sort_key == 2400.0
+        assert rec.estimated_lcp_impact_ms == 0.0  # default
+
+    def test_all_fields(self) -> None:
+        rec = ComparisonRecommendation(
+            text="TTFB improved 1200ms → 800ms",
+            category="ttfb",
+            estimated_lcp_impact_ms=240.0,
+            sort_key=2000.0,
+        )
+        assert rec.estimated_lcp_impact_ms == 240.0
+        assert rec.sort_key == 2000.0
+
+    def test_category_validation(self) -> None:
+        """Only known categories allowed."""
+        with pytest.raises(ValidationError):
+            ComparisonRecommendation(
+                text="Invalid cat",
+                category="invalid_cat",
+                sort_key=1.0,
+            )
+
+    def test_text_required(self) -> None:
+        with pytest.raises(ValidationError):
+            ComparisonRecommendation(
+                text="",
+                category="lcp",
+                sort_key=1.0,
+            )
+
+
+class TestRecommendationsInSummary:
+    """Verify that compare() populates the new recommendations field correctly."""
+
+    def test_recommendations_populated(self, before_result, after_result) -> None:
+        comp = compare(before_result, after_result)
+        assert hasattr(comp.summary, "recommendations")
+        assert len(comp.summary.recommendations) > 0
+
+    def test_recommendations_are_comparison_recommendation_instances(self, before_result, after_result) -> None:
+        comp = compare(before_result, after_result)
+        for rec in comp.summary.recommendations:
+            assert isinstance(rec, ComparisonRecommendation)
+
+    def test_improvements_sorted_by_roi_descending(self, before_result, after_result) -> None:
+        comp = compare(before_result, after_result)
+        improvements = [r for r in comp.summary.recommendations if r.sort_key > 0]
+        assert len(improvements) >= 2  # LCP + image improvements
+        for i in range(len(improvements) - 1):
+            assert improvements[i].sort_key >= improvements[i + 1].sort_key
+
+    def test_regressions_sorted_by_roi_ascending(self) -> None:
+        """When after is worse than before, regressions come first."""
+        import sys
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+        from engine.audit_orchestrator import run_audit
+
+        before = run_audit(Path(__file__).resolve().parents[1] / "fixtures" / "before_after" / "after_lcp.json",
+                           url="https://demo.myshopify.com")
+        after = run_audit(Path(__file__).resolve().parents[1] / "fixtures" / "before_after" / "before_lcp.json",
+                          url="https://demo.myshopify.com")
+        comp = compare(before, after)
+        regressions = [r for r in comp.summary.recommendations if r.sort_key < 0]
+        assert len(regressions) >= 1
+        # Most negative first (worst regression)
+        for i in range(len(regressions) - 1):
+            assert regressions[i].sort_key <= regressions[i + 1].sort_key
+
+    def test_top_improvements_derived_from_recommendations(self, before_result, after_result) -> None:
+        comp = compare(before_result, after_result)
+        expected = [r.text for r in comp.summary.recommendations if r.sort_key > 0]
+        assert comp.summary.top_improvements == expected
+
+    def test_top_regressions_derived_from_recommendations(self, before_result, after_result) -> None:
+        comp = compare(before_result, after_result)
+        expected = [r.text for r in comp.summary.recommendations if r.sort_key < 0]
+        assert comp.summary.top_regressions == expected
+
+    def test_backward_compat_no_recommendations_when_unchanged(self) -> None:
+        """Comparing identical results yields no recommendations but stable fields."""
+        import sys
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+        from engine.audit_orchestrator import run_audit
+
+        result = run_audit(Path(__file__).resolve().parents[1] / "fixtures" / "before_after" / "before_lcp.json",
+                           url="https://demo.myshopify.com")
+        comp = compare(result, result)
+        assert comp.summary.recommendations == []
+        assert "No measurable changes" in comp.summary.top_improvements[0]
+        assert comp.summary.top_regressions == []
+
+    def test_roi_estimate_still_populated(self, before_result, after_result) -> None:
+        """The existing roi_estimate field must still be present."""
+        comp = compare(before_result, after_result)
+        assert "conversion" in comp.summary.roi_estimate.lower()
+        assert "24%" in comp.summary.roi_estimate
+
+    def test_recommendations_serialize_to_json(self, before_result, after_result) -> None:
+        """Recommendations must survive a model_dump/model_validate round-trip."""
+        comp = compare(before_result, after_result)
+        raw = comp.model_dump()
+        assert "summary" in raw
+        assert "recommendations" in raw["summary"]
+        assert len(raw["summary"]["recommendations"]) > 0
+        # Verify the first recommendation has the expected keys
+        first = raw["summary"]["recommendations"][0]
+        for key in ("text", "category", "estimated_lcp_impact_ms", "sort_key"):
+            assert key in first, f"Missing key {key} in serialized recommendation"
 
 
 # ---------------------------------------------------------------------------

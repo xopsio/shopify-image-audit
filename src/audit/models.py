@@ -182,12 +182,37 @@ class ImageStatsDelta(_ExcludeNoneModel):
 
 
 class ComparisonSummary(_ExcludeNoneModel):
-    """Human-readable roll-up of a comparison."""
+    """Human-readable roll-up of a comparison.
+
+    ``recommendations`` is the authoritative, ROI-sorted list of all detected
+    changes. ``top_improvements`` and ``top_regressions`` are kept for backward
+    compatibility and are derived from ``recommendations`` by the caller.
+    """
     model_config = {"extra": "forbid"}
 
     top_improvements: list[str]
     top_regressions: list[str]
     roi_estimate: str
+    recommendations: list[ComparisonRecommendation] = Field(default_factory=list)
+
+
+class ComparisonRecommendation(_ExcludeNoneModel):
+    """A single ROI-ranked recommendation derived from a before/after comparison.
+
+    Each recommendation describes one measurable change (vital metric, image
+    payload, score, etc.) and assigns a ``sort_key`` based on estimated
+    conversion uplift. Positive ``sort_key`` = improvement; negative = regression.
+    The absolute value encodes the estimated ROI magnitude.
+
+    ``estimated_lcp_impact_ms`` is a rough heuristic of how many ms of LCP
+    improvement this change likely contributed. It is *not* a measured value.
+    """
+    model_config = {"extra": "forbid"}
+
+    text: str = Field(..., min_length=1)
+    category: str = Field(..., pattern=r"^(lcp|cls|inp|ttfb|image_payload|image_waste|image_score)$")
+    estimated_lcp_impact_ms: float = 0.0
+    sort_key: float
 
 
 class ImageDelta(_ExcludeNoneModel):
