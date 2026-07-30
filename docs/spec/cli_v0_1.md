@@ -50,18 +50,21 @@ result as a reusable baseline (`audit_result.json`).
 - Output path safety: `--save` is run through the same path-validation as
   `run --out-dir` (no absolute paths, no `..`, must stay within cwd → exit 2).
 
-### `audit compare <baseline.json> <current.json>` *(Sprint 2, #18/#20)*
+### `audit compare <baseline.json> <current>` *(Sprint 2, #18/#20 + Sprint 3 live URL)*
 Compares a baseline audit against a current audit and reports before/after deltas.
-- Each input may be either a saved `audit_result.json` (from `audit baseline`)
-  **or** a raw Lighthouse/fixture report — the latter is run through the audit
-  pipeline automatically.
+- Each input may be:
+  - a saved `audit_result.json` (from `audit baseline`)
+  - a raw Lighthouse/fixture report (run through the audit pipeline)
+  - **a live URL** (`http://` / `https://`) — fetched via PageSpeed Insights API
 - Flags:
-  - `-o, --output <path>` — write an HTML before/after report (default: print
-    comparison JSON to stdout)
-  - `--json <path>` — also write the comparison result JSON to this file
-- Output: a `ComparisonResult` (vitals deltas + image aggregate deltas + ROI
+  - `-o, --output <path>` — write an HTML before/after report (default: stdout JSON)
+  - `--json <path>` — also write the comparison JSON
+  - `--strategy mobile|desktop` — PageSpeed strategy when `<current>` is a URL
+  - `--api-key <key>` — optional Google Cloud API key for higher rate limits
+- Output: `ComparisonResult` (vitals deltas + image aggregate deltas + ROI
   estimate). Units mirror `Vitals`: ms for LCP/INP/TTFB, unitless for CLS.
-- Exit codes: 0 success, 2 invalid args (missing file, unsafe output path, invalid JSON)
+- Exit codes: 0 success, 2 invalid args (missing file, bad URL, unsafe path),
+  10 backend failure (PageSpeed API error after retries).
 - Output path safety: `-o`/`--json` are run through path-validation (exit 2).
 
 ## Required final output

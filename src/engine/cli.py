@@ -502,23 +502,27 @@ def baseline(
 @app.command()
 def compare(
     baseline_json: Path = typer.Argument(..., help="Path to a baseline audit_result.json (from `audit baseline`)."),
-    current_json: Path = typer.Argument(..., help="Path to the current audit_result.json to compare against."),
+    current: str = typer.Argument(..., help="Path to the current audit_result.json OR a live URL (https://...)."),
     output: Path | None = typer.Option(None, "-o", "--output",
                                           help="Write an HTML before/after report here (default: stdout JSON)."),
     json_out: Path | None = typer.Option(None, "--json",
                                             help="Also write the comparison result JSON to this file."),
+    strategy: str = typer.Option("mobile", "--strategy", help="PageSpeed strategy when <current> is a URL."),
+    api_key: str | None = typer.Option(None, "--api-key", help="Google Cloud API key for PageSpeed (optional)."),
 ) -> None:
     """Compare a baseline audit against a current audit (before/after).
 
-    Each input may be either a saved ``audit_result.json`` (from ``audit
-    baseline``) or a raw Lighthouse / fixture report — the latter is run
-    through the audit pipeline first. This makes ``compare`` usable directly
-    on fixtures without a separate ``baseline`` step.
+    Each input may be a saved ``audit_result.json`` (from ``audit baseline``),
+    a raw Lighthouse/fixture file, or a live URL (the latter is fetched via
+    the PageSpeed Insights API). Mixing formats is fine: e.g. a saved
+    baseline against a live URL.
     """
-    for label, path in (("baseline", baseline_json), ("current", current_json)):
-        if not path.exists():
-            rprint(f"[red]Error:[/red] {label} file not found: {path}")
-            raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+    if not baseline_json.exists():
+        rprint(f"[red]Error:[/red] baseline file not found: {baseline_json}")
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+
+    # --- detect URL vs path in <current> ---
+    current_is_url = current.startswith(("http://", "https://"))
 
     # --- validate output path safety ---
     if output is not None:
@@ -526,17 +530,38 @@ def compare(
     if json_out is not None:
         _validate_out_path(json_out)
 
-    def _load_or_audit(path: Path) -> AuditResult:
+    def _load_or_audit_file(path: Path) -> AuditResult:
         """Load a saved AuditResult, or run the audit pipeline on a raw report."""
         try:
             return load_baseline(path)
         except Exception:
-            # Not a valid AuditResult payload — treat it as a raw LHR/fixture.
             return run_audit(path)
 
+    def _fetch_url_as_audit(url: str) -> AuditResult:
+        """Fetch a live URL via PageSpeed API and run the audit pipeline on the LHR JSON."""
+        from integrations.pagespeed_api import fetch_lighthouse_json
+        lhr = fetch_lighthouse_json(url, strategy=strategy, api_key=api_key)
+        # Write the LHR to a temp file because run_audit takes a path.
+        import tempfile
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as fh:
+            json.dump(lhr, fh)
+            tmp_path = Path(fh.name)
+        try:
+            return run_audit(tmp_path, url=url, device=strategy)
+        finally:
+            tmp_path.unlink(missing_ok=True)
+
     try:
-        before = _load_or_audit(baseline_json)
-        after = _load_or_audit(current_json)
+        before = _load_or_audit_file(baseline_json)
+        if current_is_url:
+            rprint(f"[cyan]Fetching live metrics for {current} (strategy={strategy})...[/cyan]")
+            after = _fetch_url_as_audit(current)
+        else:
+            current_path = Path(current)
+            if not current_path.exists():
+                rprint(f"[red]Error:[/red] current file not found: {current_path}")
+                raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+            after = _load_or_audit_file(current_path)
         comparison = compare_audits(before, after)
     except (json.JSONDecodeError, ValueError) as exc:
         rprint(f"[red]Error:[/red] Invalid input: {exc}")
@@ -544,6 +569,10 @@ def compare(
     except FileNotFoundError as exc:
         rprint(f"[red]Error:[/red] {exc}")
         raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+    except RuntimeError as exc:
+        # Backend failure (PageSpeed API rate limit, 5xx, schema drift).
+        rprint(f"[red]Error:[/red] Backend failure: {exc}")
+        raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE) from None
     except Exception as exc:
         rprint(f"[red]Error:[/red] Failed to compare audits: {exc}")
         raise typer.Exit(code=EXIT_INVALID_ARGS) from None
@@ -581,7 +610,12 @@ def compare(
     if output:
         # Render the current audit with the comparison section attached.
         current_payload = json.loads(after.model_dump_json())
-        current_payload["_source_file"] = str(current_json)
+        # The source file is only meaningful for file-based inputs; URLs use
+        # the URL itself so the report footer doesn't show a stale tmpfile.
+        if current_is_url:
+            current_payload["_source_file"] = current
+        else:
+            current_payload["_source_file"] = current
         html = generate_html_report(current_payload, comparison=comparison)
         Path(output).parent.mkdir(parents=True, exist_ok=True)
         Path(output).write_text(html, encoding="utf-8")

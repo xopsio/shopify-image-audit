@@ -10,6 +10,7 @@ import responses
 from integrations.pagespeed_api import (
     PageSpeedAPIClient,
     PageSpeedMetrics,
+    fetch_lighthouse_json,
 )
 
 # --- Helper for mock responses -------------------------------------------------
@@ -398,3 +399,91 @@ def test_retry_exhausted():
 
     with pytest.raises(RuntimeError, match="service unavailable"):
         client.get_metrics("https://example.com")
+
+
+# --- Tests for fetch_lighthouse_json -----------------------------------------
+
+@responses.activate
+def test_fetch_lighthouse_json_returns_lhr_dict():
+    """fetch_lighthouse_json must return the inner lighthouseResult dict,
+    the same shape as a Lighthouse CLI --output=json artifact."""
+    mock_response = {
+        "lighthouseResult": {
+            "fetchTime": "2024-01-15T10:30:00.000Z",
+            "audits": {
+                "largest-contentful-paint": {"numericValue": 1500},
+            },
+            "categories": {
+                "performance": {"score": 0.9},
+            },
+        },
+    }
+    responses.add(
+        responses.GET,
+        "https://www.googleapis.com/pagespeedonline/v5/runPagespeed",
+        json=mock_response,
+        status=200,
+    )
+
+    lhr = fetch_lighthouse_json("https://example.com", strategy="mobile")
+    assert isinstance(lhr, dict)
+    assert "audits" in lhr
+    assert "largest-contentful-paint" in lhr["audits"]
+    assert lhr["audits"]["largest-contentful-paint"]["numericValue"] == 1500
+
+
+@responses.activate
+def test_fetch_lighthouse_json_sends_strategy():
+    """The strategy parameter must propagate to the API request."""
+    responses.add(
+        responses.GET,
+        "https://www.googleapis.com/pagespeedonline/v5/runPagespeed",
+        json={"lighthouseResult": {"audits": {}, "categories": {}}},
+        status=200,
+    )
+
+    fetch_lighthouse_json("https://example.com", strategy="desktop")
+    assert "strategy=desktop" in responses.calls[0].request.url
+
+
+@responses.activate
+def test_fetch_lighthouse_json_invalid_url():
+    """Bad URL must raise ValueError without hitting the network."""
+    with pytest.raises(ValueError, match="URL"):
+        fetch_lighthouse_json("")
+
+
+@responses.activate
+def test_fetch_lighthouse_json_invalid_strategy():
+    """Bad strategy must raise ValueError."""
+    with pytest.raises(ValueError, match="Strategy"):
+        fetch_lighthouse_json("https://example.com", strategy="tablet")
+
+
+@responses.activate
+def test_fetch_lighthouse_json_missing_lhr_field():
+    """If the response has no lighthouseResult, raise RuntimeError."""
+    responses.add(
+        responses.GET,
+        "https://www.googleapis.com/pagespeedonline/v5/runPagespeed",
+        json={"kind": "pagespeedonline#result"},  # no lighthouseResult
+        status=200,
+    )
+
+    with pytest.raises(RuntimeError, match="lighthouseResult"):
+        fetch_lighthouse_json("https://example.com", max_retries=1)
+
+
+@responses.activate
+def test_fetch_lighthouse_json_url_normalization():
+    """Scheme-less URLs are normalized to https:// before the request."""
+    responses.add(
+        responses.GET,
+        "https://www.googleapis.com/pagespeedonline/v5/runPagespeed",
+        json={"lighthouseResult": {"audits": {}, "categories": {}}},
+        status=200,
+    )
+
+    fetch_lighthouse_json("example.com")
+    # The URL in the API call must have been normalized.
+    assert "url=https%3A%2F%2Fexample.com" in responses.calls[0].request.url

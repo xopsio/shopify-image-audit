@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 
 import pytest
+import responses
 from typer.testing import CliRunner
 
 from engine.cli import app
@@ -407,4 +408,175 @@ class TestCompareCommand:
         r2 = runner.invoke(app, ["compare", "base.json", "after.json"])
         assert r2.exit_code == 0, r2.stdout
         assert "improved" in r2.stdout
+
+
+class TestCompareWithLiveURL:
+    """Test that `audit compare <baseline> <live URL>` fetches via PageSpeed API."""
+
+    @staticmethod
+    def _mock_pagespeed_response() -> dict:
+        """A minimal Lighthouse-JSON-shaped response that the audit pipeline accepts."""
+        return {
+            "lighthouseResult": {
+                "fetchTime": "2024-01-15T10:30:00.000Z",
+                "requestedUrl": "https://demo.myshopify.com",
+                "audits": {
+                    "largest-contentful-paint": {"numericValue": 1800},
+                    "cumulative-layout-shift": {"numericValue": 0.04},
+                    "interactive": {"numericValue": 3500},
+                    "server-response-time": {"numericValue": 800},
+                    "metrics": {
+                        "details": {
+                            "items": [
+                                {
+                                    "largestContentfulPaint": 1800.0,
+                                    "cumulativeLayoutShift": 0.04,
+                                    "interactive": 3500.0,
+                                    "serverResponseTime": 800.0,
+                                },
+                            ]
+                        }
+                    },
+                },
+                "categories": {"performance": {"score": 0.85}},
+                # LHR-shaped image-elements audit (so the parser finds images)
+                "image-elements": {
+                    "details": {
+                        "items": [
+                            {
+                                "url": "https://demo.myshopify.com/hero.webp",
+                                "resourceSize": 95000,
+                                "mimeType": "image/webp",
+                                "displayedWidth": 1200,
+                                "displayedHeight": 600,
+                                "naturalWidth": 1200,
+                                "naturalHeight": 600,
+                            },
+                        ]
+                    }
+                },
+                "largest-contentful-paint-element": {
+                    "details": {"items": [{"url": "https://demo.myshopify.com/hero.webp"}]}
+                },
+            }
+        }
+
+    @responses.activate
+    def test_compare_against_live_url(self, tmp_path, monkeypatch):
+        """Baseline (file) vs current (URL) — full CLI smoke with mocked PSI."""
+        from typer.testing import CliRunner
+
+        from engine.cli import app
+
+        monkeypatch.chdir(tmp_path)
+
+        # Saved baseline (good state) — build via the pipeline so it's
+        # schema-compliant.
+        before_json = {
+            "lcp_ms": 4200, "cls": 0.18, "inp_ms": 320, "ttfb_ms": 900,
+            "images": [{"url": "hero.jpg", "resourceSize": 1_200_000,
+                        "mimeType": "image/jpeg",
+                        "displayedWidth": 1200, "displayedHeight": 600,
+                        "is_lcp_candidate": True}],
+        }
+        (tmp_path / "before.json").write_text(json.dumps(before_json))
+
+        # Mock PageSpeed API to return the LHR above.
+        responses.add(
+            responses.GET,
+            "https://www.googleapis.com/pagespeedonline/v5/runPagespeed",
+            json=self._mock_pagespeed_response(),
+            status=200,
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(app, [
+            "compare", "before.json", "https://demo.myshopify.com",
+            "--strategy", "mobile",
+        ])
+        # Exit code 0 = success (a happy-path LCP improvement is expected).
+        assert result.exit_code == 0, result.stdout
+        # The "improved" word appears in the comparison table for LCP delta.
+        assert "improved" in result.stdout
+        # And we actually called PageSpeed (responses-mock matches by URL).
+        assert len(responses.calls) == 1
+
+    @responses.activate
+    def test_compare_live_url_with_html_output(self, tmp_path, monkeypatch):
+        """Live URL + HTML output must render the comparison section."""
+        from typer.testing import CliRunner
+
+        from engine.cli import app
+
+        monkeypatch.chdir(tmp_path)
+        before_json = {
+            "lcp_ms": 4200, "cls": 0.18, "inp_ms": 320, "ttfb_ms": 900,
+            "images": [],
+        }
+        (tmp_path / "before.json").write_text(json.dumps(before_json))
+        responses.add(
+            responses.GET,
+            "https://www.googleapis.com/pagespeedonline/v5/runPagespeed",
+            json=self._mock_pagespeed_response(),
+            status=200,
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(app, [
+            "compare", "before.json", "https://demo.myshopify.com",
+            "-o", "report.html",
+        ])
+        assert result.exit_code == 0, result.stdout
+        html = Path("report.html").read_text(encoding="utf-8")
+        assert "Before / After Comparison" in html
+
+    @responses.activate
+    def test_compare_live_url_api_error(self, tmp_path, monkeypatch):
+        """API failure -> exit 10 (backend/Lighthouse/API failure convention)."""
+        from typer.testing import CliRunner
+
+        from engine.cli import app
+
+        monkeypatch.chdir(tmp_path)
+        before_json = {
+            "lcp_ms": 4200, "cls": 0.18, "inp_ms": 320, "ttfb_ms": 900,
+            "images": [],
+        }
+        (tmp_path / "before.json").write_text(json.dumps(before_json))
+
+        # All retries fail with 500 — the client raises RuntimeError after
+        # retries are exhausted.
+        responses.add(
+            responses.GET,
+            "https://www.googleapis.com/pagespeedonline/v5/runPagespeed",
+            status=500,
+            body="Internal Server Error",
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(app, [
+            "compare", "before.json", "https://demo.myshopify.com",
+        ])
+        assert result.exit_code == 10
+        assert "PageSpeed API" in result.stdout
+
+    def test_compare_live_url_invalid_strategy(self, tmp_path, monkeypatch):
+        """Bad --strategy must exit 2 (invalid args)."""
+        from typer.testing import CliRunner
+
+        from engine.cli import app
+
+        monkeypatch.chdir(tmp_path)
+        before_json = {
+            "lcp_ms": 4200, "cls": 0.18, "inp_ms": 320, "ttfb_ms": 900,
+            "images": [],
+        }
+        (tmp_path / "before.json").write_text(json.dumps(before_json))
+
+        runner = CliRunner()
+        result = runner.invoke(app, [
+            "compare", "before.json", "https://demo.myshopify.com",
+            "--strategy", "tablet",
+        ])
+        assert result.exit_code == 2
 

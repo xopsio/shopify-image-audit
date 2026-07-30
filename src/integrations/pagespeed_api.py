@@ -360,3 +360,87 @@ def get_pagespeed_metrics(
     """
     client = PageSpeedAPIClient(api_key=api_key)
     return client.get_metrics(url, strategy=strategy)
+
+
+def fetch_lighthouse_json(
+    url: str,
+    strategy: str = "mobile",
+    api_key: str | None = None,
+    *,
+    timeout: int = DEFAULT_TIMEOUT,
+    max_retries: int = DEFAULT_RETRIES,
+) -> dict:
+    """
+    Fetch a full Lighthouse JSON report for ``url`` from the PageSpeed Insights API.
+
+    Returns the raw ``lighthouseResult`` dict (same shape as a Lighthouse CLI
+    ``--output=json`` artifact). Suitable for passing directly to
+    ``engine.audit_orchestrator.run_audit`` via a temporary file, or for any
+    consumer that wants the raw audit payload rather than the parsed
+    ``PageSpeedMetrics``.
+
+    Raises:
+        ValueError: bad URL / strategy.
+        RuntimeError: API error or rate limit.
+        requests.exceptions.RequestException: network failure after retries.
+    """
+    if strategy not in ("mobile", "desktop"):
+        raise ValueError(f"Strategy must be 'mobile' or 'desktop', got '{strategy}'")
+
+    # Build a one-shot client with explicit timeout/retries so the caller can
+    # dial them without instantiating PageSpeedAPIClient themselves.
+    client = PageSpeedAPIClient(
+        api_key=api_key, timeout=timeout, max_retries=max_retries,
+    )
+    # Validate + normalise the URL (raises ValueError on bad input).
+    url = client._validate_url(url)
+    client._wait_for_rate_limit()
+
+    params = client._build_params(url, strategy)
+
+    last_exception: Exception | None = None
+    for attempt in range(client.max_retries):
+        try:
+            client._last_request_time = time.time()
+            response = requests.get(PSI_API_URL, params=params, timeout=client.timeout)
+
+            if response.status_code == 429:
+                if attempt < client.max_retries - 1:
+                    time.sleep(client.retry_delay * (attempt + 1))
+                    continue
+                raise RuntimeError(
+                    f"PageSpeed API rate limit exceeded. Status: {response.status_code}."
+                )
+            if response.status_code == 503:
+                if attempt < client.max_retries - 1:
+                    time.sleep(client.retry_delay * (attempt + 1))
+                    continue
+                raise RuntimeError(
+                    f"PageSpeed API service unavailable. Status: {response.status_code}."
+                )
+            if response.status_code != 200:
+                raise RuntimeError(
+                    f"PageSpeed API error: {response.status_code} - "
+                    f"{client._get_error_message(response)}"
+                )
+
+            data = response.json()
+            if "error" in data:
+                raise RuntimeError(
+                    f"PageSpeed API error: {data['error'].get('message', 'Unknown')}"
+                )
+            lhr = data.get("lighthouseResult")
+            if not isinstance(lhr, dict):
+                raise RuntimeError("PageSpeed API response missing 'lighthouseResult'")
+            return lhr
+        except requests.exceptions.RequestException as e:
+            last_exception = e
+            if attempt < client.max_retries - 1:
+                time.sleep(client.retry_delay)
+                continue
+            raise
+
+    # Defensive — should not be reachable.
+    if last_exception:
+        raise last_exception
+    raise RuntimeError("Unexpected error in PageSpeed API request")
