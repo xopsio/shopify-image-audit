@@ -11,9 +11,15 @@ from integrations.pagespeed_api import (
     PageSpeedMetrics,
     get_pagespeed_metrics,
 )
+from integrations.shopify_admin import (
+    ShopifyAdminClient,
+    ShopifyAdminError,
+)
 
 __all__ = [
     "PageSpeedAPIClient",
     "PageSpeedMetrics",
     "get_pagespeed_metrics",
+    "ShopifyAdminClient",
+    "ShopifyAdminError",
 ]

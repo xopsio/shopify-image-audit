@@ -74,6 +74,18 @@ audit measure https://demo.myshopify.com --strategy mobile
 # -> JSON metrics to stdout (or --output metrics.json)
 ```
 
+### `audit shopify <auth|inventory> <store>` — Shopify Admin API
+```bash
+# Verify a token
+audit shopify auth mystore.myshopify.com --access-token shpat_xxx
+# -> Token valid, prints shop info
+
+# List all image URLs (products + theme assets)
+audit shopify inventory mystore.myshopify.com --access-token shpat_xxx -o inventory.json
+```
+Read-only scopes required (`read_products`, `read_themes`, `read_shop`).
+See `docs/integrations/SHOPIFY_ADMIN.md` for token-acquisition steps.
+
 ### `audit score <audit_input.json> --ranker {heuristic|ml}`
 ```bash
 audit score extracted.json                    # default: heuristic
