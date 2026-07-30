@@ -11,11 +11,15 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 import requests
 
 from engine._logging import get_logger
+
+if TYPE_CHECKING:
+    from integrations._cache import ResponseCache
 
 _log = get_logger()
 
@@ -97,6 +101,7 @@ class PageSpeedAPIClient:
         timeout: int = DEFAULT_TIMEOUT,
         max_retries: int = DEFAULT_RETRIES,
         retry_delay: float = RETRY_DELAY,
+        cache: ResponseCache | None = None,
     ):
         """
         Initialize the PageSpeed API client.
@@ -106,11 +111,15 @@ class PageSpeedAPIClient:
             timeout: Request timeout in seconds.
             max_retries: Maximum number of retry attempts.
             retry_delay: Delay between retries in seconds.
+            cache: Optional :class:`~integrations._cache.ResponseCache`.
+                When provided, successful responses are cached and served
+                from cache within the TTL. Pass ``None`` to disable.
         """
         self.api_key = api_key
         self.timeout = timeout
         self.max_retries = max_retries
         self.retry_delay = retry_delay
+        self._cache = cache
         self._last_request_time: float = 0
 
         # Rate limiting: Google recommends at least 1 second between requests
@@ -253,6 +262,12 @@ class PageSpeedAPIClient:
         # Validate and normalize URL
         url = self._validate_url(url)
 
+        # Check cache before hitting the network.
+        if self._cache is not None:
+            cached = self._cache.get(url, strategy)
+            if cached is not None:
+                return self._parse_response(cached, url, strategy)
+
         # Rate limiting
         self._wait_for_rate_limit()
 
@@ -307,6 +322,10 @@ class PageSpeedAPIClient:
                 if "error" in data:
                     error_msg = data["error"].get("message", "Unknown error")
                     raise RuntimeError(f"PageSpeed API error: {error_msg}")
+
+                # Cache the successful response for future calls.
+                if self._cache is not None:
+                    self._cache.set(url, strategy, data)
 
                 return self._parse_response(data, url, strategy)
 
