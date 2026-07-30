@@ -18,7 +18,12 @@ from pydantic import ValidationError
 from audit.models import AuditResult, ComparisonResult
 from core.baseline_manager import (
     _delta,
+    _image_key,
+    _match_images,
+    _per_image_recommendation,
+    _per_image_status,
     _roi_estimate,
+    _strip_query_params,
     compare,
     load_baseline,
     save_baseline,
@@ -229,3 +234,215 @@ class TestRoiEstimate:
         )
         msg = _roi_estimate(vd, isd)
         assert "No significant LCP change" in msg
+
+
+# ---------------------------------------------------------------------------
+# Per-image deltas (Sprint 3, TD-2)
+# ---------------------------------------------------------------------------
+
+class TestStripQueryParams:
+    def test_no_query(self) -> None:
+        assert _strip_query_params("https://cdn.example.com/hero.webp") == \
+            "https://cdn.example.com/hero.webp"
+
+    def test_with_v_query(self) -> None:
+        assert _strip_query_params(
+            "https://cdn.example.com/hero.webp?v=2"
+        ) == "https://cdn.example.com/hero.webp"
+
+    def test_with_multiple_params(self) -> None:
+        assert _strip_query_params(
+            "https://cdn.example.com/hero.webp?v=2&token=abc"
+        ) == "https://cdn.example.com/hero.webp"
+
+    def test_relative_path(self) -> None:
+        assert _strip_query_params("/path/img.jpg?x=1") == "/path/img.jpg"
+
+
+class TestImageKey:
+    def test_same_input_same_key(self) -> None:
+        img = {"src": "https://cdn.example.com/x.jpg", "bytes": 1000, "mime": "image/jpeg"}
+        assert _image_key(img) == _image_key(dict(img))
+
+    def test_query_param_does_not_change_key(self) -> None:
+        # CDN cache busting must not break matching.
+        a = {"src": "https://cdn.example.com/hero.webp", "bytes": 1000, "mime": "image/webp"}
+        b = {"src": "https://cdn.example.com/hero.webp?v=2", "bytes": 1000, "mime": "image/webp"}
+        assert _image_key(a) == _image_key(b)
+
+    def test_different_bytes_different_key(self) -> None:
+        a = {"src": "https://x/y.jpg", "bytes": 1000, "mime": "image/jpeg"}
+        b = {"src": "https://x/y.jpg", "bytes": 2000, "mime": "image/jpeg"}
+        assert _image_key(a) != _image_key(b)
+
+    def test_different_mime_different_key(self) -> None:
+        a = {"src": "https://x/y", "bytes": 1000, "mime": "image/jpeg"}
+        b = {"src": "https://x/y", "bytes": 1000, "mime": "image/webp"}
+        assert _image_key(a) != _image_key(b)
+
+
+class TestPerImageStatus:
+    @pytest.mark.parametrize("before,after,expected", [
+        (1000, 500, "improved"),     # -50% >= 10% threshold
+        (1000, 700, "improved"),     # -30% >= 10% threshold
+        (1000, 950, "unchanged"),    # -5% within tolerance
+        (1000, 1050, "unchanged"),   # +5% within tolerance
+        (1000, 2000, "regressed"),   # +100% >= 10% threshold
+        (0, 1000, "unchanged"),      # zero before_bytes -> unchanged (can't compute ratio)
+    ])
+    def test_status_thresholds(self, before, after, expected) -> None:
+        assert _per_image_status(before, after) == expected
+
+
+class TestPerImageRecommendation:
+    def test_added_recommends_webp(self) -> None:
+        rec = _per_image_recommendation("added", None, "image/jpeg", 0)
+        assert "WebP" in rec or "AVIF" in rec
+
+    def test_added_no_recommendation_for_modern_format(self) -> None:
+        rec = _per_image_recommendation("added", None, "image/webp", 0)
+        assert "WebP" not in rec  # already modern
+
+    def test_removed_short(self) -> None:
+        assert _per_image_recommendation("removed", "image/jpeg", None, 0) == "Image removed."
+
+    def test_format_conversion_mentions_both(self) -> None:
+        rec = _per_image_recommendation(
+            "improved", "image/jpeg", "image/webp", 5,
+        )
+        assert "jpeg" in rec.lower() and "webp" in rec.lower()
+
+
+class TestMatchImages:
+    def test_empty_inputs(self) -> None:
+        assert _match_images([], []) == []
+
+    def test_perfect_match(self) -> None:
+        """Same src (with different cache-bust query params) and same bytes/mime -> paired."""
+        before = [{"src": "https://x/a.jpg", "bytes": 1000, "mime": "image/jpeg"}]
+        after = [{"src": "https://x/a.jpg?v=2", "bytes": 1000, "mime": "image/jpeg"}]
+        deltas = _match_images(before, after)
+        assert len(deltas) == 1
+        assert deltas[0].before == before[0]
+        assert deltas[0].after == after[0]
+        assert deltas[0].bytes_delta == 0
+        assert deltas[0].status == "unchanged"
+
+    def test_size_reduction_is_improved(self) -> None:
+        before = [{"src": "https://x/hero.jpg", "bytes": 1_200_000, "mime": "image/jpeg"}]
+        after = [{"src": "https://x/hero.webp", "bytes": 95_000, "mime": "image/webp"}]
+        deltas = _match_images(before, after)
+        # Different bytes+mime -> different _image_key -> "removed" + "added"
+        # NOT "improved" (which requires same key). This is by design: format
+        # conversion IS a new image.
+        statuses = {d.status for d in deltas}
+        assert statuses == {"removed", "added"}
+
+    def test_added_only(self) -> None:
+        deltas = _match_images(
+            [],
+            [{"src": "https://x/new.jpg", "bytes": 500, "mime": "image/jpeg"}],
+        )
+        assert len(deltas) == 1
+        assert deltas[0].status == "added"
+        assert deltas[0].before is None
+        assert deltas[0].after is not None
+
+    def test_removed_only(self) -> None:
+        deltas = _match_images(
+            [{"src": "https://x/old.jpg", "bytes": 1000, "mime": "image/jpeg"}],
+            [],
+        )
+        assert len(deltas) == 1
+        assert deltas[0].status == "removed"
+        assert deltas[0].before is not None
+        assert deltas[0].after is None
+
+    def test_mixed_add_remove_keep(self) -> None:
+            """3 before, 3 after: 1 kept, 1 removed (no match), 1 added, 1 regressed (5x growth)."""
+            before = [
+                {"src": "https://x/keep.jpg", "bytes": 1000, "mime": "image/jpeg"},
+                {"src": "https://x/removed.jpg", "bytes": 2000, "mime": "image/jpeg"},
+                {"src": "https://x/grew.jpg", "bytes": 100, "mime": "image/jpeg"},
+            ]
+            after = [
+                {"src": "https://x/keep.jpg", "bytes": 1000, "mime": "image/jpeg"},
+                {"src": "https://x/grew.jpg", "bytes": 500, "mime": "image/jpeg"},
+                {"src": "https://x/added.jpg", "bytes": 300, "mime": "image/webp"},
+            ]
+            deltas = _match_images(before, after)
+            statuses = {d.status for d in deltas}
+            # keep: unchanged (same bytes); removed: removed (no after-match);
+            # grew: regressed (bytes 100 -> 500 = +400%); added: added
+            assert statuses == {"added", "removed", "regressed", "unchanged"}
+
+
+class TestComparePerImage:
+    """The compare() function must populate the new per_image field."""
+
+    def test_compare_populates_per_image(self) -> None:
+        before = AuditResult.model_validate({
+            "meta": {"url": "x", "timestamp_utc": "2026-01-01T00:00:00Z",
+                     "device": "mobile", "runs": 1, "tool": "lighthouse"},
+            "vitals": {"lcp_ms": 1000.0, "cls": 0.0, "inp_ms": 100.0, "ttfb_ms": 200.0},
+            "images": [
+                {"src": "https://x/hero.jpg", "role": "hero", "score": 50,
+                 "bytes": 500_000, "mime": "image/jpeg"},
+            ],
+            "summary": {"top_issues": []},
+        })
+        after = AuditResult.model_validate({
+            "meta": {"url": "y", "timestamp_utc": "2026-01-02T00:00:00Z",
+                     "device": "mobile", "runs": 1, "tool": "lighthouse"},
+            "vitals": {"lcp_ms": 1000.0, "cls": 0.0, "inp_ms": 100.0, "ttfb_ms": 200.0},
+            "images": [
+                {"src": "https://x/hero.jpg?v=2", "role": "hero", "score": 90,
+                 "bytes": 500_000, "mime": "image/jpeg"},
+            ],
+            "summary": {"top_issues": []},
+        })
+        comp = compare(before, after)
+        assert len(comp.per_image) == 1
+        assert comp.per_image[0].status == "unchanged"
+        assert comp.per_image[0].score_delta == 40
+
+    def test_compare_empty_images_yields_empty_per_image(self) -> None:
+        before = AuditResult.model_validate({
+            "meta": {"url": "x", "timestamp_utc": "2026-01-01T00:00:00Z",
+                     "device": "mobile", "runs": 1, "tool": "lighthouse"},
+            "vitals": {"lcp_ms": 1000.0, "cls": 0.0, "inp_ms": 100.0, "ttfb_ms": 200.0},
+            "images": [],
+            "summary": {"top_issues": []},
+        })
+        after = before.model_copy(deep=True)
+        after.meta.url = "y"
+        after.meta.timestamp_utc = "2026-01-02T00:00:00Z"
+        comp = compare(before, after)
+        assert comp.per_image == []
+
+    def test_compare_preserves_cohort_aggregates(self) -> None:
+        """Adding per_image must not remove the existing cohort-level fields."""
+        before = AuditResult.model_validate({
+            "meta": {"url": "x", "timestamp_utc": "2026-01-01T00:00:00Z",
+                     "device": "mobile", "runs": 1, "tool": "lighthouse"},
+            "vitals": {"lcp_ms": 1000.0, "cls": 0.0, "inp_ms": 100.0, "ttfb_ms": 200.0},
+            "images": [
+                {"src": "a.jpg", "role": "hero", "score": 80, "bytes": 1000, "mime": "image/jpeg"},
+            ],
+            "summary": {"top_issues": []},
+        })
+        after = AuditResult.model_validate({
+            "meta": {"url": "y", "timestamp_utc": "2026-01-02T00:00:00Z",
+                     "device": "mobile", "runs": 1, "tool": "lighthouse"},
+            "vitals": {"lcp_ms": 1000.0, "cls": 0.0, "inp_ms": 100.0, "ttfb_ms": 200.0},
+            "images": [
+                {"src": "a.jpg", "role": "hero", "score": 90, "bytes": 800, "mime": "image/jpeg"},
+            ],
+            "summary": {"top_issues": []},
+        })
+        comp = compare(before, after)
+        # Cohort fields still populated (backward compat)
+        assert comp.images.before_total_bytes == 1000
+        assert comp.images.after_total_bytes == 800
+        # AND per_image is populated
+        assert len(comp.per_image) == 1

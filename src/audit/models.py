@@ -190,6 +190,35 @@ class ComparisonSummary(_ExcludeNoneModel):
     roi_estimate: str
 
 
+class ImageDelta(_ExcludeNoneModel):
+    """Per-image delta between before and after AuditResults.
+
+    One of ``before`` / ``after`` may be None for added or removed images.
+    ``match_key`` identifies which before-image pairs with which after-image
+    (see ``core.baseline_manager._image_key`` for the hashing scheme).
+    """
+    model_config = {"extra": "forbid"}
+
+    match_key: str
+    src: str
+    role_before: str | None = None
+    role_after: str | None = None
+
+    before: dict[str, Any] | None = None
+    after: dict[str, Any] | None = None
+
+    bytes_delta: int | None = None
+    score_delta: int | None = None
+    mime_before: str | None = None
+    mime_after: str | None = None
+
+    status: str = Field(
+        ..., pattern="^(improved|regressed|unchanged|added|removed)$"
+    )
+
+    recommendation: str | None = None
+
+
 class ComparisonResult(_ExcludeNoneModel):
     """Top-level result of comparing two AuditResults.
 
@@ -204,4 +233,5 @@ class ComparisonResult(_ExcludeNoneModel):
     vitals: VitalsDelta
     images: ImageStatsDelta
     summary: ComparisonSummary
+    per_image: list[ImageDelta] = Field(default_factory=list)
 
