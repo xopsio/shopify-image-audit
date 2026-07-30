@@ -57,6 +57,8 @@ jobs:
     environment: pypi
     permissions:
       id-token: write
+      # Required for the provenance attestation step below.
+      attestations: write
 
     steps:
       - name: Download distribution artifacts
@@ -64,6 +66,16 @@ jobs:
         with:
           name: python-package-distributions
           path: dist
+
+      # SLSA build-provenance attestation: cryptographically signs the
+      # artifacts so downstream consumers can verify their origin. Uses
+      # the existing OIDC id-token. Non-blocking so provenance failure
+      # doesn't block the PyPI publish.
+      - name: Generate build provenance attestation
+        uses: actions/attest-build-provenance@v2
+        continue-on-error: true
+        with:
+          subject-path: dist/*
 
       # Trusted publishing: no API token needed. PyPI verifies the
       # workflow identity via OIDC. Configure the trusted publisher
