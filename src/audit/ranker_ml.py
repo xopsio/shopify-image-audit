@@ -35,6 +35,8 @@ from __future__ import annotations
 import math
 from typing import Any
 
+from core.image_signals import _safe_int, assign_role, displayed_area
+
 # Same role vocabulary as ranker_heuristic (and the ImageRole enum).
 ROLES = (
     "hero",
@@ -67,21 +69,9 @@ _SIZE_CEIL = 2_500_000        # bytes at which f_size = 0.0
 _DENSITY_CEIL = 300.0
 
 
-def _safe_int(value: Any) -> int:
-    """Coerce to int; return 0 on any failure (defensive)."""
-    if value is None:
-        return 0
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return 0
-
-
-def _displayed_area(img: dict[str, Any]) -> int:
-    """Displayed pixel area; 0 when dims missing/invalid."""
-    w = _safe_int(img.get("displayed_width"))
-    h = _safe_int(img.get("displayed_height"))
-    return w * h if w > 0 and h > 0 else 0
+# Backwards-compatible aliases for the public API. The shared helpers in
+# ``core.image_signals`` are the single source of truth.
+_displayed_area = displayed_area
 
 
 def _f_size(bytes_: int) -> float:
@@ -185,22 +175,13 @@ def _score_from_features(f: dict[str, float], *, is_lcp: bool, bytes_: int) -> i
 # ---------------------------------------------------------------------------
 
 def _role_from_features(img: dict[str, Any], features: dict[str, float], index: int) -> str:
-    """Assign a role using the same vocabulary + rough thresholds as the heuristic."""
-    is_lcp = bool(img.get("is_lcp_candidate"))
-    area = _displayed_area(img)
-    bytes_ = _safe_int(img.get("bytes"))
+    """Assign a role using the shared heuristic from ``core.image_signals``.
 
-    if is_lcp and area >= 200_000:
-        return "hero"
-    if is_lcp:
-        return "above_fold"
-    if index == 0 and area >= 150_000:
-        return "above_fold"
-    if area >= 100_000 and bytes_ > 50_000:
-        return "product_primary" if index < 3 else "product_secondary"
-    if area < 30_000 or bytes_ < 5_000:
-        return "decorative"
-    return "unknown"
+    Kept as a thin shim with the original signature for backwards compat
+    (tests import ``_role_from_features(img, feats, index)``; ``features``
+    is unused but preserved).
+    """
+    return assign_role(img, index)
 
 
 # ---------------------------------------------------------------------------
