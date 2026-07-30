@@ -22,3 +22,22 @@ htmlcov/
 
 # Demo output
 demo_out/
+
+# Python build artefacts (more thorough than 'build/')
+build/lib/
+build/bdist.*/
+build/scripts-*/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Coverage report
+.coverage.*
+
+# PyPI metadata
+*.egg-info

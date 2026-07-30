@@ -3,7 +3,7 @@
 [![CI](https://github.com/xopsio/shopify-image-audit/actions/workflows/ci.yml/badge.svg)](https://github.com/xopsio/shopify-image-audit/actions)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
 [![ruff](https://img.shields.io/badge/lint-ruff-green)](https://docs.astral.sh/ruff/)
-[![tests](https://img.shields.io/badge/tests-276_passing-brightgreen)](#testing)
+[![tests](https://img.shields.io/badge/tests-390_passing-brightgreen)](#testing)
 
 A Lighthouse-based image audit tool for Shopify stores. Produces per-image
 scores, role assignments, optimisation recommendations, and a **before/after
@@ -25,7 +25,7 @@ pip install -e ".[dev]"
 
 # Verify the install
 audit version
-pytest -q                                              # 276 tests
+pytest -q                                              # 390 tests
 ```
 
 ---
@@ -60,12 +60,16 @@ audit compare baseline.json fixtures/before_after/after_lcp.json \
 audit compare baseline.json https://demo.myshopify.com \
     --strategy mobile --api-key YOUR_KEY \
     -o comparison.html
+
+# HTML report includes a per-image delta table (bytes, score, status per image).
+# PDF export via --pdf flag.
 ```
 Exit codes: `0` success, `2` invalid args, `10` backend failure.
 
-### `audit report <audit_result.json>` — HTML report
+### `audit report <audit_result.json>` — HTML or PDF report
 ```bash
-audit report baseline.json -o report.html
+audit report baseline.json -o report.html          # HTML
+audit report baseline.json -o report.pdf --pdf     # PDF (WeasyPrint)
 ```
 
 ### `audit measure <url>` — live PageSpeed metrics only
@@ -118,25 +122,27 @@ ranker is a hand-coded feature ensemble, not a statistical model — see
 ```
 src/
 ├── audit/                    # scoring + reporting
-│   ├── models.py             # Pydantic v2 schemas (AuditResult, ComparisonResult)
+│   ├── models.py             # Pydantic v2 schemas (AuditResult, ComparisonResult, ImageDelta)
 │   ├── parser.py             # Lighthouse / fixture JSON parser
 │   ├── ranker_heuristic.py   # default ranker (bpp-based)
 │   ├── ranker_ml.py          # opt-in ML-style ranker (weighted ensemble)
-│   ├── report.py             # HTML report renderer (split into _render_* funcs)
-│   └── lighthouse_runner.py  # reserved for future Lighthouse subprocess refactor
+│   └── report.py             # HTML/PDF report renderer (split into _render_* funcs)
 ├── core/                     # core algorithms
 │   ├── image_extractor.py    # LHR image audit extraction
-│   ├── performance_scorer.py # single-image score helper (standalone, not wired)
-│   └── baseline_manager.py   # save/load baselines + compare()
+│   ├── image_signals.py      # shared displayed_area, assign_role, _safe_int
+│   └── baseline_manager.py   # save/load baselines + compare() + per-image matching
 ├── engine/                   # orchestration + CLI
-│   ├── cli.py                # Typer app (run, measure, baseline, compare, ...)
+│   ├── cli.py                # Typer app (run, measure, baseline, compare, shopify, ...)
+│   ├── cli_helpers/          # extracted CLI helpers (validators, dispatchers, table, errors)
 │   └── audit_orchestrator.py # run_audit() pipeline
 └── integrations/             # external APIs
-    └── pagespeed_api.py      # PageSpeed Insights (measure + fetch_lighthouse_json)
+    ├── pagespeed_api.py      # PageSpeed Insights (measure + fetch_lighthouse_json)
+    └── shopify_admin.py      # Shopify Admin API (auth, products, theme_assets)
 
 schemas/audit_result.schema.json    # JSON Schema contract (validated by tests)
-tests/                              # 276 tests, single-writer (ZCode)
+tests/                              # 390 tests, single-writer (ZCode)
 docs/examples/                       # live demo report + comparison JSON
+docs/integrations/                   # Shopify Admin API token guide
 ```
 
 The codebase is governed by **a single ZCode agent** (see
@@ -147,8 +153,8 @@ The codebase is governed by **a single ZCode agent** (see
 ## Testing
 
 ```bash
-pytest -q                                # 276 tests, single-writer discipline
-pytest --cov=src --cov-report=term       # ~82% coverage
+pytest -q                                # 390 tests, single-writer discipline
+pytest --cov=src --cov-report=term       # ~87% coverage
 ruff check src/ tests/                   # 0 violations
 ```
 
@@ -171,11 +177,11 @@ merge. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
 - ✅ Sprint 1 — v0.1.0 baseline (parser, ranker, orchestrator, CLI, HTML report, 103 tests)
 - ✅ Sprint 2 — before/after workflow, customer docs, ML ranker, live URL compare, CI, governance cleanup (276 tests)
-- 🔜 Sprint 3 — see [`docs/ROADMAP.md`](docs/ROADMAP.md) (in progress)
-  - PDF report export
-  - Per-image before/after comparison (currently cohort-level only)
-  - Shopify Admin API integration for direct store access
-  - Image-optimisation automation hooks
+- ✅ Sprint 3 — PDF export, per-image deltas, Shopify Admin API, v0.2.0 release prep (390 tests)
+- 🔜 Sprint 4 — see [`docs/SPRINT_4_PLAN.md`](docs/SPRINT_4_PLAN.md)
+  - Branded report templates (customer logo + colours)
+  - ROI-ranked recommendations
+  - Audit history + trend view
 
 ---
 
@@ -184,5 +190,6 @@ merge. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 - [`docs/spec/cli_v0_1.md`](docs/spec/cli_v0_1.md) — full CLI specification
 - [`docs/governance.md`](docs/governance.md) — ownership + workflow
 - [`docs/runbook/measurement_protocol.md`](docs/runbook/measurement_protocol.md) — how LCP/CLS/INP are measured deterministically
-- [`docs/SPRINT_2_COMPLETE.md`](docs/SPRINT_1_COMPLETE.md) — what shipped in Sprint 1
+- [`docs/SPRINT_1_COMPLETE.md`](docs/SPRINT_1_COMPLETE.md) — what shipped in Sprint 1
+- [`docs/SPRINT_3_PLAN.md`](docs/SPRINT_3_PLAN.md) — Sprint 3 breakdown (all done)
 - [`QA_CHECKLIST.md`](QA_CHECKLIST.md) — quality gates

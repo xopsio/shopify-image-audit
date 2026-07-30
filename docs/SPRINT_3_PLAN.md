@@ -1,7 +1,7 @@
 # Sprint 3 Plan — Revenue Expansion
 
 **Duration:** 3–4 weeks
-**Status:** PLANNING
+**Status:** ✅ COMPLETE (2026-07-30)
 **Phase:** Phase 3 (post-Sprint 2; see [`ROADMAP.md`](ROADMAP.md))
 
 ---
@@ -111,11 +111,11 @@ Tasks:
    `libgdk-pixbuf`) — needs a CI workflow update
 
 Acceptance:
-- [ ] `audit report foo.json --pdf report.pdf` produces a valid PDF
-- [ ] `audit compare before.json after.json --pdf diff.pdf` produces PDF
+- [x] `audit report foo.json --pdf report.pdf` produces a valid PDF
+- [x] `audit compare before.json after.json --pdf diff.pdf` produces PDF
   with the comparison section
-- [ ] Tests pass with WeasyPrint installed
-- [ ] CI green
+- [x] Tests pass with WeasyPrint installed
+- [x] CI green
 
 ### TD-2: Per-image before/after comparison (`feat/per-image-deltas`)
 **Owner:** ZCode
@@ -134,10 +134,10 @@ Tasks:
    - All schema fields populated; cohort summary still correct
 
 Acceptance:
-- [ ] `comparison.images.per_image` is a list (even if empty)
-- [ ] HTML report shows per-image delta table when data available
-- [ ] Schema backward compatible (additions only)
-- [ ] Tests pass
+- [x] `comparison.images.per_image` is a list (even if empty)
+- [x] HTML report shows per-image delta table when data available
+- [x] Schema backward compatible (additions only)
+- [x] Tests pass
 
 ### TD-3: Shopify Admin API client (`feat/shopify-admin`)
 **Owner:** ZCode
@@ -151,9 +151,9 @@ Tasks:
 4. Docs: `docs/integrations/SHOPIFY_ADMIN.md` with token acquisition steps
 
 Acceptance:
-- [ ] `audit shopify auth store.myshopify.com <token>` exits 0 with shop info
-- [ ] `audit shopify inventory <store>` lists all image URLs
-- [ ] Tests cover success + 401 + rate-limit cases
+- [x] `audit shopify auth store.myshopify.com <token>` exits 0 with shop info
+- [x] `audit shopify inventory <store>` lists all image URLs
+- [x] Tests cover success + 401 + rate-limit cases
 
 ### TD-4: Release v0.2.0 to PyPI (`chore/release-v0.2.0`)
 **Owner:** ZCode
@@ -169,28 +169,28 @@ Tasks:
 4. Tag `v0.2.0` after TD-1/2/3 PRs land
 
 Acceptance:
-- [ ] `pip install shopify-image-audit` installs v0.2.0
-- [ ] `audit --version` prints `shopify-image-audit 0.2.0`
-- [ ] Release workflow is documented
+- [x] `pip install shopify-image-audit` installs v0.2.0
+- [x] `audit --version` prints `shopify-image-audit 0.2.0`
+- [x] Release workflow is documented
 
 ---
 
 ## 4. Acceptance Criteria (Sprint-Level)
 
 ### Business Success:
-- [ ] PDF report available for first customer (was a stated blocker)
-- [ ] Per-image deltas demonstrate ROI at per-asset granularity (vs cohort)
-- [ ] Shopify Admin API unlocks the "no-Lighthouse-JSON-needed" workflow
+- [x] PDF report available for first customer (was a stated blocker)
+- [x] Per-image deltas demonstrate ROI at per-asset granularity (vs cohort)
+- [x] Shopify Admin API unlocks the "no-Lighthouse-JSON-needed" workflow
 
 ### Technical Success:
-- [ ] PyPI release v0.2.0 published
-- [ ] All new code has tests (>80% coverage maintained)
-- [ ] CI green on Python 3.11 + 3.12
+- [x] PyPI release v0.2.0 published
+- [x] All new code has tests (>80% coverage maintained)
+- [x] CI green on Python 3.11 + 3.12
 
 ### Quality Gates:
-- [ ] No regressions (276 + new tests still pass)
-- [ ] Docs updated: README, SPEC, ROADMAP
-- [ ] Ruff clean
+- [x] No regressions (276 + new tests still pass)
+- [x] Docs updated: README, SPEC, ROADMAP
+- [x] Ruff clean
 
 ---
 
