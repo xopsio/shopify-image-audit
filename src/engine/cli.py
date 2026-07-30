@@ -56,6 +56,7 @@ from engine.cli_helpers._validators import (
     validate_out_path,
     validate_run_url,
 )
+from engine.history import HistoryStore
 from integrations.pagespeed_api import PageSpeedAPIClient
 from integrations.shopify_admin import ShopifyAdminClient
 
@@ -379,6 +380,98 @@ def _shopify_inventory(
 
 
 # ---------------------------------------------------------------------------
+# history
+# ---------------------------------------------------------------------------
+
+@app.command()
+def history(
+    subcommand: str = typer.Argument(..., help="Subcommand: 'list' or 'show'."),
+    hostname: str = typer.Argument(..., help="Store hostname, e.g. 'mystore.myshopify.com'."),
+    history_dir: Path | None = typer.Option(
+        None, "--history-dir",
+        help="Override the audit-history directory (default: $XDG_DATA_HOME/.shopify-image-audit/history/).",
+    ),
+    output: Path | None = typer.Option(
+        None, "-o", "--output",
+        help="[show] Output HTML file path (default: <hostname>-history.html).",
+    ),
+) -> None:
+    """Inspect audit history for a store: list snapshots or generate a trend HTML report.
+
+    Requires at least one recorded baseline (via ``audit baseline``) for the store.
+    """
+    if subcommand not in ("list", "show"):
+        rprint(f"[red]Error:[/red] Unknown history subcommand: {subcommand!r} "
+               "(use 'list' or 'show').")
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+
+    store = HistoryStore(base_dir=history_dir)
+
+    try:
+        entries = store.list_entries(hostname)
+    except Exception as exc:
+        rprint(f"[red]Error:[/red] Failed to read history: {exc}")
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+
+    if not entries:
+        rprint(f"[yellow]No history entries found for {hostname!r}.[/yellow]")
+        rprint("  Run `audit baseline` first to record a snapshot.")
+        raise typer.Exit(code=EXIT_OK) from None
+
+    if subcommand == "list":
+        _history_list(hostname, entries)
+    else:
+        _history_show(hostname, entries, output=output)
+
+    raise typer.Exit(code=EXIT_OK) from None
+
+
+def _history_list(hostname: str, entries: list) -> None:
+    """Print a table of history entries for a hostname."""
+    from rich.table import Table
+
+    table = Table(title=f"Audit History — {hostname}")
+    table.add_column("#", style="dim")
+    table.add_column("Timestamp")
+    table.add_column("Label")
+    table.add_column("LCP", justify="right")
+    table.add_column("CLS", justify="right")
+    table.add_column("INP", justify="right")
+    table.add_column("Images", justify="right")
+    table.add_column("Size", justify="right")
+    table.add_column("Score", justify="right")
+
+    for idx, entry in enumerate(entries, start=1):
+        label = entry.label or "—"
+        lcp_display = f"{entry.lcp_ms:.0f}ms"
+        cls_display = f"{entry.cls:.3f}"
+        inp_display = f"{entry.inp_ms:.0f}ms"
+        ts = entry.timestamp_utc.replace("T", " ")[:19]
+        table.add_row(
+            str(idx), ts, label,
+            lcp_display, cls_display, inp_display,
+            str(entry.image_count),
+            f"{entry.total_bytes / 1024:.0f} KB",
+            f"{entry.avg_score:.0f}",
+        )
+
+    console = Console()
+    console.print(table)
+
+
+def _history_show(hostname: str, entries: list, *, output: Path | None = None) -> None:
+    """Generate a trend HTML report for a hostname's audit history."""
+    from engine.history import generate_trend_html
+
+    html = generate_trend_html(hostname, entries)
+
+    out = output or Path(f"{hostname}-history.html")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(html, encoding="utf-8")
+    rprint(f"[green]Trend report written to {out}[/green]")
+
+
+# ---------------------------------------------------------------------------
 # extract
 # ---------------------------------------------------------------------------
 
@@ -530,6 +623,14 @@ def baseline(
     save: Path = typer.Option(..., "--save", help="Where to write the baseline audit_result.json."),
     url: str | None = typer.Option(None, "--url", help="Override the store URL in the baseline meta."),
     device: str = typer.Option("mobile", "--device", help="Device type: mobile or desktop."),
+    history_dir: Path | None = typer.Option(
+        None, "--history-dir",
+        help="Override the audit-history directory (default: $XDG_DATA_HOME/.shopify-image-audit/history/).",
+    ),
+    label: str | None = typer.Option(
+        None, "--label",
+        help="Optional label for the history entry (e.g. 'Pre-optimisation baseline').",
+    ),
 ) -> None:
     """Run an audit on <lhr_json> and store it as a reusable baseline."""
     if not lhr_json.exists():
@@ -556,6 +657,15 @@ def baseline(
     rprint(f"[green]Baseline saved to {save}[/green]")
     rprint(f"  URL: {result.meta.url} | LCP: {result.vitals.lcp_ms:.0f}ms | "
           f"images: {len(result.images)} | {sum(i.bytes for i in result.images) / 1024:.0f} KB")
+
+    # --- record to audit history ---
+    try:
+        store = HistoryStore(base_dir=history_dir)
+        history_path = store.record(result, label=label)
+        rprint(f"[dim]Recorded to audit history: {history_path}[/dim]")
+    except Exception as exc:
+        rprint(f"[yellow]Warning:[/yellow] Failed to record audit history: {exc}")
+
     raise typer.Exit(code=EXIT_OK) from None
 
 
