@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 import responses
 from typer.testing import CliRunner
 
@@ -107,7 +108,9 @@ class TestMeasureCommand:
         assert "lcp" in result.stdout.lower() or "1800" in result.stdout
 
     @responses.activate
-    def test_measure_writes_output_file(self, tmp_path: Path) -> None:
+    def test_measure_writes_output_file(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         responses.add(
             responses.GET,
             "https://www.googleapis.com/pagespeedonline/v5/runPagespeed",
@@ -127,14 +130,12 @@ class TestMeasureCommand:
             status=200,
         )
         output = tmp_path / "metrics.json"
-        # Change to cwd before invocation (CliRunner uses CWD for relative paths)
-        import os
-        old_cwd = os.getcwd()
-        try:
-            os.chdir(tmp_path)
-            result = runner.invoke(app, ["measure", "https://demo.myshopify.com", "-o", "metrics.json"])
-        finally:
-            os.chdir(old_cwd)
+        # validate_out_path requires a relative path; chdir then use basename.
+        monkeypatch.chdir(tmp_path)
+        result = runner.invoke(
+            app,
+            ["measure", "https://demo.myshopify.com", "-o", "metrics.json"],
+        )
         assert result.exit_code == 0, f"Output: {result.stdout}"
         assert output.exists()
         payload = json.loads(output.read_text())
@@ -275,7 +276,9 @@ class TestHistoryCliDispatcher:
         ])
         assert result.exit_code == 0
 
-    def test_history_show_with_entries(self, tmp_path: Path) -> None:
+    def test_history_show_with_entries(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         """Record a baseline first, then generate a trend HTML."""
         fixture = REPO_ROOT / "fixtures" / "bad_hero_lcp.json"
         result = runner.invoke(app, [
@@ -285,21 +288,15 @@ class TestHistoryCliDispatcher:
         ])
         assert result.exit_code == 0
 
-        out_html = tmp_path / "trend.html"
-        # The history show -o output is relative to cwd; chdir so the file
-        # lands in tmp_path.
-        import os
-        old_cwd = os.getcwd()
-        try:
-            os.chdir(tmp_path)
-            result = runner.invoke(app, [
-                "history", "show", "cdn.shopify.com",
-                "--history-dir", str(tmp_path / "history"),
-                "-o", "trend.html",
-            ])
-        finally:
-            os.chdir(old_cwd)
+        # validate_out_path requires relative; chdir then pass basename.
+        monkeypatch.chdir(tmp_path)
+        result = runner.invoke(app, [
+            "history", "show", "cdn.shopify.com",
+            "--history-dir", str(tmp_path / "history"),
+            "-o", "trend.html",
+        ])
         assert result.exit_code == 0, f"Output: {result.stdout}"
+        out_html = tmp_path / "trend.html"
         assert out_html.exists()
         assert "Audit History" in out_html.read_text()
 

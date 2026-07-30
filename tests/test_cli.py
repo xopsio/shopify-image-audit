@@ -339,27 +339,36 @@ class TestCompareCommand:
         assert "vitals" in result.stdout
         assert "improved" in result.stdout
 
-    def test_compare_writes_html_report(self, before_after_files):
+    def test_compare_writes_html_report(self, before_after_files, tmp_path: Path,
+                                 monkeypatch: pytest.MonkeyPatch):
         from typer.testing import CliRunner
 
         from engine.cli import app
         before, after = before_after_files
         runner = CliRunner()
-        result = runner.invoke(app, ["compare", before, after, "-o", "report.html"])
+        # validate_out_path requires relative; chdir then pass basename.
+        monkeypatch.chdir(tmp_path)
+        result = runner.invoke(app, [
+            "compare", before, after, "-o", "report.html",
+        ])
         assert result.exit_code == 0, result.stdout
-        html = Path("report.html").read_text(encoding="utf-8")
+        html = (tmp_path / "report.html").read_text(encoding="utf-8")
         assert "Before / After Comparison" in html
         assert "ROI estimate" in html
 
-    def test_compare_writes_json_too(self, before_after_files):
+    def test_compare_writes_json_too(self, before_after_files, tmp_path: Path,
+                                     monkeypatch: pytest.MonkeyPatch):
         from typer.testing import CliRunner
 
         from engine.cli import app
         before, after = before_after_files
         runner = CliRunner()
-        result = runner.invoke(app, ["compare", before, after, "--json", "cmp.json"])
+        monkeypatch.chdir(tmp_path)
+        result = runner.invoke(app, [
+            "compare", before, after, "--json", "cmp.json",
+        ])
         assert result.exit_code == 0, result.stdout
-        cmp = json.loads(Path("cmp.json").read_text())
+        cmp = json.loads((tmp_path / "cmp.json").read_text())
         assert cmp["vitals"]["lcp"]["status"] == "improved"
 
     def test_compare_missing_file(self, tmp_path, monkeypatch):
@@ -527,7 +536,7 @@ class TestCompareWithLiveURL:
             "-o", "report.html",
         ])
         assert result.exit_code == 0, result.stdout
-        html = Path("report.html").read_text(encoding="utf-8")
+        html = (tmp_path / "report.html").read_text(encoding="utf-8")
         assert "Before / After Comparison" in html
 
     @responses.activate
