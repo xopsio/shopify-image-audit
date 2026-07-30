@@ -257,25 +257,55 @@ def measure(
 
 @app.command(name="shopify")
 def shopify(
-    subcommand: str = typer.Argument(..., help="Subcommand: 'auth' or 'inventory'."),
-    shop_domain: str = typer.Argument(..., help="Your shop domain, e.g. 'store.myshopify.com'."),
-    access_token: str = typer.Option(
-        None, "--access-token", help="Admin API access token. Required for both 'auth' and 'inventory'.",
+    subcommand: str = typer.Argument(..., help="Subcommand: 'auth', 'inventory', or 'batch'."),
+    shop_domain: str = typer.Argument(
+        None,
+        help="Your shop domain, e.g. 'store.myshopify.com'. "
+        "Omit when --stores-file is provided.",
+    ),
+    access_token: str | None = typer.Option(
+        None, "--access-token", help="Admin API access token. Required for 'auth' and single-store 'inventory'.",
         envvar="SHOPIFY_ACCESS_TOKEN",
     ),
     output: Path = typer.Option(
-        None, "-o", "--output", help="[inventory] Write the inventory JSON to this file.",
+        None, "-o", "--output", help="[inventory/batch] Write the inventory JSON to this file.",
     ),
     limit: int = typer.Option(
         50, "--limit", help="[inventory] Maximum products to fetch (1-250, default 50).",
     ),
+    stores_file: Path | None = typer.Option(
+        None, "--stores-file",
+        help="[batch] Path to a JSON file listing stores to audit. "
+        "Each entry must have 'shop_domain' and 'access_token'.",
+    ),
+    parallel: int = typer.Option(
+        1, "--parallel",
+        help="[batch] Number of concurrent store audits. 0 = unlimited (default 1, sequential).",
+    ),
+    stop_on_error: bool = typer.Option(
+        False, "--stop-on-error",
+        help="[batch] Abort on the first store failure (default: continue past failures).",
+    ),
 ) -> None:
-    """Interact with a Shopify store via the Admin API (auth, inventory)."""
-    # Validate the subcommand first — we want a clean error message before
-    # any token checks.
-    if subcommand not in ("auth", "inventory"):
+    """Interact with a Shopify store via the Admin API (auth, inventory, batch)."""
+    if subcommand not in ("auth", "inventory", "batch"):
         rprint(f"[red]Error:[/red] Unknown shopify subcommand: {subcommand!r} "
-               "(use 'auth' or 'inventory').")
+               "(use 'auth', 'inventory', or 'batch').")
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+
+    # batch subcommand has its own dispatch path
+    if subcommand == "batch":
+        _shopify_batch(
+            stores_file=stores_file,
+            output=output,
+            parallel=parallel,
+            stop_on_error=stop_on_error,
+        )
+        raise typer.Exit(code=EXIT_OK) from None
+
+    # auth / inventory require a single token
+    if shop_domain is None:
+        rprint(f"[red]Error:[/red] `audit shopify {subcommand}` requires a shop_domain.")
         raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
     if access_token is None:
@@ -291,6 +321,63 @@ def shopify(
         _shopify_inventory(shop_domain, access_token, output, limit)
 
     raise typer.Exit(code=EXIT_OK) from None
+
+
+def _shopify_batch(
+    *,
+    stores_file: Path | None,
+    output: Path | None,
+    parallel: int,
+    stop_on_error: bool,
+) -> None:
+    """Run an inventory audit across multiple stores from a JSON file."""
+    from engine.batch import merge_inventory, parse_stores_file, run_batch
+
+    if stores_file is None:
+        rprint("[red]Error:[/red] `audit shopify batch` requires --stores-file.")
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+
+    if parallel < 0:
+        rprint(f"[red]Error:[/red] --parallel must be >= 0, got {parallel}.")
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+
+    try:
+        stores = parse_stores_file(stores_file)
+    except (FileNotFoundError, ValueError) as exc:
+        rprint(f"[red]Error:[/red] {exc}")
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+
+    if not stores:
+        rprint(f"[yellow]No stores found in {stores_file}.[/yellow]")
+        raise typer.Exit(code=EXIT_OK) from None
+
+    rprint(f"[cyan]Running batch for {len(stores)} store(s) "
+          f"(parallel={parallel if parallel > 0 else len(stores)}, "
+          f"stop_on_error={stop_on_error})...[/cyan]")
+    batch_result = run_batch(stores, parallel=parallel, stop_on_error=stop_on_error)
+
+    for r in batch_result.results:
+        if r.success:
+            rprint(f"  [green]✓[/green] {r.shop_domain}: {len(r.inventory)} images")
+        else:
+            rprint(f"  [red]✗[/red] {r.shop_domain}: {r.error}")
+
+    inventory = merge_inventory(batch_result.results)
+
+    if output is not None:
+        validate_out_path(output)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(
+            json.dumps(inventory, indent=2), encoding="utf-8",
+        )
+        rprint(f"[green]Batch inventory written to {output}[/green] "
+              f"({len(inventory)} images from {len(stores)} store(s))")
+    else:
+        # Print combined inventory to stdout
+        rprint(json.dumps(inventory, indent=2))
+
+    if batch_result.all_failed:
+        raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE) from None
 
 
 @handle_shopify_errors()
