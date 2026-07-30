@@ -221,24 +221,20 @@ class TestGenerateDiffHtml:
 class TestHistoryDiffCli:
     def test_diff_writes_html_report(
         self, tmp_path: Path, populated_history: HistoryStore,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         entries = populated_history.list_entries("mystore.myshopify.com")
         id_a, id_b = entries[1].id, entries[0].id
-        out_html = tmp_path / "diff.html"
-        # CliRunner uses cwd for relative paths; chdir so -o writes into tmp_path
-        import os
-        old_cwd = os.getcwd()
-        try:
-            os.chdir(tmp_path)
-            result = runner.invoke(app, [
-                "history", "diff", "mystore.myshopify.com",
-                "--from", id_a, "--to", id_b,
-                "--history-dir", str(tmp_path),
-                "-o", "diff.html",
-            ])
-        finally:
-            os.chdir(old_cwd)
+        # validate_out_path requires relative path; chdir then pass basename.
+        monkeypatch.chdir(tmp_path)
+        result = runner.invoke(app, [
+            "history", "diff", "mystore.myshopify.com",
+            "--from", id_a, "--to", id_b,
+            "--history-dir", str(tmp_path),
+            "-o", "diff.html",
+        ])
         assert result.exit_code == 0, f"Output: {result.stdout}"
+        out_html = tmp_path / "diff.html"
         assert out_html.exists()
         assert "Audit Diff" in out_html.read_text()
 
