@@ -14,7 +14,8 @@ from typing import Any
 
 from audit.models import AuditResult, ImageRole
 from audit.parser import parse
-from audit.ranker_heuristic import rank
+from audit.ranker_heuristic import rank as rank_heuristic
+from audit.ranker_ml import rank as rank_ml
 
 # ---------------------------------------------------------------------------
 # helpers
@@ -127,6 +128,7 @@ def run_audit(
     url: str | None = None,
     device: str = "mobile",
     runs: int = 1,
+    ranker: str = "heuristic",
 ) -> AuditResult:
     """
     Full pipeline: load JSON → parse → rank → validate → AuditResult.
@@ -137,11 +139,17 @@ def run_audit(
     url      : override URL for meta; defaults to first image src.
     device   : "mobile" or "desktop".
     runs     : number of Lighthouse runs (informational).
+    ranker   : scoring algorithm — "heuristic" (default, fast bpp-based)
+               or "ml" (weighted feature ensemble with LCP/dim/format signals).
 
     Returns
     -------
     AuditResult (Pydantic model, schema-compliant).
     """
+    if ranker not in ("heuristic", "ml"):
+        raise ValueError(f"ranker must be 'heuristic' or 'ml', got {ranker!r}")
+    rank_fn = rank_ml if ranker == "ml" else rank_heuristic
+
     lhr_path = Path(lhr_path)
 
     # 1. load raw JSON
@@ -152,7 +160,7 @@ def run_audit(
     parsed_images: list[dict[str, Any]] = parse(raw)
 
     # 3. rank  → list[dict]  (role, score, recommendation added)
-    ranked_images: list[dict[str, Any]] = rank(parsed_images)
+    ranked_images: list[dict[str, Any]] = rank_fn(parsed_images)
 
     # 4. add waste estimate & sanitise
     sanitised: list[dict[str, Any]] = []

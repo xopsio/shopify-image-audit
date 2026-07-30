@@ -175,3 +175,39 @@ class TestOptimizedFixture:
         for img in result.images:
             assert img.mime in modern or img.score >= 60
 
+
+# ---------------------------------------------------------------------------
+# ML ranker end-to-end (Sprint 3, #27)
+# ---------------------------------------------------------------------------
+
+class TestMLRankerEndToEnd:
+    """run_audit(ranker="ml") must produce a schema-valid AuditResult that
+    respects the same contract as the default (heuristic) path."""
+
+    def test_ml_ranker_produces_valid_result(self, fixture_path: Path) -> None:
+        result = run_audit(fixture_path, ranker="ml")
+        assert isinstance(result, AuditResult)
+        assert result.meta.tool.value == "lighthouse"
+        # Every image must have role/score/recommendation, score in [0, 100],
+        # role in the ImageRole enum.
+        for img in result.images:
+            assert isinstance(img.role.value, str)
+            assert 0 <= img.score <= 100
+            assert isinstance(img.recommendation, str)
+
+    def test_invalid_ranker_rejected(self, fixture_path: Path) -> None:
+        with pytest.raises(ValueError, match="ranker"):
+            run_audit(fixture_path, ranker="bogus")
+
+    def test_ml_and_heuristic_differ(self, fixture_path: Path) -> None:
+        """The two rankers are different formulas; they must produce *some*
+        different scores on real fixtures (sanity check that the dispatch
+        actually routes to a different code path)."""
+        h = run_audit(fixture_path, ranker="heuristic")
+        m = run_audit(fixture_path, ranker="ml")
+        h_scores = [img.score for img in h.images]
+        m_scores = [img.score for img in m.images]
+        # At least one image must score differently.
+        deltas = [abs(a - b) for a, b in zip(h_scores, m_scores, strict=True)]
+        assert max(deltas) > 0, f"ML and heuristic produced identical scores: {h_scores}"
+
