@@ -194,7 +194,11 @@ class HistoryStore:
         path.write_text(json.dumps(snapshot, indent=2), encoding="utf-8")
 
         # Prune old entries if over the cap.
-        self._prune(host)
+        pruned = self._prune(host)
+        if pruned:
+            from engine._logging import get_logger
+            get_logger().debug("History pruned: %d old entries for host=%s",
+                               pruned, host)
 
         return path
 
@@ -362,19 +366,25 @@ class HistoryStore:
             avg_score=avg_score,
         )
 
-    def _prune(self, hostname: str) -> None:
-        """Remove oldest entries beyond ``_MAX_ENTRIES``."""
+    def _prune(self, hostname: str) -> int:
+        """Remove oldest entries beyond ``_MAX_ENTRIES``.
+
+        Returns the count of entries deleted (0 when nothing was over the cap).
+        """
         host_dir = self._base / hostname
         if not host_dir.is_dir():
-            return
+            return 0
 
         files = sorted(
             [p for p in host_dir.iterdir() if p.suffix == ".json"],
             key=lambda p: p.stat().st_mtime,
         )
+        pruned = 0
         while len(files) > _MAX_ENTRIES:
             oldest = files.pop(0)
             oldest.unlink(missing_ok=True)
+            pruned += 1
+        return pruned
 
 
 # ---------------------------------------------------------------------------

@@ -74,6 +74,8 @@ def _parse_brand_color(hex_str: str | None) -> str | None:
         return None
     s = hex_str.strip()
     if not s.startswith("#"):
+        from engine._logging import get_logger
+        get_logger().debug("Invalid --brand-color %r: missing '#' prefix", hex_str)
         return None
     body = s[1:]
     if len(body) == 3:
@@ -102,10 +104,15 @@ def _read_brand_logo(path: str | Path) -> tuple[str, str] | None:
     except OSError:
         return None
     if size > _BRAND_LOGO_MAX_BYTES:
+        from engine._logging import get_logger
+        get_logger().debug("Brand logo too large: %d > %d bytes (path=%s)",
+                           size, _BRAND_LOGO_MAX_BYTES, path)
         return None
     ext = p.suffix.lower()
     mime = _BRAND_LOGO_MIME.get(ext)
     if mime is None:
+        from engine._logging import get_logger
+        get_logger().debug("Unsupported brand logo extension: %s (path=%s)", ext, path)
         return None
     try:
         data = p.read_bytes()
@@ -115,6 +122,8 @@ def _read_brand_logo(path: str | Path) -> tuple[str, str] | None:
     # <script> tag. This is NOT a complete sanitiser — it's a cheap
     # tripwire that catches the common "external SVG with embedded JS" case.
     if mime == "image/svg+xml" and b"<script" in data.lower():
+        from engine._logging import get_logger
+        get_logger().debug("Brand logo rejected: SVG contains <script> tag (path=%s)", path)
         return None
     return mime, base64.b64encode(data).decode("ascii")
 

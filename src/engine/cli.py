@@ -136,6 +136,8 @@ def _run_lighthouse(
     emulated = "none" if device == "desktop" else "mobile"
 
     best_path: Path | None = None
+    from engine._logging import get_logger
+    _lh_log = get_logger()
     for i in range(1, runs + 1):
         out_file = out_dir / f"lhr_run{i}.json"
         cmd = [
@@ -149,9 +151,11 @@ def _run_lighthouse(
             "--chrome-flags=--headless",
         ]
         rprint(f"[cyan]Lighthouse run {i}/{runs}[/cyan]")
+        _lh_log.info("Lighthouse run %d/%d: %s", i, runs, url)
         try:
             subprocess.run(cmd, check=True, capture_output=True, text=True)
         except subprocess.CalledProcessError as exc:
+            _lh_log.error("Lighthouse run %d failed: %s", i, exc.stderr[:500])
             rprint(f"[red]Lighthouse failed (run {i}):[/red] {exc.stderr[:500]}")
             raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE) from exc
         best_path = out_file  # simple: use the last successful run
@@ -889,6 +893,8 @@ def version() -> None:
 # ---------------------------------------------------------------------------
 
 def main() -> None:
+    from engine._logging import configure
+    configure()
     app()
 
 

@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Empty — all Sprint 5 work shipped in v0.4.0.
+Empty — all Sprint 6 work shipped in v0.5.0.
 
 ---
 
@@ -107,7 +107,32 @@ Empty — all Sprint 5 work shipped in v0.4.0.
 
 ---
 
-[Unreleased]: https://github.com/xopsio/shopify-image-audit/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/xopsio/shopify-image-audit/compare/v0.5.0...HEAD
+
+---
+
+## [0.5.0] - 2026-07-30
+
+### Added (Sprint 6)
+- `audit shopify batch --stores-file <path>` — multi-store inventory audit with `--parallel N` (concurrent workers) and `--stop-on-error` flag — TD-3
+- `src/engine/batch.py` (NEW): `StoreConfig`, `parse_stores_file`, `run_batch`, `merge_inventory`
+- `src/engine/_logging.py` (NEW, ~70 lines): centralised `logging.getLogger("shopify_image_audit")` with `LOG_LEVEL` env-var override — TD-4
+- 6 structured log hooks (INFO at request, DEBUG per stage/branch, ERROR on subprocess failure) across `audit_orchestrator`, `engine.history`, `pagespeed_api`, `_run_lighthouse`, brand validators, role sanitiser
+- `CONTRIBUTING.md` (NEW, ~150 lines): WeasyPrint install + snapshot workflow + release process + observability guide
+- `tests/test_table_snapshots.py` (NEW, 16 tests): Rich Console captures for `_table.py` renderers — TD-1
+
+### Changed
+- CI coverage threshold: `--cov-fail-under=85` → `--cov-fail-under=90`
+- Test isolation: zero `Path("foo")` writes or `os.chdir` in tests; all CLI output writes go through `tmp_path` or `monkeypatch.chdir` — TD-2
+- `HistoryStore._prune()` now returns the prune count (was: `None`)
+
+### Stats
+- 606 tests (up from 546)
+- 93% coverage (up from 91.24%)
+- `_table.py` coverage 68% → 100%
+- Ruff clean
+
+[0.5.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.1.0-sprint1...v0.2.0

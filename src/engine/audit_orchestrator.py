@@ -16,6 +16,9 @@ from audit.models import AuditResult, ImageRole
 from audit.parser import parse
 from audit.ranker_heuristic import rank as rank_heuristic
 from audit.ranker_ml import rank as rank_ml
+from engine._logging import get_logger
+
+_log = get_logger()
 
 # ---------------------------------------------------------------------------
 # helpers
@@ -29,7 +32,10 @@ def _sanitise_image(img: dict[str, Any]) -> dict[str, Any]:
     out: dict[str, Any] = {}
 
     out["src"] = img.get("src") or img.get("url") or ""
-    out["role"] = img.get("role", "unknown") if img.get("role") in _VALID_ROLES else "unknown"
+    original_role = img.get("role", "unknown")
+    out["role"] = original_role if original_role in _VALID_ROLES else "unknown"
+    if out["role"] == "unknown" and original_role != "unknown":
+        _log.debug("Image role %r rewritten to 'unknown'", original_role)
     out["score"] = max(0, min(100, int(img.get("score", 0))))
     out["bytes"] = max(0, int(img.get("bytes", 0)))
     out["mime"] = img.get("mime") or img.get("mimeType") or "image/jpeg"
@@ -151,6 +157,8 @@ def run_audit(
     rank_fn = rank_ml if ranker == "ml" else rank_heuristic
 
     lhr_path = Path(lhr_path)
+    _log.info("run_audit start: path=%s url=%s device=%s runs=%d ranker=%s",
+              lhr_path, url, device, runs, ranker)
 
     # 1. load raw JSON
     with open(lhr_path, encoding="utf-8") as f:
@@ -158,9 +166,11 @@ def run_audit(
 
     # 2. parse → list[dict]  (normalized images, no role/score yet)
     parsed_images: list[dict[str, Any]] = parse(raw)
+    _log.debug("parse stage: %d image(s) extracted", len(parsed_images))
 
     # 3. rank  → list[dict]  (role, score, recommendation added)
     ranked_images: list[dict[str, Any]] = rank_fn(parsed_images)
+    _log.debug("rank stage: %d image(s) scored", len(ranked_images))
 
     # 4. add waste estimate & sanitise
     sanitised: list[dict[str, Any]] = []
@@ -194,5 +204,8 @@ def run_audit(
         "summary": summary,
     }
 
-    return AuditResult.model_validate(payload)
+    result = AuditResult.model_validate(payload)
+    _log.info("run_audit complete: %d images, LCP=%sms",
+              len(result.images), int(result.vitals.lcp_ms))
+    return result
 

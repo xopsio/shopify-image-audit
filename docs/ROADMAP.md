@@ -1,6 +1,6 @@
 # Roadmap — Shopify Image Audit
 
-**Last updated:** 2026-07-30 (Sprint 5 complete, v0.4.0 released)
+**Last updated:** 2026-07-30 (Sprint 6 complete, v0.5.0 released)
 **Owner:** ZCode (single-agent, governance v1.3)
 
 ---
@@ -71,6 +71,20 @@ the fourth targets scalability and recurring revenue.
 - ✅ **TD-4**: `audit history diff` with stable entry-ids; CHANGELOG.md; `--cov-fail-under=85` CI gate
 - ✅ **v0.4.0 release** (546 tests, 91.24% coverage, ruff clean)
 
+### Phase 6 — Coverage, Isolation, Batch & Observability (✅ DONE, Sprint 6)
+
+> Goal: lock down remaining coverage gaps, harden test isolation, ship multi-store
+> batch, and add operator-friendly observability.
+
+- ✅ **TD-1**: Coverage close-out — `_table.py` 68% → 100%, total 91.24% → 93%
+- ✅ **TD-2**: Test isolation hardening — zero `Path("foo")` writes or `os.chdir` in tests
+- ✅ **TD-3**: Multi-store batch — `audit shopify batch --stores-file <path>` (sequential + parallel)
+- ✅ **TD-4**: Observability + docs + v0.5.0 release
+  - `engine._logging` centralised logger (6 hooks)
+  - `CONTRIBUTING.md` with WeasyPrint install + snapshot workflow
+  - Coverage gate `--cov-fail-under=85` → `--cov-fail-under=90`
+- ✅ **v0.5.0 release** (606 tests, 93% coverage, ruff clean)
+
 ---
 
 ## Phase 4 themes (high-level)
@@ -131,5 +145,6 @@ the fourth targets scalability and recurring revenue.
 | 3 | 2026-07 | ✅ Complete | 390 | 40 |
 | 4 | 2026-07 | ✅ Complete | 489 | 44 |
 | 5 | 2026-07 | ✅ Complete | 546 | 48 |
+| 6 | 2026-07 | ✅ Complete | 606 | 52 |
 
 See [`docs/`](.) for the full documentation tree.
