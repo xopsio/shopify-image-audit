@@ -1,6 +1,6 @@
 # Roadmap — Shopify Image Audit
 
-**Last updated:** 2026-07-30 (Sprint 3 complete, Sprint 4 in progress)
+**Last updated:** 2026-07-30 (Sprint 4 complete, v0.3.0 released)
 **Owner:** ZCode (single-agent, governance v1.3)
 
 ---
@@ -51,18 +51,15 @@ the fourth targets scalability and recurring revenue.
 - ✅ **TD-4**: v0.2.0 release prep (trusted publishing, release workflow)
 - ✅ Release workflow hardening (structural build/publish split)
 
-### Phase 4 — Scalability & recurring revenue (🔜 CURRENT, Sprint 4)
+### Phase 4 — Scalability & recurring revenue (✅ DONE, Sprint 4)
 
 > Goal: make the tool useful to *repeat* customers, not just first-time audits.
 
-Detailed ticket breakdown: [`SPRINT_4_PLAN.md`](SPRINT_4_PLAN.md).
-
-**Theme**: recurring value, automation, and sharper deliverables.
-
-- **Branded report templates** — customer logo + brand colours (Theme A)
-- **ROI-ranked recommendations** — order by estimated conversion uplift (Theme C)
-- **Audit history + trend view** — store past audits per-store, surface trends (Theme B)
-- **Scheduled re-audit** — periodic re-measurement (Theme B)
+- ✅ **TD-1**: Documentation & tech-debt cleanup
+- ✅ **TD-2**: Branded report templates (--brand-logo, --brand-color)
+- ✅ **TD-3**: ROI-ranked recommendations (ComparisonRecommendation model)
+- ✅ **TD-4**: Audit history + trend view (HistoryStore, `audit history list/show`)
+- ✅ **v0.3.0 release** (489 tests, PyPI trusted publishing)
 
 ---
 
@@ -71,16 +68,16 @@ Detailed ticket breakdown: [`SPRINT_4_PLAN.md`](SPRINT_4_PLAN.md).
 ### Theme A — Deliverable polish
 - ✅ PDF export (Sprint 3)
 - ✅ Per-image comparison (Sprint 3)
-- 🔜 Branded report template — customer logo + colours (Sprint 4 TD-2)
+- ✅ Branded report template — customer logo + colours (Sprint 4 TD-2)
 
 ### Theme B — Workflow integration
 - ✅ Shopify Admin API client (Sprint 3)
-- 🔜 Audit history + trend view (Sprint 4 TD-3)
-- 🔜 Scheduled re-audit (Sprint 4+, requires infra decisions)
+- ✅ Audit history + trend view (Sprint 4 TD-4)
+- 🔜 Scheduled re-audit (Sprint 5+, requires infra decisions)
 
 ### Theme C — Smarter recommendations
 - ⚠️ Real ML ranker — partially addressed by weighted ensemble (deliberate, see decision log)
-- 🔜 Recommendation prioritisation by ROI (Sprint 4 TD-3)
+- ✅ Recommendation prioritisation by ROI (Sprint 4 TD-3)
 - ❌ Image-optimisation automation hooks (out of scope — sister tool)
 
 ### Theme D — Reliability
@@ -122,6 +119,6 @@ Detailed ticket breakdown: [`SPRINT_4_PLAN.md`](SPRINT_4_PLAN.md).
 | 1 | 2026-03 | ✅ Complete | 103 | 16 |
 | 2 | 2026-07 | ✅ Complete | 276 | 28 |
 | 3 | 2026-07 | ✅ Complete | 390 | 40 |
-| 4 | 2026-08+ | 🔜 Current | — | — |
+| 4 | 2026-07 | ✅ Complete | 489 | 44 |
 
 See [`docs/`](.) for the full documentation tree.

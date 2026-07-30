@@ -3,7 +3,7 @@
 [![CI](https://github.com/xopsio/shopify-image-audit/actions/workflows/ci.yml/badge.svg)](https://github.com/xopsio/shopify-image-audit/actions)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
 [![ruff](https://img.shields.io/badge/lint-ruff-green)](https://docs.astral.sh/ruff/)
-[![tests](https://img.shields.io/badge/tests-390_passing-brightgreen)](#testing)
+[![tests](https://img.shields.io/badge/tests-489_passing-brightgreen)](#testing)
 
 A Lighthouse-based image audit tool for Shopify stores. Produces per-image
 scores, role assignments, optimisation recommendations, and a **before/after
@@ -153,7 +153,7 @@ The codebase is governed by **a single ZCode agent** (see
 ## Testing
 
 ```bash
-pytest -q                                # 390 tests, single-writer discipline
+pytest -q                                # 489 tests, single-writer discipline
 pytest --cov=src --cov-report=term       # ~87% coverage
 ruff check src/ tests/                   # 0 violations
 ```
@@ -178,10 +178,10 @@ merge. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 - ✅ Sprint 1 — v0.1.0 baseline (parser, ranker, orchestrator, CLI, HTML report, 103 tests)
 - ✅ Sprint 2 — before/after workflow, customer docs, ML ranker, live URL compare, CI, governance cleanup (276 tests)
 - ✅ Sprint 3 — PDF export, per-image deltas, Shopify Admin API, v0.2.0 release prep (390 tests)
-- 🔜 Sprint 4 — see [`docs/SPRINT_4_PLAN.md`](docs/SPRINT_4_PLAN.md)
-  - Branded report templates (customer logo + colours)
-  - ROI-ranked recommendations
-  - Audit history + trend view
+- ✅ Sprint 4 — Branded reports, ROI-ranked recs, audit history, v0.3.0 (489 tests)
+  - Branded report templates (--brand-logo, --brand-color)
+  - ROI-ranked recommendations (ComparisonRecommendation model)
+  - Audit history + trend view (HistoryStore, `audit history list/show`)
 
 ---
 
@@ -192,4 +192,5 @@ merge. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 - [`docs/runbook/measurement_protocol.md`](docs/runbook/measurement_protocol.md) — how LCP/CLS/INP are measured deterministically
 - [`docs/SPRINT_1_COMPLETE.md`](docs/SPRINT_1_COMPLETE.md) — what shipped in Sprint 1
 - [`docs/SPRINT_3_PLAN.md`](docs/SPRINT_3_PLAN.md) — Sprint 3 breakdown (all done)
+- [`docs/SPRINT_4_PLAN.md`](docs/SPRINT_4_PLAN.md) — Sprint 4 breakdown (all done)
 - [`QA_CHECKLIST.md`](QA_CHECKLIST.md) — quality gates
