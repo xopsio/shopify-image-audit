@@ -27,6 +27,7 @@ import json
 import shutil
 import subprocess
 from pathlib import Path
+from typing import Any
 
 import typer
 from rich import print as rprint
@@ -56,6 +57,7 @@ from engine.cli_helpers._validators import (
     validate_run_url,
 )
 from integrations.pagespeed_api import PageSpeedAPIClient
+from integrations.shopify_admin import ShopifyAdminClient
 
 # --- Exit codes per spec ---------------------------------------------------
 EXIT_OK = 0
@@ -241,6 +243,120 @@ def measure(
         print(json.dumps(metrics.to_dict(), indent=2))
 
     raise typer.Exit(code=EXIT_OK) from None
+
+
+# ---------------------------------------------------------------------------
+# shopify
+# ---------------------------------------------------------------------------
+
+@app.command(name="shopify")
+def shopify(
+    subcommand: str = typer.Argument(..., help="Subcommand: 'auth' or 'inventory'."),
+    shop_domain: str = typer.Argument(..., help="Your shop domain, e.g. 'store.myshopify.com'."),
+    access_token: str = typer.Option(
+        None, "--access-token", help="Admin API access token. Required for both 'auth' and 'inventory'.",
+        envvar="SHOPIFY_ACCESS_TOKEN",
+    ),
+    output: Path = typer.Option(
+        None, "-o", "--output", help="[inventory] Write the inventory JSON to this file.",
+    ),
+    limit: int = typer.Option(
+        50, "--limit", help="[inventory] Maximum products to fetch (1-250, default 50).",
+    ),
+) -> None:
+    """Interact with a Shopify store via the Admin API (auth, inventory)."""
+    # Validate the subcommand first — we want a clean error message before
+    # any token checks.
+    if subcommand not in ("auth", "inventory"):
+        rprint(f"[red]Error:[/red] Unknown shopify subcommand: {subcommand!r} "
+               "(use 'auth' or 'inventory').")
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+
+    if access_token is None:
+        rprint(f"[red]Error:[/red] `audit shopify {subcommand}` requires an access token.")
+        rprint("Pass it via --access-token or $SHOPIFY_ACCESS_TOKEN.")
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+
+    if subcommand == "auth":
+        _shopify_auth(shop_domain, access_token)
+    else:  # inventory
+        if output is not None:
+            validate_out_path(output)
+        _shopify_inventory(shop_domain, access_token, output, limit)
+
+    raise typer.Exit(code=EXIT_OK) from None
+
+
+def _shopify_auth(shop_domain: str, access_token: str) -> None:
+    """Verify an Admin API access token by fetching shop info."""
+    try:
+        client = ShopifyAdminClient(shop_domain, access_token)
+        info = client.get_shop_info()
+    except ValueError as exc:
+        rprint(f"[red]Error:[/red] Invalid input: {exc}")
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+    except RuntimeError as exc:
+        rprint(f"[red]Error:[/red] Shopify API error: {exc}")
+        raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE) from None
+    except Exception as exc:
+        rprint(f"[red]Error:[/red] Failed to reach Shopify: {exc}")
+        raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE) from None
+
+    rprint("[green]✓ Token valid[/green]")
+    rprint(f"  Name:     {info['name']}")
+    rprint(f"  Domain:   {info['domain']}")
+    rprint(f"  Plan:     {info['plan']}")
+    rprint(f"  Currency: {info['currency']}")
+
+
+def _shopify_inventory(
+    shop_domain: str, access_token: str,
+    output: Path | None, limit: int,
+) -> None:
+    """List image URLs in a Shopify store: products + theme assets."""
+    try:
+        client = ShopifyAdminClient(shop_domain, access_token)
+        products = client.get_products(limit=limit)
+        theme_assets = client.get_theme_assets()
+    except ValueError as exc:
+        rprint(f"[red]Error:[/red] Invalid input: {exc}")
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+    except RuntimeError as exc:
+        rprint(f"[red]Error:[/red] Shopify API error: {exc}")
+        raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE) from None
+    except Exception as exc:
+        rprint(f"[red]Error:[/red] Failed to reach Shopify: {exc}")
+        raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE) from None
+
+    # Build the unified inventory list.
+    inventory: list[dict[str, Any]] = []
+    for p in products:
+        if p.get("image_url"):
+            inventory.append({
+                "source": "product",
+                "title": p["title"],
+                "url": p["image_url"],
+            })
+    for a in theme_assets:
+        inventory.append({
+            "source": "theme_asset",
+            "theme": a["theme_name"],
+            "key": a["key"],
+            "url": a["url"],
+        })
+
+    if output is not None:
+        Path(output).parent.mkdir(parents=True, exist_ok=True)
+        Path(output).write_text(
+            json.dumps(inventory, indent=2), encoding="utf-8",
+        )
+        rprint(f"[green]Inventory written to {output}[/green] "
+              f"({len(inventory)} images)")
+    else:
+        rprint(f"[green]✓ Inventory fetched[/green] "
+              f"({len(products)} products, {len(theme_assets)} theme assets)")
+        for item in inventory:
+            rprint(f"  [{item['source']:11}] {item['url']}")
 
 
 # ---------------------------------------------------------------------------

@@ -39,6 +39,24 @@ Fetches live performance metrics from the Google PageSpeed Insights API.
   - 2 invalid args (bad URL, bad strategy, unsafe output path)
   - 10 API failure / rate limit
 
+### `audit shopify <subcommand> <shop_domain>` *(Sprint 3, TD-3)*
+Interact with a Shopify store via the Admin API. Two subcommands:
+`auth` (verify the access token) and `inventory` (list image URLs).
+- Positional: `subcommand` (`auth` | `inventory`), `shop_domain` (e.g. `mystore.myshopify.com`; protocol optional)
+- Flags:
+  - `--access-token <token>` (required; can also be set via `$SHOPIFY_ACCESS_TOKEN`)
+  - `-o, --output <path>` (only for `inventory`; default: print to stdout)
+  - `--limit <N>` (only for `inventory`; 1–250, default 50)
+- Output:
+  - `auth`: prints shop name, domain, plan, currency
+  - `inventory`: prints one line per image (`[product]` or `[theme_asset]`) with URL, or writes JSON to `-o`
+- Exit codes:
+  - 0 success
+  - 2 invalid args (unknown subcommand, missing token, bad shop domain)
+  - 10 API failure / rate limit
+- Read-only scopes required: `read_products`, `read_themes`, `read_shop`
+- See `docs/integrations/SHOPIFY_ADMIN.md` for token acquisition steps.
+
 ### `audit baseline <lhr.json>` *(Sprint 2, #18)*
 Runs the audit pipeline on a Lighthouse JSON / fixture report and stores the
 result as a reusable baseline (`audit_result.json`).
