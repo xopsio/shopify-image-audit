@@ -1,39 +1,176 @@
 # Shopify Image Audit
 
-Työkalu Shopify-kuvien suorituskyvyn auditointiin ja optimointisuosituksiin Lighthouse-pohjaisesti.
+[![CI](https://github.com/xopsio/shopify-image-audit/actions/workflows/ci.yml/badge.svg)](https://github.com/xopsio/shopify-image-audit/actions)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
+[![ruff](https://img.shields.io/badge/lint-ruff-green)](https://docs.astral.sh/ruff/)
+[![tests](https://img.shields.io/badge/tests-276_passing-brightgreen)](#testing)
 
-## Governance & Domain Division
+A Lighthouse-based image audit tool for Shopify stores. Produces per-image
+scores, role assignments, optimisation recommendations, and a **before/after
+comparison** workflow that proves image-optimisation ROI to paying customers.
 
-Projektin domain-jako, omistajuus ja kehitysperiaatteet on dokumentoitu tiedostoon  
-[docs/governance.md](docs/governance.md).
+Designed for the 99–199 € audit-on-demand business model: run the audit,
+deliver a customer-ready HTML report, optionally compare live metrics after
+the customer implements the recommendations.
 
-## Asennus & Käyttö
+---
+
+## Quickstart
 
 ```bash
 git clone https://github.com/xopsio/shopify-image-audit.git
 cd shopify-image-audit
-python -m venv .venv && source .venv/bin/activate  # Windows: .venv\Scripts\activate
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 
-# Komentoja
-audit run https://kauppa.myshopify.com --device mobile      # Lighthouse-ajo + analyysi
-audit baseline <lhr.json> --save baseline.json              # tallenna perustaso
-audit compare baseline.json <current.json> -o report.html   # ennen/jälkeen -vertailu
-audit report <audit_result.json> -o report.html             # HTML-raportti
+# Verify the install
+audit version
+pytest -q                                              # 276 tests
 ```
 
-Kattava käyttöohje ja komentojen erittely: [CLI Specification](docs/spec/cli_v0_1.md).
+---
 
-## Asiakastoimitukset (vaihe 1)
+## CLI commands
 
-- [Asiakasraporttipohja](docs/CUSTOMER_REPORT_TEMPLATE.md) — myyntiartefakti
-- [Asiakas-onboarding](docs/CUSTOMER_ONBOARDING.md) — auditoinnin työnkulku alusta loppuun
-- [Esimerkkiasiakasraportti](docs/examples/demo_audit_report.html) — Nordic Lifestyle -demokauppa
+The tool ships with a single Typer app. Run `audit --help` for the full list;
+below are the high-value entry points.
 
-## Lisätietoa
+### `audit run <url>` — full Lighthouse + audit pipeline
+```bash
+audit run https://kauppa.myshopify.com --device mobile --runs 3 \
+    --out-dir artifacts
+# -> artifacts/lhr_run1.json, audit_result.json (schema-compliant)
+```
 
-- [QA Checklist](QA_CHECKLIST.md)
-- [CLI Specification](docs/spec/cli_v0_1.md)
-- [Measurement Protocol](docs/runbook/measurement_protocol.md)
-- [Governance](docs/governance.md)
-- [Sprint 2 Plan](docs/SPRINT_2_PLAN.md)
+### `audit baseline <lhr.json> --save baseline.json` — capture baseline
+```bash
+audit baseline fixtures/before_after/before_lcp.json \
+    --save baseline.json \
+    --url https://demo.myshopify.com
+# -> Baseline saved to baseline.json
+```
+
+### `audit compare <baseline> <current>` — before/after (file or URL)
+```bash
+# File vs file (offline)
+audit compare baseline.json fixtures/before_after/after_lcp.json \
+    -o comparison.html --json comparison.json
+
+# File vs live URL (fetches via PageSpeed Insights API)
+audit compare baseline.json https://demo.myshopify.com \
+    --strategy mobile --api-key YOUR_KEY \
+    -o comparison.html
+```
+Exit codes: `0` success, `2` invalid args, `10` backend failure.
+
+### `audit report <audit_result.json>` — HTML report
+```bash
+audit report baseline.json -o report.html
+```
+
+### `audit measure <url>` — live PageSpeed metrics only
+```bash
+audit measure https://demo.myshopify.com --strategy mobile
+# -> JSON metrics to stdout (or --output metrics.json)
+```
+
+### `audit score <audit_input.json> --ranker {heuristic|ml}`
+```bash
+audit score extracted.json                    # default: heuristic
+audit score extracted.json --ranker ml        # weighted feature ensemble
+```
+
+Full reference: [`docs/spec/cli_v0_1.md`](docs/spec/cli_v0_1.md).
+
+---
+
+## Scoring algorithms
+
+The pipeline assigns each image a `role`, a `score` (0–100), and a
+`recommendation`. Two rankers ship, switchable via `--ranker ml`:
+
+| Ranker | Formula | Use case |
+|--------|---------|----------|
+| `heuristic` (default) | bytes per displayed pixel (bpp) + LCP penalty | fast, predictable baseline |
+| `ml` | weighted ensemble: f_size, f_density, f_format, f_dim_match + LCP strictness | richer signal, more honest scoring |
+
+Both produce the same output contract (role + score + recommendation). The ML
+ranker is a hand-coded feature ensemble, not a statistical model — see
+[`src/audit/ranker_ml.py`](src/audit/ranker_ml.py) for the design rationale
+(no model deps, deterministic, fully explainable via `ml_features()`).
+
+---
+
+## Architecture
+
+```
+src/
+├── audit/                    # scoring + reporting
+│   ├── models.py             # Pydantic v2 schemas (AuditResult, ComparisonResult)
+│   ├── parser.py             # Lighthouse / fixture JSON parser
+│   ├── ranker_heuristic.py   # default ranker (bpp-based)
+│   ├── ranker_ml.py          # opt-in ML-style ranker (weighted ensemble)
+│   ├── report.py             # HTML report renderer (split into _render_* funcs)
+│   └── lighthouse_runner.py  # reserved for future Lighthouse subprocess refactor
+├── core/                     # core algorithms
+│   ├── image_extractor.py    # LHR image audit extraction
+│   ├── performance_scorer.py # single-image score helper (standalone, not wired)
+│   └── baseline_manager.py   # save/load baselines + compare()
+├── engine/                   # orchestration + CLI
+│   ├── cli.py                # Typer app (run, measure, baseline, compare, ...)
+│   └── audit_orchestrator.py # run_audit() pipeline
+└── integrations/             # external APIs
+    └── pagespeed_api.py      # PageSpeed Insights (measure + fetch_lighthouse_json)
+
+schemas/audit_result.schema.json    # JSON Schema contract (validated by tests)
+tests/                              # 276 tests, single-writer (ZCode)
+docs/examples/                       # live demo report + comparison JSON
+```
+
+The codebase is governed by **a single ZCode agent** (see
+[`docs/governance.md`](docs/governance.md) v1.3).
+
+---
+
+## Testing
+
+```bash
+pytest -q                                # 276 tests, single-writer discipline
+pytest --cov=src --cov-report=term       # ~82% coverage
+ruff check src/ tests/                   # 0 violations
+```
+
+The CI workflow runs `pytest -q` + `ruff check` on Python 3.11 and 3.12 for
+every PR. Branch protection on `main` requires both checks to pass before
+merge. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+
+---
+
+## Customer deliverables (Phase 1)
+
+- **Customer report template** — [`docs/CUSTOMER_REPORT_TEMPLATE.md`](docs/CUSTOMER_REPORT_TEMPLATE.md)
+- **Onboarding workflow** — [`docs/CUSTOMER_ONBOARDING.md`](docs/CUSTOMER_ONBOARDING.md)
+- **Example audit report** (Nordic Lifestyle demo store, LCP 4200ms → 1800ms) — [`docs/examples/demo_audit_report.html`](docs/examples/demo_audit_report.html)
+- **Example comparison data** — [`docs/examples/demo_comparison.json`](docs/examples/demo_comparison.json)
+
+---
+
+## Roadmap
+
+- ✅ Sprint 1 — v0.1.0 baseline (parser, ranker, orchestrator, CLI, HTML report, 103 tests)
+- ✅ Sprint 2 — before/after workflow, customer docs, ML ranker, live URL compare, CI, governance cleanup (276 tests)
+- 🔜 Sprint 3 — see [`docs/ROADMAP.md`](docs/ROADMAP.md) (in progress)
+  - PDF report export
+  - Per-image before/after comparison (currently cohort-level only)
+  - Shopify Admin API integration for direct store access
+  - Image-optimisation automation hooks
+
+---
+
+## Further reading
+
+- [`docs/spec/cli_v0_1.md`](docs/spec/cli_v0_1.md) — full CLI specification
+- [`docs/governance.md`](docs/governance.md) — ownership + workflow
+- [`docs/runbook/measurement_protocol.md`](docs/runbook/measurement_protocol.md) — how LCP/CLS/INP are measured deterministically
+- [`docs/SPRINT_2_COMPLETE.md`](docs/SPRINT_1_COMPLETE.md) — what shipped in Sprint 1
+- [`QA_CHECKLIST.md`](QA_CHECKLIST.md) — quality gates
