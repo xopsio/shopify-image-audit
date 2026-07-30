@@ -889,6 +889,124 @@ def version() -> None:
 
 
 # ---------------------------------------------------------------------------
+# schedule
+# ---------------------------------------------------------------------------
+
+@app.command()
+def schedule(
+    subcommand: str = typer.Argument(..., help="Subcommand: 'list', 'add', 'remove', or 'run-all'."),
+    shop_domain: str = typer.Argument(
+        None,
+        help="[add/remove] Store hostname, e.g. 'mystore.myshopify.com'.",
+    ),
+    url: str = typer.Argument(
+        None,
+        help="[add] Store URL to audit (https://...).",
+    ),
+    schedule_dir: Path | None = typer.Option(
+        None, "--schedule-dir",
+        help="Override the schedule config directory "
+        "(default: $XDG_DATA_HOME/.shopify-image-audit/).",
+    ),
+    history_dir: Path | None = typer.Option(
+        None, "--history-dir",
+        help="[run-all] Override the audit-history directory.",
+    ),
+    device: str = typer.Option("mobile", "--device", help="[add] Device: mobile or desktop."),
+    label: str | None = typer.Option(
+        None, "--label",
+        help="[add] Optional label for the schedule (e.g. 'Daily 09:00').",
+    ),
+    api_key: str | None = typer.Option(
+        None, "--api-key",
+        help="[run-all] Google Cloud API key for PageSpeed (optional).",
+    ),
+) -> None:
+    """Manage scheduled re-audits and run them on demand.
+
+    Scheduling itself (when to run) is delegated to cron / systemd — see
+    ``docs/runbook/scheduled_reaudit.md`` for a crontab example. This
+    command handles the 'what to run' half: persisting the schedule list
+    and executing it via ``run-all``.
+    """
+    if subcommand not in ("list", "add", "remove", "run-all"):
+        rprint(f"[red]Error:[/red] Unknown schedule subcommand: {subcommand!r} "
+               "(use 'list', 'add', 'remove', or 'run-all').")
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+
+    if device not in ("mobile", "desktop"):
+        rprint(f"[red]Error:[/red] --device must be 'mobile' or 'desktop', got '{device}'.")
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+
+    from engine.scheduler import ScheduleConfig, ScheduleStore, run_all_schedules
+
+    store_dir = schedule_dir or _default_schedule_dir()
+    store = ScheduleStore(store_dir)
+
+    if subcommand == "list":
+        schedules = store.load()
+        if not schedules:
+            rprint(f"[yellow]No schedules configured in {store.path}.[/yellow]")
+            rprint("  Use `audit schedule add <shop_domain> <url>` to add one.")
+        else:
+            _schedule_list(schedules)
+    elif subcommand == "add":
+        if not shop_domain or not url:
+            rprint("[red]Error:[/red] `audit schedule add` requires <shop_domain> and <url>.")
+            raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+        config = ScheduleConfig(
+            shop_domain=shop_domain, url=url, device=device, label=label,
+        )
+        store.add(config)
+        rprint(f"[green]Schedule added:[/green] {shop_domain} -> {url}")
+    elif subcommand == "remove":
+        if not shop_domain:
+            rprint("[red]Error:[/red] `audit schedule remove` requires <shop_domain>.")
+            raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+        remaining = store.remove(shop_domain)
+        if len(remaining) == len(store.load()) + 1:
+            rprint(f"[yellow]No schedule found for {shop_domain!r}.[/yellow]")
+        else:
+            rprint(f"[green]Schedule removed:[/green] {shop_domain}")
+    else:  # run-all
+        history_store = HistoryStore(base_dir=history_dir)
+        results = run_all_schedules(store, history_store=history_store, api_key=api_key)
+        if not results:
+            rprint(f"[yellow]No schedules to run in {store.path}.[/yellow]")
+        else:
+            for r in results:
+                if r.success:
+                    rprint(f"  [green]✓[/green] {r.shop_domain}: recorded (id={r.entry_id})")
+                else:
+                    rprint(f"  [red]✗[/red] {r.shop_domain}: {r.error}")
+            if not any(r.success for r in results):
+                raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE) from None
+
+    raise typer.Exit(code=EXIT_OK) from None
+
+
+def _default_schedule_dir() -> Path:
+    """Default schedule config dir (sibling of the history dir)."""
+    from engine.history import _default_history_dir
+    return _default_history_dir().parent
+
+
+def _schedule_list(schedules: list) -> None:
+    """Print a Rich table of configured schedules."""
+    from rich.table import Table
+
+    table = Table(title="Scheduled Re-audits")
+    table.add_column("Shop domain")
+    table.add_column("URL")
+    table.add_column("Device")
+    table.add_column("Label")
+    for s in schedules:
+        table.add_row(s.shop_domain, s.url, s.device, s.label or "—")
+    console = Console()
+    console.print(table)
+
+
+# ---------------------------------------------------------------------------
 # entry-point
 # ---------------------------------------------------------------------------
 
