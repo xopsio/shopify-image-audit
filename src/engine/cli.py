@@ -323,16 +323,33 @@ def score(
 @app.command()
 def report(
     audit_result_json: Path = typer.Argument(..., help="Path to audit_result.json."),
-    output: Path = typer.Option("report.html", "-o", "--output", help="Output HTML file."),
+    output: Path = typer.Option("report.html", "-o", "--output", help="Output file (HTML or PDF based on --pdf)."),
+    pdf: bool = typer.Option(False, "--pdf", help="Render the report as PDF instead of HTML."),
 ) -> None:
-    """Render an audit result JSON to an HTML report."""
+    """Render an audit result JSON to an HTML report (or PDF with --pdf)."""
     if not audit_result_json.exists():
         rprint(f"[red]Error:[/red] File not found: {audit_result_json}")
         raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
+    # If --pdf is set and the user didn't pass --output, default to .pdf.
+    # We can't mutate the Option default based on another flag in Typer,
+    # so we adjust the resolved Path here.
+    if pdf and output == Path("report.html"):
+        output = output.with_suffix(".pdf")
+
     try:
-        write_html_report(audit_result_json, output)
-        rprint(f"[green]OK[/green] HTML report written to: {output}")
+        if pdf:
+            # Render HTML in-memory, then convert to PDF. We don't use
+            # write_html_report because that helper writes HTML directly.
+            with open(audit_result_json, encoding="utf-8") as fh:
+                raw = json.load(fh)
+            from audit.report import generate_html_report, render_pdf_report
+            html = generate_html_report(raw)
+            render_pdf_report(html, output)
+            rprint(f"[green]OK[/green] PDF report written to: {output}")
+        else:
+            write_html_report(audit_result_json, output)
+            rprint(f"[green]OK[/green] HTML report written to: {output}")
     except json.JSONDecodeError as e:
         rprint(f"[red]Error:[/red] Invalid JSON in {audit_result_json}: {e}")
         raise typer.Exit(code=EXIT_INVALID_ARGS) from None
@@ -393,6 +410,7 @@ def compare(
     current: str = typer.Argument(..., help="Path to the current audit_result.json OR a live URL (https://...)."),
     output: Path | None = typer.Option(None, "-o", "--output",
                                           help="Write an HTML before/after report here (default: stdout JSON)."),
+    pdf: bool = typer.Option(False, "--pdf", help="When --output is set, render a PDF instead of HTML."),
     json_out: Path | None = typer.Option(None, "--json",
                                             help="Also write the comparison result JSON to this file."),
     strategy: str = typer.Option("mobile", "--strategy", help="PageSpeed strategy when <current> is a URL."),
@@ -460,8 +478,16 @@ def compare(
             current_payload["_source_file"] = current
         html = generate_html_report(current_payload, comparison=comparison)
         Path(output).parent.mkdir(parents=True, exist_ok=True)
-        Path(output).write_text(html, encoding="utf-8")
-        rprint(f"\n[green]HTML report written to {output}[/green]")
+        if pdf:
+            # Render HTML -> PDF via WeasyPrint. The CLI's --pdf flag
+            # toggles between the two output formats; the output file
+            # extension is the user's choice (no auto-rename here).
+            from audit.report import render_pdf_report
+            render_pdf_report(html, output)
+            rprint(f"\n[green]PDF report written to {output}[/green]")
+        else:
+            Path(output).write_text(html, encoding="utf-8")
+            rprint(f"\n[green]HTML report written to {output}[/green]")
     else:
         print(json.dumps(comparison.model_dump(), indent=2))
 

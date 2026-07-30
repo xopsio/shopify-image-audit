@@ -36,6 +36,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
+      # WeasyPrint needs native libraries (pango, cairo, gdk-pixbuf, ...)
+      # for PDF rendering. Install them before tests so the PDF tests
+      # (`tests/test_report_pdf.py`) can render. If a future PR stops
+      # depending on WeasyPrint, this step can be removed.
+      - name: Install WeasyPrint system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libpango-1.0-0 libpangoft2-1.0-0 libcairo2 libgdk-pixbuf-2.0-0
+
       - name: Lint (ruff)
         run: ruff check src/ tests/
 

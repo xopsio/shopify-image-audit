@@ -612,6 +612,34 @@ def generate_html_report(audit_result: dict[str, Any], comparison=None) -> str:
     return html
 
 
+def render_pdf_report(html_content: str, output_path: Path | str) -> Path:
+    """
+    Render an HTML report string to a PDF file using WeasyPrint.
+
+    The HTML must already be fully assembled (use ``generate_html_report`` or
+    its callers). The output file is created or overwritten. Parent dirs
+    are created as needed.
+
+    Returns the resolved output path.
+
+    Raises:
+        ImportError: if WeasyPrint is not installed (the runtime dependency
+            ``weasyprint>=63.0`` should make this impossible in practice;
+            it surfaces here only if the install is broken).
+        OSError: if WeasyPrint cannot write the PDF (e.g. fontconfig or
+            pango missing on the host).
+    """
+    output = Path(output_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+
+    # Lazy import so CLI commands that never produce a PDF don't pay the
+    # ~200 ms WeasyPrint import cost.
+    import weasyprint
+
+    weasyprint.HTML(string=html_content).write_pdf(target=str(output))
+    return output
+
+
 def write_html_report(audit_result_path: Path, output_path: Path) -> None:
     """
     Read an audit result JSON file and write an HTML report.
