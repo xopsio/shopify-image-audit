@@ -460,11 +460,30 @@ def report(
     audit_result_json: Path = typer.Argument(..., help="Path to audit_result.json."),
     output: Path = typer.Option("report.html", "-o", "--output", help="Output file (HTML or PDF based on --pdf)."),
     pdf: bool = typer.Option(False, "--pdf", help="Render the report as PDF instead of HTML."),
+    brand_logo: Path | None = typer.Option(
+        None, "--brand-logo",
+        help="Path to a brand logo (PNG, JPG, GIF, WebP, SVG). Embedded in the report header as a data URI.",
+    ),
+    brand_color: str | None = typer.Option(
+        None, "--brand-color",
+        help="Brand primary colour as a hex string (e.g. '#ff6b35'). Invalid values are ignored.",
+    ),
 ) -> None:
     """Render an audit result JSON to an HTML report (or PDF with --pdf)."""
+    from audit.report import _parse_brand_color, _read_brand_logo
+
     if not audit_result_json.exists():
         rprint(f"[red]Error:[/red] File not found: {audit_result_json}")
         raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+
+    # Validate brand colour; warn (don't fail) on invalid input.
+    validated_color = _parse_brand_color(brand_color) if brand_color else None
+    if brand_color and validated_color is None:
+        rprint(f"[yellow]Warning:[/yellow] Ignoring invalid --brand-color {brand_color!r}; using default palette.")
+    # Validate brand logo; warn (don't fail) on missing/invalid.
+    validated_logo = _read_brand_logo(brand_logo) if brand_logo else None
+    if brand_logo and validated_logo is None:
+        rprint(f"[yellow]Warning:[/yellow] Could not read --brand-logo {brand_logo!r}; rendering without logo.")
 
     # If --pdf is set and the user didn't pass --output, default to .pdf.
     # We can't mutate the Option default based on another flag in Typer,
@@ -479,11 +498,16 @@ def report(
             with open(audit_result_json, encoding="utf-8") as fh:
                 raw = json.load(fh)
             from audit.report import generate_html_report, render_pdf_report
-            html = generate_html_report(raw)
+            html = generate_html_report(
+                raw, brand_logo=validated_logo, brand_color=validated_color,
+            )
             render_pdf_report(html, output)
             rprint(f"[green]OK[/green] PDF report written to: {output}")
         else:
-            write_html_report(audit_result_json, output)
+            write_html_report(
+                audit_result_json, output,
+                brand_logo=brand_logo, brand_color=brand_color,
+            )
             rprint(f"[green]OK[/green] HTML report written to: {output}")
     except json.JSONDecodeError as e:
         rprint(f"[red]Error:[/red] Invalid JSON in {audit_result_json}: {e}")
@@ -550,6 +574,14 @@ def compare(
                                             help="Also write the comparison result JSON to this file."),
     strategy: str = typer.Option("mobile", "--strategy", help="PageSpeed strategy when <current> is a URL."),
     api_key: str | None = typer.Option(None, "--api-key", help="Google Cloud API key for PageSpeed (optional)."),
+    brand_logo: Path | None = typer.Option(
+        None, "--brand-logo",
+        help="Path to a brand logo (PNG, JPG, GIF, WebP, SVG). Used when -o/--pdf writes a report.",
+    ),
+    brand_color: str | None = typer.Option(
+        None, "--brand-color",
+        help="Brand primary colour as hex (e.g. '#ff6b35'). Invalid values are ignored.",
+    ),
 ) -> None:
     """Compare a baseline audit against a current audit (before/after).
 
@@ -611,7 +643,17 @@ def compare(
             current_payload["_source_file"] = current
         else:
             current_payload["_source_file"] = current
-        html = generate_html_report(current_payload, comparison=comparison)
+        from audit.report import _parse_brand_color, _read_brand_logo
+        validated_color = _parse_brand_color(brand_color) if brand_color else None
+        validated_logo = _read_brand_logo(brand_logo) if brand_logo else None
+        if brand_color and validated_color is None:
+            rprint(f"[yellow]Warning:[/yellow] Ignoring invalid --brand-color {brand_color!r}.")
+        if brand_logo and validated_logo is None:
+            rprint(f"[yellow]Warning:[/yellow] Could not read --brand-logo {brand_logo!r}.")
+        html = generate_html_report(
+            current_payload, comparison=comparison,
+            brand_logo=validated_logo, brand_color=validated_color,
+        )
         Path(output).parent.mkdir(parents=True, exist_ok=True)
         if pdf:
             # Render HTML -> PDF via WeasyPrint. The CLI's --pdf flag

@@ -11,6 +11,7 @@ will be finalised once the comparison data contract from #18 is ready.
 
 from __future__ import annotations
 
+import base64
 import json
 from html import escape
 from pathlib import Path
@@ -38,6 +39,84 @@ def _vitals_status(metric: str, value: float) -> str:
     elif value <= poor:
         return "needs-improvement"
     return "poor"
+
+
+# ---------------------------------------------------------------------------
+# Brand customisation (Sprint 4, TD-2)
+# ---------------------------------------------------------------------------
+
+#: Maximum logo file size for base64-embedded data URIs. Beyond this, we
+#: warn and skip the logo to avoid bloating the report.
+_BRAND_LOGO_MAX_BYTES = 5 * 1024 * 1024  # 5 MB
+
+#: Map of file extension to MIME type for supported logo formats.
+#: SVGs are filtered for `<script>` tags at load time to avoid an injection
+#: vector for embedded JavaScript in a self-contained data-URI report.
+_BRAND_LOGO_MIME: dict[str, str] = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".svg": "image/svg+xml",
+}
+
+
+def _parse_brand_color(hex_str: str | None) -> str | None:
+    """Validate and normalise a hex colour string.
+
+    Accepts ``#RGB`` or ``#RRGGBB`` (case-insensitive). Returns the
+    normalised ``#RRGGBB`` form, or ``None`` if the input is empty /
+    invalid. Validation only — the caller is expected to log a warning
+    on ``None`` and fall back to the default.
+    """
+    if not hex_str:
+        return None
+    s = hex_str.strip()
+    if not s.startswith("#"):
+        return None
+    body = s[1:]
+    if len(body) == 3:
+        body = "".join(c * 2 for c in body)
+    if len(body) != 6 or any(c not in "0123456789abcdefABCDEF" for c in body):
+        return None
+    return f"#{body.lower()}"
+
+
+def _read_brand_logo(path: str | Path) -> tuple[str, str] | None:
+    """Read a brand logo from disk for inline embedding in the HTML report.
+
+    Returns ``(mime_type, base64_data)`` for use in a ``data:`` URI, or
+    ``None`` if the file is missing, too large, has an unsupported
+    extension, or is an SVG that contains ``<script>`` (a basic injection
+    guard — not a full sanitiser).
+
+    The caller is expected to log a warning on ``None`` and fall back to
+    the default (no logo).
+    """
+    p = Path(path)
+    if not p.is_file():
+        return None
+    try:
+        size = p.stat().st_size
+    except OSError:
+        return None
+    if size > _BRAND_LOGO_MAX_BYTES:
+        return None
+    ext = p.suffix.lower()
+    mime = _BRAND_LOGO_MIME.get(ext)
+    if mime is None:
+        return None
+    try:
+        data = p.read_bytes()
+    except OSError:
+        return None
+    # Basic injection guard for SVGs: refuse any file containing a
+    # <script> tag. This is NOT a complete sanitiser — it's a cheap
+    # tripwire that catches the common "external SVG with embedded JS" case.
+    if mime == "image/svg+xml" and b"<script" in data.lower():
+        return None
+    return mime, base64.b64encode(data).decode("ascii")
 
 
 # ---------------------------------------------------------------------------
@@ -83,6 +162,12 @@ _CSS = """        * { box-sizing: border-box; margin: 0; padding: 0; }
             border-radius: 8px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
+        .brand-logo {
+            display: block;
+            max-height: 80px;
+            max-width: 240px;
+            margin-bottom: 20px;
+        }
         h1 {
             font-size: 2em;
             margin-bottom: 10px;
@@ -93,7 +178,7 @@ _CSS = """        * { box-sizing: border-box; margin: 0; padding: 0; }
             margin-top: 30px;
             margin-bottom: 15px;
             color: #2c3e50;
-            border-bottom: 2px solid #3498db;
+            border-bottom: 2px solid var(--brand-color, #3498db);
             padding-bottom: 5px;
         }
         h3 {
@@ -151,7 +236,7 @@ _CSS = """        * { box-sizing: border-box; margin: 0; padding: 0; }
             margin: 20px 0;
         }
         .stat-box {
-            background: #3498db;
+            background: var(--brand-color, #3498db);
             color: white;
             padding: 20px;
             border-radius: 5px;
@@ -268,13 +353,38 @@ _CSS = """        * { box-sizing: border-box; margin: 0; padding: 0; }
         }
         .roi-box {
             background: #e8f4fd;
-            border-left: 4px solid #3498db;
+            border-left: 4px solid var(--brand-color, #3498db);
             padding: 15px;
             margin: 15px 0;
         }"""
 
 
-def _render_head() -> str:
+def _render_head(
+    brand_logo: tuple[str, str] | None = None,
+    brand_color: str | None = None,
+) -> str:
+    """Render the HTML document head, body open, and report title.
+
+    Optional brand customisation:
+    - ``brand_logo``: ``(mime_type, base64_data)`` from ``_read_brand_logo``.
+      Rendered as an ``<img>`` above the title via a data URI, so the
+      report is self-contained (no external file dependency).
+    - ``brand_color``: validated hex colour, applied as a CSS variable
+      so all brand-tinted elements pick it up automatically.
+    """
+    extra_css = ""
+    if brand_color:
+        extra_css = f"        :root {{ --brand-color: {brand_color}; }}\n"
+
+    if brand_logo is not None:
+        logo_mime, logo_b64 = brand_logo
+        logo_tag = (
+            f'    <img class="brand-logo" alt="Brand logo" '
+            f'src="data:{logo_mime};base64,{logo_b64}">\n'
+        )
+    else:
+        logo_tag = ""
+
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -282,12 +392,12 @@ def _render_head() -> str:
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Shopify Image Audit Report</title>
     <style>
-{_CSS}
+{extra_css}{_CSS}
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🖼️ Shopify Image Audit Report</h1>
+{logo_tag}        <h1>🖼️ Shopify Image Audit Report</h1>
 
 """
 
@@ -652,7 +762,13 @@ def _render_footer(audit_result: dict[str, Any]) -> str:
 # Public API
 # ---------------------------------------------------------------------------
 
-def generate_html_report(audit_result: dict[str, Any], comparison=None) -> str:
+def generate_html_report(
+    audit_result: dict[str, Any],
+    comparison=None,
+    *,
+    brand_logo: tuple[str, str] | None = None,
+    brand_color: str | None = None,
+) -> str:
     """
     Generate an HTML report from an audit result dictionary.
 
@@ -662,6 +778,13 @@ def generate_html_report(audit_result: dict[str, Any], comparison=None) -> str:
             model or its dict form. When provided, a "Before / After Comparison"
             section is rendered after the top-issues block. Defaults to None
             (no comparison section — original behaviour).
+        brand_logo: Optional ``(mime_type, base64_data)`` tuple from
+            ``_read_brand_logo``. Rendered as a data-URI image at the top
+            of the report.
+        brand_color: Optional validated hex colour (e.g. ``"#ff6b35"``).
+            Applied as a CSS variable so all brand-tinted elements pick it
+            up. Invalid values are ignored — call sites are expected to
+            validate before calling.
 
     Returns:
         HTML string ready to be written to a file
@@ -687,7 +810,7 @@ def generate_html_report(audit_result: dict[str, Any], comparison=None) -> str:
     summary = audit_result["summary"]
     stats = _aggregate_stats(images)
 
-    html = _render_head()
+    html = _render_head(brand_logo=brand_logo, brand_color=brand_color)
     html += _render_meta(meta)
     html += _render_vitals(vitals)
     html += _render_stats(stats)
@@ -728,13 +851,24 @@ def render_pdf_report(html_content: str, output_path: Path | str) -> Path:
     return output
 
 
-def write_html_report(audit_result_path: Path, output_path: Path) -> None:
+def write_html_report(
+    audit_result_path: Path,
+    output_path: Path,
+    *,
+    brand_logo: str | Path | None = None,
+    brand_color: str | None = None,
+) -> None:
     """
     Read an audit result JSON file and write an HTML report.
 
     Args:
         audit_result_path: Path to the audit_result.json file
         output_path: Path where the HTML report should be written
+        brand_logo: Optional path to a brand logo file (PNG, JPG, GIF, WebP, SVG).
+            Embedded as a data URI in the report header. Invalid/missing
+            files are ignored (the report renders without a logo).
+        brand_color: Optional hex colour string (e.g. ``"#ff6b35"``).
+            Invalid values are ignored (default palette is used).
 
     Raises:
         FileNotFoundError: If audit_result_path doesn't exist
@@ -748,7 +882,11 @@ def write_html_report(audit_result_path: Path, output_path: Path) -> None:
     if isinstance(audit_result, dict):
         audit_result["_source_file"] = str(audit_result_path)
 
-    html_content = generate_html_report(audit_result)
+    html_content = generate_html_report(
+        audit_result,
+        brand_logo=_read_brand_logo(brand_logo) if brand_logo else None,
+        brand_color=_parse_brand_color(brand_color),
+    )
 
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(html_content)
