@@ -75,19 +75,11 @@ EXIT_LIGHTHOUSE_FAILURE = 10
 def _get_version() -> str:
     """Read the package version from pyproject.toml at runtime.
 
-    Keeps the version in one place: bump ``pyproject.toml``'s ``version``
-    and ``audit version`` follows. Falls back to "unknown" if the file
-    can't be read (e.g. when running from a wheel without pyproject.toml
-    next to it).
+    Delegates to the shared ``src/_version.py`` helper so both the CLI
+    and the HTML report footer read from one place.
     """
-    import tomllib
-    from pathlib import Path
-    pyproject = Path(__file__).resolve().parents[2] / "pyproject.toml"
-    try:
-        with open(pyproject, "rb") as f:
-            return tomllib.load(f)["project"]["version"]
-    except (FileNotFoundError, KeyError):
-        return "unknown"
+    from _version import get_version
+    return get_version()
 
 
 _VERSION = _get_version()
