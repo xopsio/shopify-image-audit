@@ -64,7 +64,26 @@ EXIT_OK = 0
 EXIT_INVALID_ARGS = 2
 EXIT_LIGHTHOUSE_FAILURE = 10
 
-_VERSION = "0.1.0"
+
+def _get_version() -> str:
+    """Read the package version from pyproject.toml at runtime.
+
+    Keeps the version in one place: bump ``pyproject.toml``'s ``version``
+    and ``audit version`` follows. Falls back to "unknown" if the file
+    can't be read (e.g. when running from a wheel without pyproject.toml
+    next to it).
+    """
+    import tomllib
+    from pathlib import Path
+    pyproject = Path(__file__).resolve().parents[2] / "pyproject.toml"
+    try:
+        with open(pyproject, "rb") as f:
+            return tomllib.load(f)["project"]["version"]
+    except (FileNotFoundError, KeyError):
+        return "unknown"
+
+
+_VERSION = _get_version()
 
 console = Console()
 
