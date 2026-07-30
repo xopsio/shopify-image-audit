@@ -34,6 +34,11 @@ from rich.console import Console
 
 from audit.models import AuditResult
 from audit.report import generate_html_report, write_html_report
+
+# NOTE: imported as ``run_comparison`` to avoid shadowing the Typer command
+# function below (also named ``compare``). The CLI exposes ``compare`` for the
+# end-user-facing ``audit compare`` subcommand; the underlying engine function
+# is the actual comparison logic from ``core.baseline_manager``.
 from core.baseline_manager import compare as run_comparison
 from core.baseline_manager import save_baseline
 from engine.audit_orchestrator import run_audit
