@@ -3,7 +3,7 @@
 [![CI](https://github.com/xopsio/shopify-image-audit/actions/workflows/ci.yml/badge.svg)](https://github.com/xopsio/shopify-image-audit/actions)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
 [![ruff](https://img.shields.io/badge/lint-ruff-green)](https://docs.astral.sh/ruff/)
-[![tests](https://img.shields.io/badge/tests-606_passing-brightgreen)](#testing)
+[![tests](https://img.shields.io/badge/tests-642_passing-brightgreen)](#testing)
 
 A Lighthouse-based image audit tool for Shopify stores. Produces per-image
 scores, role assignments, optimisation recommendations, and a **before/after
@@ -17,6 +17,29 @@ the customer implements the recommendations.
 
 ## Quickstart
 
+### End-user install (PyPI)
+
+```bash
+# Recommended: pipx creates an isolated env
+pipx install shopify-image-audit
+
+# Alternative: pip into a venv
+python -m venv .venv && source .venv/bin/activate
+pip install shopify-image-audit
+```
+
+The PDF renderer (`audit report --pdf`) requires native libraries
+(`libpango`, `libcairo`, `libgdk-pixbuf`). On Linux:
+
+```bash
+sudo apt-get install -y libpango-1.0-0 libpangoft2-1.0-0 libcairo2 libgdk-pixbuf-2.0-0
+```
+
+The `lighthouse` Node CLI is required for `audit run <url>`. Install with
+`npm i -g lighthouse` (or pass `--lhr <file>` to use a pre-existing report).
+
+### Developer install (from source)
+
 ```bash
 git clone https://github.com/xopsio/shopify-image-audit.git
 cd shopify-image-audit
@@ -25,7 +48,7 @@ pip install -e ".[dev]"
 
 # Verify the install
 audit version
-pytest -q                                              # 390 tests
+pytest -q                                              # 642 tests
 ```
 
 ---
@@ -140,7 +163,7 @@ src/
     └── shopify_admin.py      # Shopify Admin API (auth, products, theme_assets)
 
 schemas/audit_result.schema.json    # JSON Schema contract (validated by tests)
-tests/                              # 390 tests, single-writer (ZCode)
+tests/                              # 642 tests, single-writer (ZCode)
 docs/examples/                       # live demo report + comparison JSON
 docs/integrations/                   # Shopify Admin API token guide
 ```
@@ -153,8 +176,8 @@ The codebase is governed by **a single ZCode agent** (see
 ## Testing
 
 ```bash
-pytest -q                                # 606 tests, single-writer discipline
-pytest --cov=src --cov-report=term       # ~87% coverage
+pytest -q                                # 642 tests, single-writer discipline
+pytest --cov=src --cov-report=term       # ~91% coverage
 ruff check src/ tests/                   # 0 violations
 ```
 
@@ -188,6 +211,17 @@ merge. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
   - Error decorator wiring + consistency pass (RuntimeError → exit 10)
   - `audit history diff` with stable entry-ids
   - `CHANGELOG.md` and `--cov-fail-under=85` CI gate
+- ✅ Sprint 6 — Coverage close-out, test isolation, multi-store batch, observability, v0.5.0 (606 tests)
+  - `tests/test_table_snapshots.py` (Rich Console captures)
+  - Zero CWD-relative writes in tests
+  - `audit shopify batch --stores-file` for multi-store inventory
+  - `engine._logging` with 6 structured log hooks
+  - `CONTRIBUTING.md`, `--cov-fail-under=90`
+- ✅ Sprint 7 — Scheduled re-audit, dependency hygiene, PageSpeed cache, v0.6.0 (642 tests)
+  - `audit schedule list/add/remove/run-all` + crontab runbook
+  - Dependabot + SLSA build-provenance attestation
+  - PageSpeed response cache (`PAGESPEED_CACHE_TTL`)
+  - Report footer version drift fixed
 
 ---
 

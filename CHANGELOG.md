@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Empty — all Sprint 6 work shipped in v0.5.0.
+Empty — all Sprint 7 work shipped in v0.6.0.
 
 ---
 
@@ -132,6 +132,47 @@ Empty — all Sprint 6 work shipped in v0.5.0.
 - `_table.py` coverage 68% → 100%
 - Ruff clean
 
+[Unreleased]: https://github.com/xopsio/shopify-image-audit/compare/v0.6.0...HEAD
+
+---
+
+## [0.6.0] - 2026-07-30
+
+### Added (Sprint 7)
+- `audit schedule list/add/remove/run-all` — scheduled re-audit via the
+  external-cron model (Sprint 4's deferred work, finally shipped) — TD-1
+- `src/engine/scheduler.py` (NEW): ScheduleConfig, ScheduleStore,
+  run_all_schedules — reads `~/.shopify-image-audit/schedules.json` and
+  records each fetch to `HistoryStore`
+- `src/integrations/_cache.py` (NEW): on-disk PageSpeed response cache with
+  TTL — `PAGESPEED_CACHE_TTL` env var (default 3600s; `0` disables) — TD-3
+- `src/_version.py` (NEW): shared `get_version()` helper — fixes the
+  long-standing report footer version drift (was hardcoded `v0.1`)
+- `docs/runbook/scheduled_reaudit.md` (NEW): crontab snippet, systemd
+  timer alternative, `flock` overlap-prevention, env-var reference, security
+  notes, troubleshooting
+- Dependabot config (`.github/dependabot.yml`) — weekly pip + GitHub
+  Actions updates with grouped minor+patch — TD-2
+- SLSA build-provenance attestation on every PyPI release (best-effort,
+  non-blocking) — TD-2
+
+### Changed
+- CLI spec (`docs/spec/cli_v0_1.md`) rewritten to document all 11 actual
+  commands (was: 8) — TD-4
+- `README.md`: added `pipx install` Deployment section, fixed test-count
+  drift (3 different numbers → 1 consistent), added Lighthouse CLI
+  prerequisite note
+- `docs/runbook/measurement_protocol.md`: corrected the `--runs`
+  semantics (last run, not median) — TD-4
+- Runtime deps: upper caps on `pydantic`, `typer`, `rich`, `requests`,
+  `jsonschema` (matches existing `weasyprint` pinning pattern) — TD-2
+
+### Stats
+- 642 tests (up from 606)
+- Ruff clean
+- Trusted publishing + provenance attestation active for PyPI
+
+[0.6.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.2.0...v0.3.0
