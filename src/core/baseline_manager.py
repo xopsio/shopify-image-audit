@@ -16,6 +16,7 @@ Design notes
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -24,6 +25,7 @@ from audit.models import (
     AuditResult,
     ComparisonResult,
     ComparisonSummary,
+    ImageDelta,
     ImageStatsDelta,
     MetricDelta,
     VitalsDelta,
@@ -135,6 +137,190 @@ def _roi_estimate(vitals: VitalsDelta, images: ImageStatsDelta) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Per-image matching and delta computation
+# ---------------------------------------------------------------------------
+
+def _strip_query_params(src: str) -> str:
+    """Remove ``?key=value`` query params from a URL/path.
+
+    Used to normalise URLs before hashing so that CDN cache-busting
+    suffixes (e.g. ``?v=2``) don't break per-image matching.
+    """
+    return src.split("?", 1)[0]
+
+
+def _image_key(img: dict[str, Any]) -> str:
+    """Stable identifier for matching an image across two AuditResults.
+
+    Hash over (normalised src, bytes, mime). This tolerates CDN
+    cache-busting query params (which are stripped before hashing) but
+    treats genuine data changes — format conversion (JPEG → WebP) or
+    re-encoded content — as different images.
+
+    The key is short (8 hex chars) and stable; collisions in 2^32 are
+    astronomically unlikely across realistic audit pairs.
+    """
+    src = _strip_query_params(str(img.get("src", "")))
+    bytes_ = int(img.get("bytes") or 0)
+    mime = str(img.get("mime") or "")
+    payload = f"{src}|{bytes_}|{mime}"
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+
+def _per_image_status(before_bytes: int, after_bytes: int) -> str:
+    """Derive a per-image status from byte delta.
+
+    Heuristic: a byte reduction of >=10% is "improved", increase of >=10%
+    is "regressed", otherwise "unchanged". Mime changes are not part of
+    the status — those show up in the recommendation string.
+    """
+    if before_bytes <= 0:
+        return "unchanged"
+    pct = (after_bytes - before_bytes) / before_bytes
+    if pct <= -0.10:
+        return "improved"
+    if pct >= 0.10:
+        return "regressed"
+    return "unchanged"
+
+
+def _per_image_recommendation(status: str, mime_before: str | None,
+                              mime_after: str | None, score_delta: int) -> str:
+    """A short per-image recommendation string for the report table."""
+    if status == "added":
+        if mime_after and mime_after not in ("image/webp", "image/avif", "image/jxl"):
+            return "New image; consider WebP/AVIF."
+        return "New image."
+    if status == "removed":
+        return "Image removed."
+    if status == "regressed":
+        return "Image grew; review."
+    if status == "improved" and mime_before and mime_after and mime_before != mime_after:
+        return f"Format converted: {mime_before.split('/')[-1]} → {mime_after.split('/')[-1]}."
+    if status == "improved" and score_delta > 0:
+        return f"Score improved by {score_delta} points."
+    return ""
+
+
+def _match_images(
+    before_imgs: list[dict[str, Any]],
+    after_imgs: list[dict[str, Any]],
+) -> list[ImageDelta]:
+    """Pair images between before/after and produce per-image deltas.
+
+    Two-phase matching:
+    1. **Primary: hash match.** Pair by ``_image_key(img)`` (normalised src
+       + bytes + mime). Two images with the same data hash are the same
+       image even if the CDN appended cache-busting query params.
+    2. **Fallback: src match.** If hash doesn't match but the normalised
+       src matches exactly, pair them. This catches "same URL, slightly
+       different bytes" (e.g. a re-encoding that only changes a few bytes
+       due to compression nondeterminism).
+
+    Unmatched before-images are "removed"; unmatched after-images are
+    "added". Matched pairs get bytes/score deltas.
+    """
+    # Index after-images by key for fast lookup (primary match).
+    after_by_key: dict[str, dict[str, Any]] = {}
+    for img in after_imgs:
+        key = _image_key(img)
+        if key not in after_by_key:
+            after_by_key[key] = img
+
+    # Secondary index: normalised src -> image (for fallback match).
+    after_by_src: dict[str, dict[str, Any]] = {}
+    for img in after_imgs:
+        src = _strip_query_params(str(img.get("src", "")))
+        if src and src not in after_by_src:
+            after_by_src[src] = img
+
+    consumed: set[int] = set()
+    deltas: list[ImageDelta] = []
+
+    for b_img in before_imgs:
+        b_key = _image_key(b_img)
+        b_src_norm = _strip_query_params(str(b_img.get("src", "")))
+
+        # Primary: hash match.
+        a_img = after_by_key.get(b_key)
+        match_kind: str | None = "hash" if a_img is not None else None
+
+        # Fallback: src match (only if hash didn't match).
+        if a_img is None and b_src_norm:
+            a_img = after_by_src.get(b_src_norm)
+            if a_img is not None:
+                match_kind = "src"
+
+        if a_img is None:
+            # No match — image removed.
+            deltas.append(ImageDelta(
+                match_key=b_key,
+                src=str(b_img.get("src", "")),
+                role_before=b_img.get("role"),
+                before=b_img,
+                status="removed",
+                mime_before=b_img.get("mime"),
+                recommendation=_per_image_recommendation(
+                    "removed", b_img.get("mime"), None, 0,
+                ),
+            ))
+            continue
+
+        # Mark the matched after-image as consumed.
+        consumed.add(id(a_img))
+
+        b_bytes = int(b_img.get("bytes") or 0)
+        a_bytes = int(a_img.get("bytes") or 0)
+        b_score = int(b_img.get("score") or 0)
+        a_score = int(a_img.get("score") or 0)
+        status = _per_image_status(b_bytes, a_bytes)
+        # When matched via src (not hash), there's a genuine data change —
+        # the recommendation should reflect that this is a "same URL,
+        # different bytes" case.
+        rec = _per_image_recommendation(
+            status, b_img.get("mime"), a_img.get("mime"), a_score - b_score,
+        )
+        if match_kind == "src" and status == "unchanged" and not rec:
+            rec = "Image re-encoded (same URL, bytes changed)."
+
+        deltas.append(ImageDelta(
+            match_key=b_key,
+            src=str(a_img.get("src") or b_img.get("src", "")),
+            role_before=b_img.get("role"),
+            role_after=a_img.get("role"),
+            before=b_img,
+            after=a_img,
+            bytes_delta=a_bytes - b_bytes,
+            score_delta=a_score - b_score,
+            mime_before=b_img.get("mime"),
+            mime_after=a_img.get("mime"),
+            status=status,
+            recommendation=rec,
+        ))
+
+    # Any after-image not consumed is "added".
+    for a_img in after_imgs:
+        if id(a_img) in consumed:
+            continue
+        a_key = _image_key(a_img)
+        a_bytes = int(a_img.get("bytes") or 0)
+        deltas.append(ImageDelta(
+            match_key=a_key,
+            src=str(a_img.get("src", "")),
+            role_after=a_img.get("role"),
+            after=a_img,
+            bytes_delta=a_bytes,
+            mime_after=a_img.get("mime"),
+            status="added",
+            recommendation=_per_image_recommendation(
+                "added", None, a_img.get("mime"), 0,
+            ),
+        ))
+
+    return deltas
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -179,12 +365,14 @@ def compare(before: AuditResult, after: AuditResult) -> ComparisonResult:
     )
 
     summary = _build_summary(vitals, images)
+    per_image = _match_images(b_imgs, a_imgs)
     return ComparisonResult(
         before={"url": b["meta"]["url"], "timestamp_utc": b["meta"]["timestamp_utc"]},
         after={"url": a["meta"]["url"], "timestamp_utc": a["meta"]["timestamp_utc"]},
         vitals=vitals,
         images=images,
         summary=summary,
+        per_image=per_image,
     )
 
 

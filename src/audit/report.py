@@ -257,6 +257,15 @@ _CSS = """        * { box-sizing: border-box; margin: 0; padding: 0; }
         .delta.improved { background: #d4edda; color: #155724; }
         .delta.regressed { background: #f8d7da; color: #721c24; }
         .delta.unchanged { background: #e2e3e5; color: #383d41; }
+        .status-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            color: white;
+            font-size: 0.8em;
+            font-weight: 500;
+            text-transform: lowercase;
+        }
         .roi-box {
             background: #e8f4fd;
             border-left: 4px solid #3498db;
@@ -411,6 +420,7 @@ def _render_comparison_section(comparison) -> str:
     vitals = comparison["vitals"]
     img_stats = comparison["images"]
     summary = comparison.get("summary", {})
+    per_image = comparison.get("per_image", [])
 
     # Vital metric rows: (label, vital_key, format)
     rows = ""
@@ -441,6 +451,9 @@ def _render_comparison_section(comparison) -> str:
     improvements = summary.get("top_improvements", [])
     regressions = summary.get("top_regressions", [])
     roi = summary.get("roi_estimate", "")
+
+    # Per-image delta table (rendered only if the comparison has per-image data)
+    per_image_html = _render_per_image_deltas(per_image)
 
     improvement_items = "".join(f"<li>{escape(i)}</li>" for i in improvements)
     regression_items = "".join(f"<li>{escape(i)}</li>" for i in regressions)
@@ -478,7 +491,7 @@ def _render_comparison_section(comparison) -> str:
                 <tbody>
 {img_rows}                </tbody>
             </table>
-            <h3 style="color:#27ae60;">✅ Improvements</h3>
+{per_image_html}            <h3 style="color:#27ae60;">✅ Improvements</h3>
             <ul>{improvement_items}</ul>
             {regressions_block}
             <div class="roi-box">
@@ -486,6 +499,81 @@ def _render_comparison_section(comparison) -> str:
             </div>
         </div>
 
+"""
+
+
+def _render_per_image_deltas(per_image: list[dict[str, Any]]) -> str:
+    """Render a per-image before/after delta table for the comparison section.
+
+    Each row shows one image: src (truncated), role change, bytes delta,
+    score delta, and a coloured status badge. Added/removed/re-encoded
+    images are visually distinguished. Returns an empty string when
+    ``per_image`` is empty so a single-audit report is unaffected.
+    """
+    if not per_image:
+        return ""
+
+    status_colours = {
+        "improved": "#27ae60",   # green
+        "regressed": "#c0392b",   # red
+        "unchanged": "#7f8c8d",   # grey
+        "added": "#2980b9",      # blue
+        "removed": "#95a5a6",    # light grey
+    }
+
+    rows = []
+    for d in per_image:
+        status = d.get("status", "unchanged")
+        colour = status_colours.get(status, "#7f8c8d")
+
+        # Cell formatters — handle None for added/removed cases.
+        def fmt_bytes(b: int | None) -> str:
+            if b is None:
+                return "—"
+            sign = "+" if b > 0 else ""
+            return f"{sign}{b / 1024:.1f} KB"
+
+        def fmt_score(s: int | None) -> str:
+            if s is None:
+                return "—"
+            sign = "+" if s > 0 else ""
+            return f"{sign}{s}"
+
+        def fmt_role(rb: str | None, ra: str | None) -> str:
+            if rb == ra:
+                return escape(rb or "—")
+            return f"{escape(rb or '—')} → {escape(ra or '—')}"
+
+        src = escape(str(d.get("src") or "—")[-50:])
+        bytes_delta = fmt_bytes(d.get("bytes_delta"))
+        score_delta = fmt_score(d.get("score_delta"))
+        role = fmt_role(d.get("role_before"), d.get("role_after"))
+        rec = escape(str(d.get("recommendation") or ""))
+
+        rows.append(f"""                <tr>
+                    <td>{src}</td>
+                    <td>{role}</td>
+                    <td>{bytes_delta}</td>
+                    <td>{score_delta}</td>
+                    <td><span class="status-badge" style="background:{colour};">{status}</span></td>
+                    <td class="recommendation">{rec}</td>
+                </tr>""")
+
+    return f"""            <h3>📸 Per-Image Changes</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Source</th>
+                        <th>Role</th>
+                        <th>Bytes</th>
+                        <th>Score</th>
+                        <th>Status</th>
+                        <th>Recommendation</th>
+                    </tr>
+                </thead>
+                <tbody>
+{chr(10).join(rows)}                </tbody>
+            </table>
 """
 
 
