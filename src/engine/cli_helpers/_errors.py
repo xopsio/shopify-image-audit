@@ -56,6 +56,10 @@ def handle_pipeline_errors(*, step_name: str, success_exit_code: int = 0,
       * ``RuntimeError`` -> exit 10 (backend / API failure)
       * anything else -> ``unknown_exit_code`` (default 2)
 
+    ``typer.Exit`` (raised explicitly inside the wrapped function for normal
+    flow control — e.g. early validation failure with the spec exit code)
+    is re-raised unchanged so the caller can still control its own exit code.
+
     Use this around an ``audit baseline`` / ``audit run`` step that calls
     ``run_audit`` and expects to translate failures to a CLI exit code.
     """
@@ -65,6 +69,10 @@ def handle_pipeline_errors(*, step_name: str, success_exit_code: int = 0,
             from typer import Exit
             try:
                 return func(*args, **kwargs)
+            except Exit:
+                # Explicit exits (validation failures, normal flow control)
+                # bubble up unchanged so the caller keeps its exit code.
+                raise
             except (FileNotFoundError, ValueError) as exc:
                 rprint(f"[red]Audit pipeline error:[/red] {exc}")
                 raise Exit(code=2) from exc
@@ -85,6 +93,9 @@ def handle_compare_errors(*, source_label: str = "input") -> Callable:
       * ``json.JSONDecodeError`` / ``ValueError`` / ``FileNotFoundError`` -> exit 2
       * ``RuntimeError`` -> exit 10 (PageSpeed API failure)
       * other -> exit 2
+
+    ``typer.Exit`` raised explicitly inside the wrapped function bubbles up
+    unchanged.
     """
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
@@ -92,6 +103,8 @@ def handle_compare_errors(*, source_label: str = "input") -> Callable:
             from typer import Exit
             try:
                 return func(*args, **kwargs)
+            except Exit:
+                raise
             except (json.JSONDecodeError, ValueError) as exc:
                 rprint(f"[red]Error:[/red] Invalid {source_label}: {exc}")
                 raise Exit(code=2) from exc
@@ -104,5 +117,36 @@ def handle_compare_errors(*, source_label: str = "input") -> Callable:
             except Exception as exc:
                 rprint(f"[red]Error:[/red] Failed to compare audits: {exc}")
                 raise Exit(code=2) from exc
+        return wrapper
+    return decorator
+
+
+def handle_shopify_errors() -> Callable:
+    """Error handler for ``audit shopify auth`` / ``audit shopify inventory``.
+
+    Maps:
+      * ``ValueError`` -> exit 2 (invalid input)
+      * ``RuntimeError`` -> exit 10 (Shopify API failure)
+      * other -> exit 10 (treated as backend failure)
+
+    ``typer.Exit`` raised explicitly bubbles up unchanged.
+    """
+    def decorator(func: Callable) -> Callable:
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            from typer import Exit
+            try:
+                return func(*args, **kwargs)
+            except Exit:
+                raise
+            except ValueError as exc:
+                rprint(f"[red]Error:[/red] Invalid input: {exc}")
+                raise Exit(code=2) from exc
+            except RuntimeError as exc:
+                rprint(f"[red]Error:[/red] Shopify API error: {exc}")
+                raise Exit(code=10) from exc
+            except Exception as exc:
+                rprint(f"[red]Error:[/red] Failed to reach Shopify: {exc}")
+                raise Exit(code=10) from exc
         return wrapper
     return decorator
