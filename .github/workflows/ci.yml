@@ -50,7 +50,7 @@ jobs:
         run: ruff check src/ tests/
 
       - name: Test (pytest + coverage)
-        run: pytest --cov=src --cov-report=term-missing -q
+        run: pytest --cov=src --cov-fail-under=85 --cov-report=term-missing -q
 
       - name: Smoke test (CLI help)
         run: audit --help
