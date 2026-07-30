@@ -408,3 +408,113 @@ class TestRefactorEquivalence:
         assert "</div>            <div" not in html
         # No Before/After section when no comparison is supplied.
         assert "Before / After Comparison" not in html
+
+
+# ---------------------------------------------------------------------------
+# Sprint 6 TD-1: Direct coverage for _render_image_row
+# ---------------------------------------------------------------------------
+
+
+
+class TestRenderImageRowDirect:
+    def test_high_score_class(self) -> None:
+        out = _render_image_row({
+            "src": "x.jpg", "role": "hero", "score": 90,
+            "bytes": 1000, "mime": "image/jpeg",
+        })
+        assert 'class="score high"' in out
+
+    def test_medium_score_class(self) -> None:
+        out = _render_image_row({
+            "src": "x.jpg", "role": "hero", "score": 60,
+            "bytes": 1000, "mime": "image/jpeg",
+        })
+        assert 'class="score medium"' in out
+
+    def test_low_score_class(self) -> None:
+        out = _render_image_row({
+            "src": "x.jpg", "role": "hero", "score": 30,
+            "bytes": 1000, "mime": "image/jpeg",
+        })
+        assert 'class="score low"' in out
+
+    def test_role_classes(self) -> None:
+        """Each known role renders its specific CSS class."""
+        for role in (
+            "hero", "above_fold", "product_primary",
+            "product_secondary", "decorative", "unknown",
+        ):
+            out = _render_image_row({
+                "src": "x.jpg", "role": role, "score": 80,
+                "bytes": 1000, "mime": "image/jpeg",
+            })
+            assert f'class="role {role}"' in out, f"Role {role!r} did not render its class"
+
+    def test_recommendation_class_rendered(self) -> None:
+        out = _render_image_row({
+            "src": "x.jpg", "role": "hero", "score": 80,
+            "bytes": 1000, "mime": "image/jpeg",
+            "recommendation": "Convert to WebP",
+        })
+        assert 'class="recommendation"' in out
+
+    def test_lcp_candidate_badge(self) -> None:
+        out = _render_image_row({
+            "src": "x.jpg", "role": "hero", "score": 80,
+            "bytes": 1000, "mime": "image/jpeg",
+            "is_lcp_candidate": True,
+        })
+        assert "lcp-badge" in out
+
+    def test_no_lcp_badge_when_not_candidate(self) -> None:
+        out = _render_image_row({
+            "src": "x.jpg", "role": "decorative", "score": 80,
+            "bytes": 1000, "mime": "image/jpeg",
+            "is_lcp_candidate": False,
+        })
+        assert "lcp-badge" not in out
+
+    def test_long_src_truncated(self) -> None:
+        import re
+        long_src = "https://example.com/" + ("UNIQUE_" * 50) + ".jpg"
+        out = _render_image_row({
+            "src": long_src, "role": "hero", "score": 80,
+            "bytes": 1000, "mime": "image/jpeg",
+        })
+        # The visible cell contains only the last 50 chars
+        m = re.search(r'<td class="bytes" title="[^"]*">([^<]*)<', out)
+        assert m is not None, "Could not find <td> cell"
+        visible = m.group(1)
+        assert len(visible) == 50
+        assert visible == long_src[-50:]
+        # The full src (374 chars) is only in the title attribute, not in the visible cell
+        assert long_src not in visible
+
+    def test_missing_dimensions_rendered_as_na(self) -> None:
+        out = _render_image_row({
+            "src": "x.jpg", "role": "hero", "score": 80,
+            "bytes": 1000, "mime": "image/jpeg",
+        })
+        assert "N/A×N/A" in out
+
+    def test_dimensions_present(self) -> None:
+        out = _render_image_row({
+            "src": "x.jpg", "role": "hero", "score": 80,
+            "bytes": 1000, "mime": "image/jpeg",
+            "displayed_width": 800, "displayed_height": 600,
+            "natural_width": 1600, "natural_height": 1200,
+        })
+        assert "800×600" in out
+        assert "1600×1200" in out
+
+
+class TestVitalCardNeedsImprovement:
+    """The middle-band vital status must be exercised."""
+
+    def test_needs_improvement_renders_class(self) -> None:
+        from audit.report import _render_vital_card, _vitals_status
+
+        # 0.15 CLS is "needs-improvement" (between 0.1 and 0.25)
+        assert _vitals_status("cls", 0.15) == "needs-improvement"
+        out = _render_vital_card("CLS", "cls", 0.15, "{:.3f}")
+        assert "needs-improvement" in out

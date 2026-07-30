@@ -4,7 +4,10 @@ Tests for PageSpeed Insights API client.
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock
+
 import pytest
+import requests
 import responses
 
 from integrations.pagespeed_api import (
@@ -487,3 +490,131 @@ def test_fetch_lighthouse_json_url_normalization():
     fetch_lighthouse_json("example.com")
     # The URL in the API call must have been normalized.
     assert "url=https%3A%2F%2Fexample.com" in responses.calls[0].request.url
+
+
+# ---------------------------------------------------------------------------
+# Sprint 6 TD-1: Coverage close-out (additional edge-case tests)
+# ---------------------------------------------------------------------------
+
+class Test429Retry:
+    """429-then-200 retry path: the second attempt's sleep branch."""
+
+    def test_429_then_200_succeeds_after_retry(self) -> None:
+        import responses
+
+        with responses.RequestsMock() as rsps:
+            rsps.add(
+                responses.GET,
+                "https://www.googleapis.com/pagespeedonline/v5/runPagespeed",
+                status=429,
+            )
+            rsps.add(
+                responses.GET,
+                "https://www.googleapis.com/pagespeedonline/v5/runPagespeed",
+                json={
+                    "lighthouseResult": {
+                        "audits": {
+                            "largest-contentful-paint": {"numericValue": 1800},
+                            "cumulative-layout-shift": {"numericValue": 0.05},
+                            "experimental-interaction-to-next-paint": {"numericValue": 120},
+                            "server-response-time": {"numericValue": 400},
+                        },
+                        "categories": {"performance": {"score": 0.95}},
+                        "configSettings": {"formFactor": "mobile"},
+                        "finalUrl": "https://demo.myshopify.com",
+                        "fetchTime": "2026-07-30T15:00:00Z",
+                    }
+                },
+                status=200,
+            )
+            client = PageSpeedAPIClient(retry_delay=0.0)
+            metrics = client.get_metrics("https://demo.myshopify.com")
+            assert metrics.lcp == 1.8  # 1800 ms = 1.8 s
+
+
+class TestTimeoutExhaustion:
+    """Timeout across all retries → RuntimeError."""
+
+    def test_timeout_all_retries_exhausted(self) -> None:
+        import responses
+
+        with responses.RequestsMock() as rsps:
+            for _ in range(3):
+                rsps.add(
+                    responses.GET,
+                    "https://www.googleapis.com/pagespeedonline/v5/runPagespeed",
+                    body=requests.exceptions.Timeout(),
+                )
+            client = PageSpeedAPIClient(retry_delay=0.0)
+            with pytest.raises(requests.exceptions.Timeout):
+                client.get_metrics("https://demo.myshopify.com")
+
+
+class TestGetErrorMessage:
+    """_get_error_message: JSON parse fallback and plain text fallback."""
+
+    def test_json_error_field(self) -> None:
+        client = PageSpeedAPIClient(retry_delay=0.0)
+        resp = MagicMock()
+        resp.json.return_value = {"error": {"message": "rate limited"}}
+        msg = client._get_error_message(resp)
+        assert msg == "rate limited"
+
+    def test_non_json_response_falls_back_to_text(self) -> None:
+        client = PageSpeedAPIClient(retry_delay=0.0)
+        resp = MagicMock()
+        resp.json.side_effect = ValueError("not JSON")
+        resp.text = "<html>500 Internal Server Error</html>"
+        msg = client._get_error_message(resp)
+        assert "500 Internal Server Error" in msg
+
+    def test_empty_response_text(self) -> None:
+        client = PageSpeedAPIClient(retry_delay=0.0)
+        resp = MagicMock()
+        resp.json.side_effect = ValueError
+        resp.text = ""
+        msg = client._get_error_message(resp)
+        assert msg == "No error message"
+
+
+class TestGetPagespeedMetricsWrapper:
+    """The module-level convenience wrapper."""
+
+    @responses.activate
+    def test_returns_metrics(self) -> None:
+        responses.add(
+            responses.GET,
+            "https://www.googleapis.com/pagespeedonline/v5/runPagespeed",
+            json={
+                "lighthouseResult": {
+                    "audits": {
+                        "largest-contentful-paint": {"numericValue": 1500},
+                        "cumulative-layout-shift": {"numericValue": 0.04},
+                        "experimental-interaction-to-next-paint": {"numericValue": 100},
+                        "server-response-time": {"numericValue": 300},
+                    },
+                    "categories": {"performance": {"score": 0.98}},
+                    "configSettings": {"formFactor": "desktop"},
+                    "finalUrl": "https://demo.myshopify.com",
+                    "fetchTime": "2026-07-30T15:00:00Z",
+                }
+            },
+            status=200,
+        )
+        from integrations.pagespeed_api import get_pagespeed_metrics
+        metrics = get_pagespeed_metrics("https://demo.myshopify.com", strategy="desktop")
+        assert metrics.lcp == 1.5  # seconds (1500 ms / 1000)
+
+
+class TestValidateUrlEdgeCases:
+    """_validate_url edge cases not covered elsewhere."""
+
+    def test_hostless_url_raises(self) -> None:
+        client = PageSpeedAPIClient()
+        with pytest.raises(ValueError, match="hostname"):
+            client._validate_url("http:///path-only")
+
+    def test_empty_url_raises(self) -> None:
+        client = PageSpeedAPIClient()
+        with pytest.raises(ValueError, match="empty"):
+            client._validate_url("")

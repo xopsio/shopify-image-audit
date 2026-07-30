@@ -435,3 +435,54 @@ class TestGenerateTrendHtml:
         assert "CLS" in html
         assert "INP" in html
         assert "TTFB" in html
+
+
+# ---------------------------------------------------------------------------
+# Sprint 6 TD-1: Edge-case coverage close-out
+# ---------------------------------------------------------------------------
+
+class TestDefaultHistoryDir:
+    """Cover the XDG_DATA_HOME and macOS branch of _default_history_dir()."""
+
+    def test_xdg_data_home_used_when_set(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from engine.history import _default_history_dir
+
+        monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+        result = _default_history_dir()
+        assert str(result).startswith(str(tmp_path))
+        assert ".shopify-image-audit" in str(result)
+        assert "history" in str(result)
+
+    def test_no_xdg_data_home_uses_default_path(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """When XDG_DATA_HOME is not set, fall back to home-based default."""
+        from engine.history import _default_history_dir
+
+        monkeypatch.delenv("XDG_DATA_HOME", raising=False)
+        # macOS path is platform-dependent; the assertion just verifies
+        # the function returns a valid path under the home directory.
+        result = _default_history_dir()
+        assert ".shopify-image-audit" in str(result)
+
+
+class TestCorruptFile:
+    """A corrupt JSON snapshot file should be skipped, not crash."""
+
+    def test_corrupt_json_in_host_dir_skipped(self, tmp_path: Path) -> None:
+        from engine.history import HistoryStore
+
+        store = HistoryStore(base_dir=tmp_path)
+        host_dir = tmp_path / "demo.myshopify.com"
+        host_dir.mkdir()
+        # Write a valid file alongside a corrupt one
+        valid = host_dir / "2026-07-30T15-00-00Z.json"
+        valid.write_text('{"meta":{}, "vitals":{}, "images":[]}', encoding="utf-8")
+        corrupt = host_dir / "2026-07-29T15-00-00Z.json"
+        corrupt.write_text("{this is not json", encoding="utf-8")
+
+        entries = store.list_entries("demo.myshopify.com")
+        # Corrupt file is silently skipped; only the valid one is returned
+        assert len(entries) == 1
