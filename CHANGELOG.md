@@ -9,14 +9,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Planned for v0.4.0 (Sprint 5)
+Empty — all Sprint 5 work shipped in v0.4.0.
 
-- Snapshot testing infrastructure (syrupy) for HTML renderers — TD-1
-- CLI coverage close-out for all 10 commands — TD-2
-- Error decorator wiring (`@handle_pipeline_errors`, `@handle_compare_errors`, `@handle_json_errors`, `@handle_shopify_errors`) + consistency pass — TD-3
-- `audit history diff <store> --from <id> --to <id>` command with stable entry-ids — TD-4
-- `CHANGELOG.md` (this file) — TD-4
-- CI coverage threshold (`--cov-fail-under=85`) — TD-4
+---
+
+## [0.4.0] - 2026-07-30
+
+### Added (Sprint 5)
+- Snapshot testing infrastructure (syrupy) — 22 golden files covering 9 deterministic HTML renderers — TD-1
+- CLI coverage close-out: every one of the 10 Typer commands now has at least one happy-path test in `tests/test_cli.py` / `tests/test_cli_coverage.py` — TD-2
+- `audit history diff <store> --from <id> --to <id>` — diff any two historical snapshots and emit a comparison HTML — TD-4
+- Stable `HistoryEntry.id` (12-char SHA-256 prefix of snapshot bytes, independent of filename/timestamp)
+- `HistoryStore.get_by_id(hostname, id)` and `HistoryStore.compare_entries(hostname, id_a, id_b)` primitives
+- `generate_diff_html(hostname, entry_a, entry_b, comparison)` — diff renderer with vitals table, image-stats table, ROI summary
+- `validate_out_path()` now applied to `_history_show` and `_history_diff` `--output` flags (DX polish)
+- `CHANGELOG.md` (this file)
+- `--cov-fail-under=85` enforced in CI (current coverage: 91.24%)
+
+### Changed
+- All inline `try/except` boilerplate in `cli.py` replaced with the documented error decorators (`@handle_pipeline_errors`, `@handle_compare_errors`, `@handle_json_errors`, new `@handle_shopify_errors`) — `-58` lines net
+- `RuntimeError` exit code now consistently **10** across all commands (was: 2 in `extract`/`score`/`report`/`shopify`)
+- `cli.py` `809 → 751` lines
+
+### Stats
+- 546 tests (up from 489)
+- 91.24% coverage (above 85% threshold)
+- Ruff clean
+- Trusted publishing on PyPI
+
+[0.4.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.1.0-sprint1...v0.2.0
+[0.1.0]: https://github.com/xopsio/shopify-image-audit/releases/tag/v0.1.0-sprint1
 
 ---
 
@@ -83,7 +107,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/xopsio/shopify-image-audit/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/xopsio/shopify-image-audit/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.1.0-sprint1...v0.2.0
 [0.1.0]: https://github.com/xopsio/shopify-image-audit/releases/tag/v0.1.0-sprint1

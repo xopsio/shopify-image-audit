@@ -3,7 +3,7 @@
 [![CI](https://github.com/xopsio/shopify-image-audit/actions/workflows/ci.yml/badge.svg)](https://github.com/xopsio/shopify-image-audit/actions)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
 [![ruff](https://img.shields.io/badge/lint-ruff-green)](https://docs.astral.sh/ruff/)
-[![tests](https://img.shields.io/badge/tests-489_passing-brightgreen)](#testing)
+[![tests](https://img.shields.io/badge/tests-546_passing-brightgreen)](#testing)
 
 A Lighthouse-based image audit tool for Shopify stores. Produces per-image
 scores, role assignments, optimisation recommendations, and a **before/after
@@ -153,7 +153,7 @@ The codebase is governed by **a single ZCode agent** (see
 ## Testing
 
 ```bash
-pytest -q                                # 489 tests, single-writer discipline
+pytest -q                                # 546 tests, single-writer discipline
 pytest --cov=src --cov-report=term       # ~87% coverage
 ruff check src/ tests/                   # 0 violations
 ```
@@ -182,6 +182,12 @@ merge. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
   - Branded report templates (--brand-logo, --brand-color)
   - ROI-ranked recommendations (ComparisonRecommendation model)
   - Audit history + trend view (HistoryStore, `audit history list/show`)
+- ✅ Sprint 5 — Snapshot tests, CLI coverage, error decorator wiring, history diff, v0.4.0 (546 tests)
+  - Snapshot testing infrastructure (syrupy) for HTML renderers
+  - CLI coverage for all 10 commands
+  - Error decorator wiring + consistency pass (RuntimeError → exit 10)
+  - `audit history diff` with stable entry-ids
+  - `CHANGELOG.md` and `--cov-fail-under=85` CI gate
 
 ---
 
@@ -193,4 +199,5 @@ merge. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 - [`docs/SPRINT_1_COMPLETE.md`](docs/SPRINT_1_COMPLETE.md) — what shipped in Sprint 1
 - [`docs/SPRINT_3_PLAN.md`](docs/SPRINT_3_PLAN.md) — Sprint 3 breakdown (all done)
 - [`docs/SPRINT_4_PLAN.md`](docs/SPRINT_4_PLAN.md) — Sprint 4 breakdown (all done)
+- [`docs/SPRINT_5_PLAN.md`](docs/SPRINT_5_PLAN.md) — Sprint 5 breakdown (all done)
 - [`QA_CHECKLIST.md`](QA_CHECKLIST.md) — quality gates

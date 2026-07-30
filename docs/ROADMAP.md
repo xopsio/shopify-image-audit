@@ -1,6 +1,6 @@
 # Roadmap — Shopify Image Audit
 
-**Last updated:** 2026-07-30 (Sprint 4 complete, v0.3.0 released)
+**Last updated:** 2026-07-30 (Sprint 5 complete, v0.4.0 released)
 **Owner:** ZCode (single-agent, governance v1.3)
 
 ---
@@ -61,6 +61,16 @@ the fourth targets scalability and recurring revenue.
 - ✅ **TD-4**: Audit history + trend view (HistoryStore, `audit history list/show`)
 - ✅ **v0.3.0 release** (489 tests, PyPI trusted publishing)
 
+### Phase 5 — Reliability & DX (✅ DONE, Sprint 5)
+
+> Goal: lock down the existing surface area and ship the deferred `history diff` command.
+
+- ✅ **TD-1**: Snapshot testing infrastructure (syrupy, 22 golden files)
+- ✅ **TD-2**: CLI coverage close-out (all 10 commands have happy-path tests)
+- ✅ **TD-3**: Wire error decorators + consistency pass (RuntimeError → exit 10 across the board)
+- ✅ **TD-4**: `audit history diff` with stable entry-ids; CHANGELOG.md; `--cov-fail-under=85` CI gate
+- ✅ **v0.4.0 release** (546 tests, 91.24% coverage, ruff clean)
+
 ---
 
 ## Phase 4 themes (high-level)
@@ -81,9 +91,9 @@ the fourth targets scalability and recurring revenue.
 - ❌ Image-optimisation automation hooks (out of scope — sister tool)
 
 ### Theme D — Reliability
-- ✅ CLI distribution (PyPI v0.2.0, trusted publishing)
+- ✅ CLI distribution (PyPI v0.2.0 / v0.3.0 / v0.4.0, trusted publishing)
 - ✅ Release automation (tag-driven, hardened)
-- 🔜 Snapshot tests for HTML report (deferred to Sprint 5)
+- ✅ Snapshot tests for HTML report (Sprint 5 TD-1, syrupy, 22 golden files)
 
 ---
 
@@ -120,5 +130,6 @@ the fourth targets scalability and recurring revenue.
 | 2 | 2026-07 | ✅ Complete | 276 | 28 |
 | 3 | 2026-07 | ✅ Complete | 390 | 40 |
 | 4 | 2026-07 | ✅ Complete | 489 | 44 |
+| 5 | 2026-07 | ✅ Complete | 546 | 48 |
 
 See [`docs/`](.) for the full documentation tree.
