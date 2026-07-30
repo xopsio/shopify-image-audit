@@ -23,10 +23,11 @@ Assigns:
 - `score` 0–100
 - recommendations
 
-### `audit report <audit_result.json>`
-Renders an HTML report.
+### `audit report <audit_result.json>` *(Sprint 3 TD-1)*
+Renders an HTML (or PDF) report.
 - Flags:
-  - `-o, --output <path>` (default `report.html`)
+  - `-o, --output <path>` (default `report.html`; auto-switches to `report.pdf` with `--pdf`)
+  - `--pdf` — render PDF via WeasyPrint instead of HTML
 
 ### `audit measure <url>` *(Sprint 2, JB-002)*
 Fetches live performance metrics from the Google PageSpeed Insights API.
@@ -76,14 +77,20 @@ Compares a baseline audit against a current audit and reports before/after delta
   - **a live URL** (`http://` / `https://`) — fetched via PageSpeed Insights API
 - Flags:
   - `-o, --output <path>` — write an HTML before/after report (default: stdout JSON)
+  - `--pdf` — when `--output` is set, render a PDF instead of HTML
   - `--json <path>` — also write the comparison JSON
   - `--strategy mobile|desktop` — PageSpeed strategy when `<current>` is a URL
   - `--api-key <key>` — optional Google Cloud API key for higher rate limits
 - Output: `ComparisonResult` (vitals deltas + image aggregate deltas + ROI
-  estimate). Units mirror `Vitals`: ms for LCP/INP/TTFB, unitless for CLS.
+  estimate + per-image deltas). Units mirror `Vitals`: ms for LCP/INP/TTFB,
+  unitless for CLS. `per_image` field is a list of `ImageDelta` objects.
 - Exit codes: 0 success, 2 invalid args (missing file, bad URL, unsafe path),
   10 backend failure (PageSpeed API error after retries).
 - Output path safety: `-o`/`--json` are run through path-validation (exit 2).
+
+### `audit version`
+Prints the tool version, read from `pyproject.toml` at runtime.
+- Exit code: 0 success
 
 ## Required final output
 `audit_result.json` MUST validate against `schemas/audit_result.schema.json`.
