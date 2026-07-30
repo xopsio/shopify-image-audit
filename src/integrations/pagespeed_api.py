@@ -15,6 +15,10 @@ from urllib.parse import urlparse
 
 import requests
 
+from engine._logging import get_logger
+
+_log = get_logger()
+
 # --- Constants ---------------------------------------------------------------
 
 PSI_API_URL = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
@@ -257,6 +261,8 @@ class PageSpeedAPIClient:
 
         # Make request with retries
         last_exception: Exception | None = None
+        _log.info("PageSpeed request: url=%s strategy=%s attempt=1/%d",
+                  url, strategy, self.max_retries)
         for attempt in range(self.max_retries):
             try:
                 self._last_request_time = time.time()
@@ -269,6 +275,7 @@ class PageSpeedAPIClient:
                 # Check for rate limiting (HTTP 429)
                 if response.status_code == 429:
                     if attempt < self.max_retries - 1:
+                        _log.debug("PageSpeed 429: retrying (attempt %d)", attempt + 1)
                         time.sleep(self.retry_delay * (attempt + 1))
                         continue
                     raise RuntimeError(
