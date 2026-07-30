@@ -1,6 +1,6 @@
 # Roadmap — Shopify Image Audit
 
-**Last updated:** 2026-07-30 (Sprint 6 complete, v0.5.0 released)
+**Last updated:** 2026-07-30 (Sprint 7 complete, v0.6.0 released)
 **Owner:** ZCode (single-agent, governance v1.3)
 
 ---
@@ -85,6 +85,21 @@ the fourth targets scalability and recurring revenue.
   - Coverage gate `--cov-fail-under=85` → `--cov-fail-under=90`
 - ✅ **v0.5.0 release** (606 tests, 93% coverage, ruff clean)
 
+### Phase 7 — Scheduled Re-audit, Dependency Hygiene & Report Polish (✅ DONE, Sprint 7)
+
+> Goal: close the oldest open thread (scheduled re-audit, deferred since Sprint 4)
+> via external cron; add Dependabot, SLSA provenance, and PageSpeed response
+> cache; fix report footer version drift; refresh CLI spec docs.
+
+- ✅ **TD-1**: Scheduled re-audit — `audit schedule list/add/remove/run-all` + crontab runbook
+- ✅ **TD-2**: Dependency hygiene — Dependabot (pip + github-actions), SLSA provenance, dep upper caps
+- ✅ **TD-3**: PageSpeed response cache — `PAGESPEED_CACHE_TTL` env var, report footer version fix
+- ✅ **TD-4**: Docs polish + v0.6.0 release
+  - CLI spec rewritten to cover all 11 commands
+  - README `pipx install` Deployment section + Lighthouse CLI prerequisite
+  - Measurement protocol doc accurate
+- ✅ **v0.6.0 release** (642 tests, ruff clean)
+
 ---
 
 ## Phase 4 themes (high-level)
@@ -146,5 +161,6 @@ the fourth targets scalability and recurring revenue.
 | 4 | 2026-07 | ✅ Complete | 489 | 44 |
 | 5 | 2026-07 | ✅ Complete | 546 | 48 |
 | 6 | 2026-07 | ✅ Complete | 606 | 52 |
+| 7 | 2026-07 | ✅ Complete | 642 | 56 |
 
 See [`docs/`](.) for the full documentation tree.
