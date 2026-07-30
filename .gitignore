@@ -41,3 +41,7 @@ Thumbs.db
 
 # PyPI metadata
 *.egg-info
+
+# Test output (baseline.json etc. created by tests)
+baseline.json
+trend.html
