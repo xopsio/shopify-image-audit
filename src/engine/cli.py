@@ -353,7 +353,7 @@ def _shopify_inventory(
 
 @app.command()
 def history(
-    subcommand: str = typer.Argument(..., help="Subcommand: 'list' or 'show'."),
+    subcommand: str = typer.Argument(..., help="Subcommand: 'list', 'show', or 'diff'."),
     hostname: str = typer.Argument(..., help="Store hostname, e.g. 'mystore.myshopify.com'."),
     history_dir: Path | None = typer.Option(
         None, "--history-dir",
@@ -361,16 +361,24 @@ def history(
     ),
     output: Path | None = typer.Option(
         None, "-o", "--output",
-        help="[show] Output HTML file path (default: <hostname>-history.html).",
+        help="[show/diff] Output HTML file path.",
+    ),
+    id_a: str | None = typer.Option(
+        None, "--from",
+        help="[diff] Source entry id (the older 'before' snapshot).",
+    ),
+    id_b: str | None = typer.Option(
+        None, "--to",
+        help="[diff] Target entry id (the newer 'after' snapshot).",
     ),
 ) -> None:
-    """Inspect audit history for a store: list snapshots or generate a trend HTML report.
+    """Inspect audit history for a store: list, trend report, or diff two snapshots.
 
     Requires at least one recorded baseline (via ``audit baseline``) for the store.
     """
-    if subcommand not in ("list", "show"):
+    if subcommand not in ("list", "show", "diff"):
         rprint(f"[red]Error:[/red] Unknown history subcommand: {subcommand!r} "
-               "(use 'list' or 'show').")
+               "(use 'list', 'show', or 'diff').")
         raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
     store = HistoryStore(base_dir=history_dir)
@@ -388,8 +396,13 @@ def history(
 
     if subcommand == "list":
         _history_list(hostname, entries)
-    else:
+    elif subcommand == "show":
         _history_show(hostname, entries, output=output)
+    else:  # diff
+        if not id_a or not id_b:
+            rprint("[red]Error:[/red] `audit history diff` requires --from <id> and --to <id>.")
+            raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+        _history_diff(store, hostname, id_a, id_b, output=output)
 
     raise typer.Exit(code=EXIT_OK) from None
 
@@ -433,10 +446,55 @@ def _history_show(hostname: str, entries: list, *, output: Path | None = None) -
 
     html = generate_trend_html(hostname, entries)
 
-    out = output or Path(f"{hostname}-history.html")
+    if output is None:
+        out = Path(f"{hostname}-history.html")
+    else:
+        # Validate the user-supplied path through the standard safety helper.
+        validate_out_path(output)
+        out = output
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(html, encoding="utf-8")
     rprint(f"[green]Trend report written to {out}[/green]")
+
+
+def _history_diff(
+    store: HistoryStore,
+    hostname: str,
+    id_a: str,
+    id_b: str,
+    *,
+    output: Path | None = None,
+) -> None:
+    """Diff two historical snapshots and write a comparison HTML report."""
+    entry_a = store.get_by_id(hostname, id_a)
+    entry_b = store.get_by_id(hostname, id_b)
+    if entry_a is None or entry_b is None:
+        missing = []
+        if entry_a is None:
+            missing.append(id_a)
+        if entry_b is None:
+            missing.append(id_b)
+        rprint(f"[red]Error:[/red] Entry id(s) not found for {hostname!r}: {', '.join(missing)}.")
+        rprint("  Use `audit history list` to see available entry ids.")
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+
+    comparison = store.compare_entries(hostname, id_a, id_b)
+    if comparison is None:
+        rprint("[red]Error:[/red] Failed to compute comparison.")
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+
+    from engine.history import generate_diff_html
+
+    html = generate_diff_html(hostname, entry_a, entry_b, comparison)
+
+    if output is None:
+        output = Path(f"{hostname}-diff-{id_a[:6]}-{id_b[:6]}.html")
+    else:
+        # Validate the output path through the standard safety helper.
+        validate_out_path(output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(html, encoding="utf-8")
+    rprint(f"[green]Diff report written to {output}[/green]")
 
 
 # ---------------------------------------------------------------------------
