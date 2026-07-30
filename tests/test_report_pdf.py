@@ -3,6 +3,7 @@ Unit + CLI tests for PDF export (Sprint 3, TD-1).
 
 Covers:
 - ``render_pdf_report``: produces a valid PDF (>0 bytes, starts with %PDF-)
+- PDF resource fetcher: rejects external/file URLs and accepts embedded data
 - CLI ``report --pdf`` flag: writes a PDF (default output: report.pdf)
 - CLI ``compare --output --pdf``: writes a PDF instead of HTML
 - The existing HTML path remains untouched when --pdf is not passed
@@ -12,15 +13,80 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from urllib import request
 
 import pytest
 from typer.testing import CliRunner
 
-from audit.report import render_pdf_report
+from audit.report import _create_pdf_url_fetcher, render_pdf_report
 
 # Skip the whole module if WeasyPrint can't render — that happens on hosts
 # missing system fonts/Pango (e.g. minimal CI images without libpango).
 weasyprint = pytest.importorskip("weasyprint")
+
+
+# ---------------------------------------------------------------------------
+# PDF resource fetcher
+# ---------------------------------------------------------------------------
+
+class TestPdfUrlFetcher:
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "http://example.invalid/image.png",
+            "https://example.invalid/image.png",
+            "file:///etc/passwd",
+            "ftp://example.invalid/image.png",
+        ],
+        ids=["http", "https", "file", "ftp"],
+    )
+    def test_rejects_non_data_protocols_before_io(
+        self,
+        url: str,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        def fail_on_io(*args, **kwargs):
+            pytest.fail("Fetcher attempted I/O instead of rejecting the URL")
+
+        monkeypatch.setattr(request.OpenerDirector, "open", fail_on_io)
+        fetcher = _create_pdf_url_fetcher()
+
+        with pytest.raises(ValueError, match=r"^URI uses disallowed protocol:"):
+            fetcher.fetch(url)
+
+    def test_accepts_data_protocol(self) -> None:
+        fetcher = _create_pdf_url_fetcher()
+        response = fetcher.fetch("data:text/plain;base64,YWxsb3dlZA==")
+        try:
+            assert response.read() == b"allowed"
+        finally:
+            response.close()
+
+    def test_render_pdf_report_passes_factory_fetcher_to_weasyprint(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        captured = {}
+        sentinel_fetcher = object()
+
+        class FakeHTML:
+            def __init__(self, *, string, url_fetcher):
+                captured["string"] = string
+                captured["url_fetcher"] = url_fetcher
+
+            def write_pdf(self, *, target):
+                Path(target).write_bytes(b"%PDF")
+
+        monkeypatch.setattr("audit.report._create_pdf_url_fetcher", lambda: sentinel_fetcher)
+        monkeypatch.setattr(weasyprint, "HTML", FakeHTML)
+        output = tmp_path / "wired.pdf"
+        html = "<html><body>safe</body></html>"
+
+        render_pdf_report(html, output)
+
+        assert captured["string"] == html
+        assert captured["url_fetcher"] is sentinel_fetcher
 
 
 # ---------------------------------------------------------------------------
