@@ -841,13 +841,17 @@ def render_pdf_report(html_content: str, output_path: Path | str) -> Path:
     The HTML must already be fully assembled (use ``generate_html_report`` or
     its callers). The output file is created or overwritten. Parent dirs
     are created as needed.
+    Resource references are restricted to embedded ``data:`` URLs; all other
+    protocols are rejected before I/O.
 
     Returns the resolved output path.
 
     Raises:
         ImportError: if WeasyPrint is not installed (the runtime dependency
-            ``weasyprint>=63.0`` should make this impossible in practice;
+            ``weasyprint>=69.0,<70`` should make this impossible in practice;
             it surfaces here only if the install is broken).
+        weasyprint.urls.FatalURLFetchingError: if the HTML references a
+            resource outside the allowed ``data:`` protocol.
         OSError: if WeasyPrint cannot write the PDF (e.g. fontconfig or
             pango missing on the host).
     """
@@ -858,7 +862,8 @@ def render_pdf_report(html_content: str, output_path: Path | str) -> Path:
     # ~200 ms WeasyPrint import cost.
     import weasyprint
 
-    weasyprint.HTML(string=html_content).write_pdf(target=str(output))
+    url_fetcher = _create_pdf_url_fetcher()
+    weasyprint.HTML(string=html_content, url_fetcher=url_fetcher).write_pdf(target=str(output))
     return output
 
 
