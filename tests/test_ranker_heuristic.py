@@ -19,8 +19,15 @@ class TestDisplayedArea:
         assert _displayed_area(img) == 480_000
 
     def test_fallback_to_natural(self):
+        """No natural-dimensions fallback: missing displayed_* -> area 0.
+
+        The historical heuristic had a natural_dims fallback (or-fallback chain).
+        After the shared core.image_signals refactor (PR #2 of 5), both
+        rankers use a strict contract (displayed_* only). Missing displayed
+        dimensions now yield 0, regardless of natural dimensions.
+        """
         img = {"natural_width": 1200, "natural_height": 800}
-        assert _displayed_area(img) == 960_000
+        assert _displayed_area(img) == 0
 
     def test_missing_dimensions(self):
         img = {"bytes": 50000}

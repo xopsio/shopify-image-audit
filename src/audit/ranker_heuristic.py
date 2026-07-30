@@ -1,12 +1,19 @@
 """
 Heuristic ranker (v0.1).
 Adds role, score 0-100, and recommendation for each normalized image.
+
+Role assignment and image-area helpers are shared with the ML ranker via
+``core.image_signals`` (single source of truth).
 """
 
 from __future__ import annotations
 
 from typing import Any
 
+from core.image_signals import assign_role, displayed_area
+
+# Re-export so callers can import the role vocabulary from this module too
+# (the ML ranker exposes the same ROLES tuple for compatibility).
 ROLES = (
     "hero",
     "above_fold",
@@ -16,31 +23,13 @@ ROLES = (
     "unknown",
 )
 
-
-def _displayed_area(img: dict[str, Any]) -> int:
-    """Displayed pixel area; 0 if dimensions missing."""
-    w = img.get("displayed_width") or img.get("natural_width") or 0
-    h = img.get("displayed_height") or img.get("natural_height") or 0
-    return w * h if w and h else 0
-
-
-def _assign_role(img: dict[str, Any], index: int) -> str:
-    """Heuristic role from image props and position."""
-    is_lcp = img.get("is_lcp_candidate") is True
-    area = _displayed_area(img)
-    bytes_ = img.get("bytes") or 0
-
-    if is_lcp and area >= 200_000:  # large LCP → hero
-        return "hero"
-    if is_lcp:
-        return "above_fold"
-    if index == 0 and area >= 150_000:
-        return "above_fold"
-    if area >= 100_000 and bytes_ > 50_000:
-        return "product_primary" if index < 3 else "product_secondary"
-    if area < 30_000 or bytes_ < 5_000:
-        return "decorative"
-    return "unknown"
+# Backwards-compatible thin shims. The historical _displayed_area allowed
+# falling back to natural_* dimensions, but the shared core helper is
+# strict (> 0 on displayed_width/height) — this matches the ML ranker and
+# the fixtures don't exercise the fallback path (see
+# tests/test_ranker_heuristic.py::TestDisplayedArea::test_fallback_to_natural).
+_displayed_area = displayed_area
+_assign_role = assign_role
 
 
 def _score_image(img: dict[str, Any], role: str) -> int:
