@@ -1,43 +1,27 @@
 name: release
 
 # Two trigger paths:
-# 1. Push of a version tag (e.g. v0.2.0) — the normal release flow
-# 2. workflow_dispatch — manual trigger for testing or one-off releases.
-#    The "dry_run" input lets us build + validate without publishing,
-#    so we can confirm the workflow runs end-to-end before tagging a
-#    real release.
+# 1. Push of a version tag (e.g. v0.2.0) — build, validate, and publish.
+# 2. workflow_dispatch — build and validate only. Manual runs never publish.
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
-    inputs:
-      dry_run:
-        description: "Build + validate only; do NOT publish to PyPI"
-        type: boolean
-        required: false
-        default: true
 
-# Cancel any in-progress release for the same tag (e.g. on a force-push
-# to the tag). We don't cancel cross-tag because every release is its own
-# event and we'd rather let it finish than skip it.
+# Cancel only a duplicate run for the same event and ref. Keeping event types
+# separate prevents a manual dry-run from cancelling a real tag release.
 concurrency:
-  group: release-${{ github.ref_name }}
+  group: release-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
-# Required permissions for PyPI Trusted Publishing (OIDC). Without these,
-# the publish step cannot mint a short-lived PyPI token.
-permissions:
-  id-token: write
+permissions: {}
 
 jobs:
-  pypi-publish:
-    name: Build and publish to PyPI
+  build:
+    name: Build and validate distributions
     runs-on: ubuntu-latest
-    # The "pypi" environment is a GitHub-side gate: it lets the maintainer
-    # require manual approval before publishing. Configure this environment
-    # at https://github.com/xopsio/shopify-image-audit/settings/environments
-    # if you want a human-in-the-loop before each release.
-    environment: pypi
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
@@ -49,28 +33,37 @@ jobs:
           python-version: "3.12"
 
       - name: Install build dependencies
-        run: python -m pip install --upgrade pip build
+        run: python -m pip install --upgrade pip build twine
 
       - name: Build sdist and wheel
         run: python -m build
 
-      # Twine check is redundant here (gh-action-pypi-publish runs it
-      # internally) but it makes the build step's output easier to debug
-      # when a release fails.
       - name: Validate distribution metadata
         run: python -m twine check dist/*
 
-      - name: Determine whether to publish
-        id: check
-        run: |
-          # If dry_run input is provided (workflow_dispatch), respect it.
-          # Otherwise (tag push), always publish.
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-            echo "::notice title=Dry run::Build validated; PyPI upload SKIPPED (dry_run=true)."
-          else
-            echo "publish=true" >> "$GITHUB_OUTPUT"
-          fi
+      - name: Upload distribution artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    name: Publish to PyPI
+    needs: build
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    # Keep the PyPI environment gate and OIDC permission scoped to this job.
+    environment: pypi
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Download distribution artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist
 
       # Trusted publishing: no API token needed. PyPI verifies the
       # workflow identity via OIDC. Configure the trusted publisher
@@ -81,11 +74,4 @@ jobs:
       #   Workflow: release.yml
       #   Environment: pypi
       - name: Publish to PyPI
-        if: steps.check.outputs.publish == 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
-
-      - name: Skip notice (dry-run)
-        if: steps.check.outputs.publish != 'true'
-        run: |
-          echo "::notice::Dry-run mode — skipping PyPI upload."
-          echo "Build artefacts available in the 'Upload artifact' step."
