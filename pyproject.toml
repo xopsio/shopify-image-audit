@@ -18,6 +18,7 @@ dependencies = [
     "typer>=0.12",
     "rich>=13.7",
     "requests>=2.31",
+    "weasyprint>=63.0",
 ]
 
 [project.optional-dependencies]
