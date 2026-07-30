@@ -44,6 +44,12 @@ from core.baseline_manager import compare as run_comparison
 from core.baseline_manager import save_baseline
 from engine.audit_orchestrator import run_audit
 from engine.cli_helpers._dispatchers import fetch_url_as_audit, load_or_audit_file
+from engine.cli_helpers._errors import (
+    handle_compare_errors,
+    handle_json_errors,
+    handle_pipeline_errors,
+    handle_shopify_errors,
+)
 from engine.cli_helpers._table import (
     print_audit_results,
     print_audit_summary,
@@ -159,6 +165,7 @@ def _run_lighthouse(
 # ---------------------------------------------------------------------------
 
 @app.command()
+@handle_pipeline_errors(step_name="run")
 def run(
     url: str = typer.Argument(..., help="Shopify store URL to audit."),
     device: str = typer.Option("mobile", "--device", help="Device type: mobile or desktop."),
@@ -188,19 +195,8 @@ def run(
     else:
         json_path = _run_lighthouse(url, device=device, runs=runs, out_dir=out_dir)
 
-    # --- run the audit pipeline ---
-    try:
-        result: AuditResult = run_audit(json_path, url=url, device=device, runs=runs)
-    except (FileNotFoundError, json.JSONDecodeError) as exc:
-        rprint(f"[red]Audit pipeline error:[/red] {exc}")
-        raise typer.Exit(code=EXIT_INVALID_ARGS) from exc
-    except ValueError as exc:
-        rprint(f"[red]Audit pipeline error:[/red] {exc}")
-        raise typer.Exit(code=EXIT_INVALID_ARGS) from exc
-    except Exception as exc:
-        # Other errors (e.g., schema validation) are Lighthouse-related
-        rprint(f"[red]Audit pipeline error:[/red] {exc}")
-        raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE) from exc
+    # --- run the audit pipeline (errors caught by @handle_pipeline_errors) ---
+    result: AuditResult = run_audit(json_path, url=url, device=device, runs=runs)
 
     # --- pretty table ---
     print_audit_results(result, console=console)
@@ -240,18 +236,8 @@ def measure(
         validate_out_path(output)
 
     # --- fetch metrics ---
-    try:
-        client = PageSpeedAPIClient(api_key=api_key)
-        metrics = client.get_metrics(url, strategy=strategy)
-    except ValueError as exc:
-        rprint(f"[red]Error:[/red] Invalid input: {exc}")
-        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
-    except RuntimeError as exc:
-        rprint(f"[red]Error:[/red] PageSpeed API error: {exc}")
-        raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE) from None
-    except Exception as exc:
-        rprint(f"[red]Error:[/red] Failed to fetch metrics: {exc}")
-        raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE) from None
+    client = PageSpeedAPIClient(api_key=api_key)
+    metrics = client.get_metrics(url, strategy=strategy)
 
     # --- output ---
     if output:
@@ -307,20 +293,11 @@ def shopify(
     raise typer.Exit(code=EXIT_OK) from None
 
 
+@handle_shopify_errors()
 def _shopify_auth(shop_domain: str, access_token: str) -> None:
     """Verify an Admin API access token by fetching shop info."""
-    try:
-        client = ShopifyAdminClient(shop_domain, access_token)
-        info = client.get_shop_info()
-    except ValueError as exc:
-        rprint(f"[red]Error:[/red] Invalid input: {exc}")
-        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
-    except RuntimeError as exc:
-        rprint(f"[red]Error:[/red] Shopify API error: {exc}")
-        raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE) from None
-    except Exception as exc:
-        rprint(f"[red]Error:[/red] Failed to reach Shopify: {exc}")
-        raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE) from None
+    client = ShopifyAdminClient(shop_domain, access_token)
+    info = client.get_shop_info()
 
     rprint("[green]✓ Token valid[/green]")
     rprint(f"  Name:     {info['name']}")
@@ -329,24 +306,15 @@ def _shopify_auth(shop_domain: str, access_token: str) -> None:
     rprint(f"  Currency: {info['currency']}")
 
 
+@handle_shopify_errors()
 def _shopify_inventory(
     shop_domain: str, access_token: str,
     output: Path | None, limit: int,
 ) -> None:
     """List image URLs in a Shopify store: products + theme assets."""
-    try:
-        client = ShopifyAdminClient(shop_domain, access_token)
-        products = client.get_products(limit=limit)
-        theme_assets = client.get_theme_assets()
-    except ValueError as exc:
-        rprint(f"[red]Error:[/red] Invalid input: {exc}")
-        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
-    except RuntimeError as exc:
-        rprint(f"[red]Error:[/red] Shopify API error: {exc}")
-        raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE) from None
-    except Exception as exc:
-        rprint(f"[red]Error:[/red] Failed to reach Shopify: {exc}")
-        raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE) from None
+    client = ShopifyAdminClient(shop_domain, access_token)
+    products = client.get_products(limit=limit)
+    theme_assets = client.get_theme_assets()
 
     # Build the unified inventory list.
     inventory: list[dict[str, Any]] = []
@@ -476,6 +444,7 @@ def _history_show(hostname: str, entries: list, *, output: Path | None = None) -
 # ---------------------------------------------------------------------------
 
 @app.command()
+@handle_json_errors("lighthouse_json")
 def extract(
     lighthouse_json: Path = typer.Argument(..., help="Path to a Lighthouse JSON report."),
 ) -> None:
@@ -486,19 +455,11 @@ def extract(
 
     from audit.parser import parse
 
-    try:
-        with open(lighthouse_json, encoding="utf-8") as f:
-            raw = json.load(f)
-    except json.JSONDecodeError as e:
-        rprint(f"[red]Error:[/red] Invalid JSON in {lighthouse_json}: {e}")
-        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+    with open(lighthouse_json, encoding="utf-8") as f:
+        raw = json.load(f)
 
-    try:
-        images = parse(raw)
-        print(json.dumps(images, indent=2))
-    except Exception as e:
-        rprint(f"[red]Error:[/red] Failed to parse Lighthouse data: {e}")
-        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+    images = parse(raw)
+    print(json.dumps(images, indent=2))
 
     raise typer.Exit(code=EXIT_OK) from None
 
@@ -508,6 +469,7 @@ def extract(
 # ---------------------------------------------------------------------------
 
 @app.command()
+@handle_json_errors("audit_input_json")
 def score(
     audit_input_json: Path = typer.Argument(..., help="Path to intermediate audit input JSON."),
     ranker: str = typer.Option("heuristic", "--ranker",
@@ -527,19 +489,11 @@ def score(
     else:
         from audit.ranker_heuristic import rank
 
-    try:
-        with open(audit_input_json, encoding="utf-8") as f:
-            images = json.load(f)
-    except json.JSONDecodeError as e:
-        rprint(f"[red]Error:[/red] Invalid JSON in {audit_input_json}: {e}")
-        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+    with open(audit_input_json, encoding="utf-8") as f:
+        images = json.load(f)
 
-    try:
-        scored = rank(images)
-        print(json.dumps(scored, indent=2))
-    except Exception as e:
-        rprint(f"[red]Error:[/red] Failed to score images: {e}")
-        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+    scored = rank(images)
+    print(json.dumps(scored, indent=2))
 
     raise typer.Exit(code=EXIT_OK) from None
 
@@ -608,6 +562,12 @@ def report(
     except KeyError as e:
         rprint(f"[red]Error:[/red] Missing required field in audit result: {e}")
         raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+    except RuntimeError as e:
+        # PDF rendering can fail with RuntimeError if WeasyPrint can't
+        # write the file (fontconfig / pango missing). Surface as exit 10
+        # to match the convention used by other commands.
+        rprint(f"[red]Error:[/red] Report rendering failed: {e}")
+        raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE) from None
     except Exception as e:
         rprint(f"[red]Error:[/red] Failed to generate report: {e}")
         raise typer.Exit(code=EXIT_INVALID_ARGS) from None
@@ -618,6 +578,7 @@ def report(
 # ---------------------------------------------------------------------------
 
 @app.command()
+@handle_pipeline_errors(step_name="baseline")
 def baseline(
     lhr_json: Path = typer.Argument(..., help="Path to a Lighthouse JSON / fixture report to use as the baseline."),
     save: Path = typer.Option(..., "--save", help="Where to write the baseline audit_result.json."),
@@ -644,21 +605,15 @@ def baseline(
     # --- validate --save path safety ---
     validate_out_path(save)
 
-    try:
-        result: AuditResult = run_audit(lhr_json, url=url, device=device)
-    except (FileNotFoundError, json.JSONDecodeError, ValueError) as exc:
-        rprint(f"[red]Audit pipeline error:[/red] {exc}")
-        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
-    except Exception as exc:
-        rprint(f"[red]Audit pipeline error:[/red] {exc}")
-        raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE) from None
+    # Pipeline errors caught by @handle_pipeline_errors
+    result: AuditResult = run_audit(lhr_json, url=url, device=device)
 
     save_baseline(result, save)
     rprint(f"[green]Baseline saved to {save}[/green]")
     rprint(f"  URL: {result.meta.url} | LCP: {result.vitals.lcp_ms:.0f}ms | "
           f"images: {len(result.images)} | {sum(i.bytes for i in result.images) / 1024:.0f} KB")
 
-    # --- record to audit history ---
+    # --- record to audit history (never blocks the baseline) ---
     try:
         store = HistoryStore(base_dir=history_dir)
         history_path = store.record(result, label=label)
@@ -674,6 +629,7 @@ def baseline(
 # ---------------------------------------------------------------------------
 
 @app.command()
+@handle_compare_errors()
 def compare(
     baseline_json: Path = typer.Argument(..., help="Path to a baseline audit_result.json (from `audit baseline`)."),
     current: str = typer.Argument(..., help="Path to the current audit_result.json OR a live URL (https://...)."),
@@ -713,31 +669,18 @@ def compare(
     if json_out is not None:
         validate_out_path(json_out)
 
-    try:
-        before = load_or_audit_file(baseline_json)
-        if current_is_url:
-            rprint(f"[cyan]Fetching live metrics for {current} (strategy={strategy})...[/cyan]")
-            after = fetch_url_as_audit(current, strategy=strategy, api_key=api_key)
-        else:
-            current_path = Path(current)
-            if not current_path.exists():
-                rprint(f"[red]Error:[/red] current file not found: {current_path}")
-                raise typer.Exit(code=EXIT_INVALID_ARGS) from None
-            after = load_or_audit_file(current_path)
-        comparison = run_comparison(before, after)
-    except (json.JSONDecodeError, ValueError) as exc:
-        rprint(f"[red]Error:[/red] Invalid input: {exc}")
-        raise typer.Exit(code=EXIT_INVALID_ARGS) from exc
-    except FileNotFoundError as exc:
-        rprint(f"[red]Error:[/red] {exc}")
-        raise typer.Exit(code=EXIT_INVALID_ARGS) from exc
-    except RuntimeError as exc:
-        # Backend failure (PageSpeed API rate limit, 5xx, schema drift).
-        rprint(f"[red]Error:[/red] Backend failure: {exc}")
-        raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE) from exc
-    except Exception as exc:
-        rprint(f"[red]Error:[/red] Failed to compare audits: {exc}")
-        raise typer.Exit(code=EXIT_INVALID_ARGS) from exc
+    # Errors handled by @handle_compare_errors
+    before = load_or_audit_file(baseline_json)
+    if current_is_url:
+        rprint(f"[cyan]Fetching live metrics for {current} (strategy={strategy})...[/cyan]")
+        after = fetch_url_as_audit(current, strategy=strategy, api_key=api_key)
+    else:
+        current_path = Path(current)
+        if not current_path.exists():
+            rprint(f"[red]Error:[/red] current file not found: {current_path}")
+            raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+        after = load_or_audit_file(current_path)
+    comparison = run_comparison(before, after)
 
     # --- pretty table + summary (extracted helpers, identical output) ---
     print_comparison_table(comparison, console=console)
