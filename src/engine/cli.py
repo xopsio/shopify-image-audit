@@ -394,13 +394,22 @@ def extract(
 @app.command()
 def score(
     audit_input_json: Path = typer.Argument(..., help="Path to intermediate audit input JSON."),
+    ranker: str = typer.Option("heuristic", "--ranker",
+                                help="Scoring algorithm: 'heuristic' (default) or 'ml'."),
 ) -> None:
     """Assign role, score (0-100), and recommendations to each image."""
     if not audit_input_json.exists():
         rprint(f"[red]Error:[/red] File not found: {audit_input_json}")
         raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
-    from audit.ranker_heuristic import rank
+    if ranker not in ("heuristic", "ml"):
+        rprint(f"[red]Error:[/red] --ranker must be 'heuristic' or 'ml', got '{ranker}'.")
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+
+    if ranker == "ml":
+        from audit.ranker_ml import rank
+    else:
+        from audit.ranker_heuristic import rank
 
     try:
         with open(audit_input_json, encoding="utf-8") as f:
