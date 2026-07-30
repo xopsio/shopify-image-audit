@@ -1,14 +1,11 @@
 """
-Unit tests for ``src/core/`` modules (image_extractor + performance_scorer).
+Unit tests for ``src/core/image_extractor.py``.
 
-These tests consume the previously-orphaned fixtures under ``tests/fixtures/``
-(extract_input.json, expected_images.json, expected_scores.json), which were
-authored against the core modules but had no test wiring them up.
-
-Note: ``core/performance_scorer`` uses a *different* scoring formula than the
-pipeline's ``audit/ranker_heuristic`` (absolute-bytes + modern-format bonus +
-LCP penalty, vs. area-based bpp). Both are intentionally retained side by side
-(see governance v1.2); these tests pin the core scorer's behaviour.
+Consumes the fixtures under ``tests/fixtures/`` (extract_input.json,
+expected_images.json) which were authored against the core module but had
+no test wiring them up. (Previously also tested ``core.performance_scorer``,
+but that module was removed in the Sprint 3 refactor plan: it had no
+production callers, and the rankers in ``audit/`` are the real scoring path.)
 """
 
 from __future__ import annotations
@@ -20,7 +17,6 @@ from typing import Any
 import pytest
 
 from core.image_extractor import extract_images
-from core.performance_scorer import calculate_score
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = REPO_ROOT / "tests" / "fixtures"
@@ -105,56 +101,3 @@ class TestExtractImages:
         assert images[0]["bytes"] == 1000  # first occurrence wins
 
 
-# ---------------------------------------------------------------------------
-# performance_scorer
-# ---------------------------------------------------------------------------
-
-class TestCalculateScore:
-    def test_scores_match_expected(self, expected_images, expected_scores) -> None:
-        """calculate_score must reproduce expected_scores.json for the fixtures."""
-        by_src = {row["src"]: row["score"] for row in expected_scores}
-        for img in expected_images:
-            assert calculate_score(img) == by_src[img["src"]]
-
-    def test_hero_is_heavy_lcp(self) -> None:
-        # 320 KB WebP LCP image -> 50 base - 15 LCP + 5 modern = 40
-        score = calculate_score(
-            {"bytes": 320_000, "mime": "image/webp", "is_lcp_candidate": True}
-        )
-        assert score == 40
-
-    def test_small_image_scores_high(self) -> None:
-        score = calculate_score({"bytes": 24_000, "mime": "image/png"})
-        assert score == 95
-
-    def test_score_range(self) -> None:
-        for b in (0, 1, 50_000, 150_000, 300_000, 600_000, 1_000_000):
-            score = calculate_score({"bytes": b, "mime": "image/jpeg"})
-            assert 0 <= score <= 100
-
-    def test_modern_format_bonus(self) -> None:
-        base = calculate_score({"bytes": 100_000, "mime": "image/jpeg"})
-        modern = calculate_score({"bytes": 100_000, "mime": "image/webp"})
-        assert modern == base + 5
-
-    def test_lcp_penalty_applied(self) -> None:
-        non_lcp = calculate_score({"bytes": 400_000, "mime": "image/jpeg"})
-        lcp = calculate_score(
-            {"bytes": 400_000, "mime": "image/jpeg", "is_lcp_candidate": True}
-        )
-        assert lcp < non_lcp
-
-    def test_non_dict_returns_zero(self) -> None:
-        assert calculate_score(None) == 0  # type: ignore[arg-type]
-        assert calculate_score("string") == 0  # type: ignore[arg-type]
-
-    def test_clamped_to_zero(self) -> None:
-        # Huge LCP image would go negative without clamping.
-        score = calculate_score(
-            {"bytes": 5_000_000, "mime": "image/jpeg", "is_lcp_candidate": True}
-        )
-        assert score == 0
-
-    def test_invalid_bytes_treated_as_zero(self) -> None:
-        score = calculate_score({"bytes": "not-a-number", "mime": "image/jpeg"})
-        assert score == 95  # treated as 0 bytes
