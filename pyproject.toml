@@ -38,7 +38,7 @@ dependencies = [
     "typer>=0.12",
     "rich>=13.7",
     "requests>=2.31",
-    "weasyprint>=63.0",
+    "weasyprint>=69.0,<70",
 ]
 
 [project.urls]
