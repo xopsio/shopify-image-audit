@@ -823,6 +823,17 @@ def generate_html_report(
     return html
 
 
+def _create_pdf_url_fetcher() -> Any:
+    """Create a PDF resource fetcher that only permits embedded data URLs.
+
+    Policy violations are fatal so rendering never silently ignores an
+    attempted external fetch.
+    """
+    from weasyprint.urls import URLFetcher
+
+    return URLFetcher(allowed_protocols=("data",), fail_on_errors=True)
+
+
 def render_pdf_report(html_content: str, output_path: Path | str) -> Path:
     """
     Render an HTML report string to a PDF file using WeasyPrint.
