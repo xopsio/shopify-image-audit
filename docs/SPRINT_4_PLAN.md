@@ -1,8 +1,8 @@
 # Sprint 4 Plan — Scalability & Recurring Revenue
 
 **Duration:** 3–4 weeks
-**Status:** PLANNING
-**Phase:** Phase 4 (post-Sprint 3; see [`ROADMAP.md`](ROADMAP.md))
+**Status:** ✅ COMPLETE (v0.3.0 released 2026-07-30)
+**Phase:** Phase 4 (complete; see [`ROADMAP.md`](ROADMAP.md))
 
 ---
 
@@ -96,10 +96,10 @@ Tasks:
 6. Missing logo / invalid colour → warning printed, default styling used
 
 Acceptance:
-- [ ] `audit report foo.json --brand-logo logo.png --brand-color "#ff6b35" -o branded.html` produces a report with the brand colour in the header
-- [ ] `audit report foo.json` (no brand args) still works (no regression)
-- [ ] Tests for the brand-colour parser, the base64 encoding, and the CSS rendering
-- [ ] Bad colour / missing logo paths log a clear warning and fall back
+- [x] `audit report foo.json --brand-logo logo.png --brand-color "#ff6b35" -o branded.html` produces a report with the brand colour in the header
+- [x] `audit report foo.json` (no brand args) still works (no regression)
+- [x] Tests for the brand-colour parser, the base64 encoding, and the CSS rendering
+- [x] Bad colour / missing logo paths log a clear warning and fall back
 
 ### TD-3: ROI-ranked recommendations
 **Owner:** ZCode
@@ -114,11 +114,11 @@ Tasks:
 5. HTML report uses the new ordering automatically
 
 Acceptance:
-- [ ] `summary.recommendations` is a list of `ComparisonRecommendation` with `sort_key` populated
-- [ ] `summary.top_improvements[0]` is the highest-ROI improvement
-- [ ] `summary.top_regressions[0]` is the worst-ROI regression
-- [ ] HTML report still shows the same content (or richer) and the test suite still passes
-- [ ] Tests for the sort order across multiple improvement/regression scenarios
+- [x] `summary.recommendations` is a list of `ComparisonRecommendation` with `sort_key` populated
+- [x] `summary.top_improvements[0]` is the highest-ROI improvement
+- [x] `summary.top_regressions[0]` is the worst-ROI regression
+- [x] HTML report still shows the same content (or richer) and the test suite still passes
+- [x] Tests for the sort order across multiple improvement/regression scenarios
 
 ### TD-4: Audit history
 **Owner:** ZCode
@@ -137,31 +137,31 @@ Tasks:
 5. `audit history show mystore.myshopify.com` — generates a trend HTML (uses existing report infrastructure)
 
 Acceptance:
-- [ ] `audit baseline foo.json --save baseline.json` records a copy to `~/.shopify-image-audit/history/<host>/<ts>.json` (alongside the user-supplied path)
-- [ ] `audit history list mystore.myshopify.com` lists recorded audits
-- [ ] `audit history show mystore.myshopify.com` produces a trend HTML
-- [ ] `--history-dir <path>` overrides the default location
-- [ ] Tests use `tmp_path` for the history directory
+- [x] `audit baseline foo.json --save baseline.json` records a copy to `~/.shopify-image-audit/history/<host>/<ts>.json` (alongside the user-supplied path)
+- [x] `audit history list mystore.myshopify.com` lists recorded audits
+- [x] `audit history show mystore.myshopify.com` produces a trend HTML
+- [x] `--history-dir <path>` overrides the default location
+- [x] Tests use `tmp_path` for the history directory
 
 ---
 
 ## 4. Acceptance Criteria (Sprint-Level)
 
 ### Business Success:
-- [ ] Branded reports can be delivered to enterprise customers (logo + brand colour)
-- [ ] Recommendations are ordered by ROI so the most impactful ones appear first
-- [ ] Repeat customers can see audit trends over time
+- [x] Branded reports can be delivered to enterprise customers (logo + brand colour)
+- [x] Recommendations are ordered by ROI so the most impactful ones appear first
+- [x] Repeat customers can see audit trends over time
 
 ### Technical Success:
-- [ ] Audit history persists across runs
-- [ ] All new code has tests (>= 80% coverage on new modules)
+- [x] Audit history persists across runs
+- [x] All new code has tests (>= 80% coverage on new modules)
 - [ ] `cli.py` coverage improves (currently 63%)
 
 ### Quality Gates:
-- [ ] No regressions (390 + new tests still pass)
-- [ ] Ruff clean
-- [ ] CI green Python 3.11 + 3.12
-- [ ] Docs updated: README, SPRINT_4_PLAN, ROADMAP, CLI spec
+- [x] No regressions (390 + new tests still pass)
+- [x] Ruff clean
+- [x] CI green Python 3.11 + 3.12
+- [x] Docs updated: README, SPRINT_4_PLAN, ROADMAP, CLI spec
 
 ---
 
