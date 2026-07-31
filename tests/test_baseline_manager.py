@@ -31,8 +31,7 @@ from core.baseline_manager import (
     save_baseline,
 )
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-BEFORE_AFTER = REPO_ROOT / "fixtures" / "before_after"
+BEFORE_AFTER = Path(__file__).resolve().parents[1] / "fixtures" / "before_after"
 
 
 # ---------------------------------------------------------------------------
@@ -41,16 +40,12 @@ BEFORE_AFTER = REPO_ROOT / "fixtures" / "before_after"
 
 @pytest.fixture(scope="module")
 def before_result() -> AuditResult:
-    import sys
-    sys.path.insert(0, str(REPO_ROOT / "src"))
     from engine.audit_orchestrator import run_audit
     return run_audit(BEFORE_AFTER / "before_lcp.json", url="https://demo.myshopify.com")
 
 
 @pytest.fixture(scope="module")
 def after_result() -> AuditResult:
-    import sys
-    sys.path.insert(0, str(REPO_ROOT / "src"))
     from engine.audit_orchestrator import run_audit
     return run_audit(BEFORE_AFTER / "after_lcp.json", url="https://demo.myshopify.com")
 
@@ -193,8 +188,6 @@ class TestCompare:
 
     def test_empty_images(self) -> None:
         """compare() must not divide by zero when images lists are empty."""
-        import sys
-        sys.path.insert(0, str(REPO_ROOT / "src"))
         empty = {
             "meta": {"url": "x", "timestamp_utc": "2026-01-01T00:00:00Z",
                      "device": "mobile", "runs": 1, "tool": "lighthouse"},
@@ -219,8 +212,6 @@ class TestRoiEstimate:
         assert "conversion" in comp.summary.roi_estimate.lower()
 
     def test_no_lcp_change_gives_neutral_message(self) -> None:
-        import sys
-        sys.path.insert(0, str(REPO_ROOT / "src"))
         from audit.models import ImageStatsDelta, MetricDelta, VitalsDelta
         vd = VitalsDelta(
             lcp=MetricDelta(before=1000, after=1000, delta=0, delta_pct=0, status="unchanged"),
@@ -376,8 +367,6 @@ class TestRecommendationsInSummary:
 
     def test_regressions_sorted_by_roi_ascending(self) -> None:
         """When after is worse than before, regressions come first."""
-        import sys
-        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
         from engine.audit_orchestrator import run_audit
 
         before = run_audit(Path(__file__).resolve().parents[1] / "fixtures" / "before_after" / "after_lcp.json",
@@ -403,8 +392,6 @@ class TestRecommendationsInSummary:
 
     def test_backward_compat_no_recommendations_when_unchanged(self) -> None:
         """Comparing identical results yields no recommendations but stable fields."""
-        import sys
-        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
         from engine.audit_orchestrator import run_audit
 
         result = run_audit(Path(__file__).resolve().parents[1] / "fixtures" / "before_after" / "before_lcp.json",

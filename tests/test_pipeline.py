@@ -19,10 +19,7 @@ from audit.models import AuditResult
 from audit.parser import parse
 from audit.ranker_heuristic import rank
 from engine.audit_orchestrator import run_audit
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
-FIXTURES = REPO_ROOT / "fixtures"
-
+from tests import FIXTURES
 
 # ---------------------------------------------------------------------------
 # parametrised fixture paths

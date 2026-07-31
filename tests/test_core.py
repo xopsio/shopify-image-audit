@@ -11,15 +11,12 @@ production callers, and the rankers in ``audit/`` are the real scoring path.)
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import Any
 
 import pytest
 
 from core.image_extractor import extract_images
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
-FIXTURES = REPO_ROOT / "tests" / "fixtures"
+from tests import FIXTURES
 
 EXTRACT_INPUT = FIXTURES / "extract_input.json"
 EXPECTED_IMAGES = FIXTURES / "expected_images.json"

@@ -16,7 +16,6 @@ from audit.models import AuditResult
 from engine.cli import app
 from engine.history import HistoryStore, generate_diff_html
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
 runner = CliRunner()
 
 

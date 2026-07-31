@@ -13,7 +13,6 @@ Scope (Sprint 2, issue #20 prep):
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pytest
 
@@ -28,6 +27,7 @@ from audit.report import (
     _vitals_status,
     generate_html_report,
 )
+from tests import FIXTURES
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -377,8 +377,6 @@ class TestGenerateHtmlReport:
 # Golden-output equivalence (regression guard for the refactor)
 # ---------------------------------------------------------------------------
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-FIXTURES = REPO_ROOT / "fixtures"
 
 
 class TestRefactorEquivalence:
@@ -391,9 +389,7 @@ class TestRefactorEquivalence:
 
     @pytest.mark.parametrize("fixture", ["bad_hero_lcp.json", "optimized_shopify.json"])
     def test_single_audit_report_structure(self, fixture: str) -> None:
-        import sys
 
-        sys.path.insert(0, str(REPO_ROOT / "src"))
         from engine.audit_orchestrator import run_audit
 
         result = run_audit(FIXTURES / fixture)

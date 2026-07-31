@@ -5,8 +5,6 @@ Tests that parser → ranker → AuditResult.model_validate works end-to-end.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 from pydantic import ValidationError
 
@@ -14,10 +12,7 @@ from audit.models import AuditResult, ImageItem, ImageRole, Meta, Vitals
 from audit.parser import parse_file
 from audit.ranker_heuristic import rank
 from engine.audit_orchestrator import run_audit
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
-FIXTURES = REPO_ROOT / "fixtures"
-
+from tests import FIXTURES
 
 # ---------------------------------------------------------------------------
 # Pipeline integration (parse → rank → validate)
