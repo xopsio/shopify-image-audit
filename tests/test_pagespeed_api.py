@@ -9,7 +9,9 @@ from unittest.mock import MagicMock
 import pytest
 import requests
 import responses
+from typer.testing import CliRunner
 
+from engine.cli import app
 from integrations.pagespeed_api import (
     PageSpeedAPIClient,
     PageSpeedMetrics,
@@ -618,3 +620,99 @@ class TestValidateUrlEdgeCases:
         client = PageSpeedAPIClient()
         with pytest.raises(ValueError, match="empty"):
             client._validate_url("")
+
+
+# ---------------------------------------------------------------------------
+# TD-3: API key must never leak into error messages
+# ---------------------------------------------------------------------------
+
+class TestApiKeyRedaction:
+    """The key embedded in a connection-error URL must be redacted."""
+
+    def test_connection_error_redacts_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        key = "SUPERSECRETKEY123"
+        client = PageSpeedAPIClient(api_key=key, max_retries=1, retry_delay=0.0)
+
+        def boom(url, **kwargs):
+            raise requests.exceptions.ConnectionError(
+                "HTTPSConnectionPool(host='www.googleapis.com', port=443): "
+                f"Max retries exceeded with url: /pagespeedonline/v5/runPagespeed"
+                f"?key={key}&url=https%3A%2F%2Fdemo.myshopify.com"
+            )
+
+        monkeypatch.setattr("integrations.pagespeed_api.requests.get", boom)
+
+        with pytest.raises(RuntimeError, match=r"\*\*\*") as excinfo:
+            client.get_metrics("https://demo.myshopify.com")
+        assert key not in str(excinfo.value)
+
+    def test_redact_message_covers_percent_encoded_key(self) -> None:
+        client = PageSpeedAPIClient(api_key="SUPERSECRET KEY")
+        msg = "url: /runPagespeed?key=SUPERSECRET%20KEY&url=https://demo"
+        out = client._redact_message(msg)
+        assert "SUPERSECRET" not in out
+        assert "***" in out
+
+    def test_redact_message_returns_text_when_no_key(self) -> None:
+        client = PageSpeedAPIClient(api_key=None)
+        assert client._redact_message("plain error") == "plain error"
+
+
+# ---------------------------------------------------------------------------
+# TD-3: PAGESPEED_API_KEY env var as --api-key fallback
+# ---------------------------------------------------------------------------
+
+class TestApiKeyEnvvar:
+    """`PAGESPEED_API_KEY` supplies the key when --api-key is omitted."""
+
+    @staticmethod
+    def _sample_metrics(url: str) -> PageSpeedMetrics:
+        return PageSpeedMetrics(
+            lcp=2.5, cls=0.05, inp=0.1,
+            first_contentful_paint=1.2, first_meaningful_paint=1.5,
+            speed_index=1.8, time_to_interactive=3.5, total_blocking_time=150,
+            performance_score=90, url=url, strategy="mobile",
+            fetch_time="2026-01-01T00:00:00Z",
+        )
+
+    def _invoke_measure(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        *,
+        env_key: str | None,
+        flag_key: str | None = None,
+    ) -> dict:
+        captured: dict = {}
+
+        class FakeClient:
+            def __init__(self, **kwargs):
+                captured["client_kwargs"] = kwargs
+
+            def get_metrics(self, url, strategy):
+                return TestApiKeyEnvvar._sample_metrics(url)
+
+        monkeypatch.setattr("engine.cli.PageSpeedAPIClient", FakeClient)
+        if env_key is None:
+            monkeypatch.delenv("PAGESPEED_API_KEY", raising=False)
+        else:
+            monkeypatch.setenv("PAGESPEED_API_KEY", env_key)
+
+        args = ["measure", "https://demo.myshopify.com"]
+        if flag_key is not None:
+            args += ["--api-key", flag_key]
+        result = CliRunner().invoke(app, args)
+        assert result.exit_code == 0, result.stdout
+        assert "client_kwargs" in captured
+        return captured
+
+    def test_envvar_used_when_flag_missing(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        captured = self._invoke_measure(monkeypatch, env_key="env-secret")
+        assert captured["client_kwargs"]["api_key"] == "env-secret"
+
+    def test_flag_overrides_envvar(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        captured = self._invoke_measure(monkeypatch, env_key="env-secret", flag_key="flag-secret")
+        assert captured["client_kwargs"]["api_key"] == "flag-secret"
+
+    def test_no_key_when_neither_set(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        captured = self._invoke_measure(monkeypatch, env_key=None)
+        assert captured["client_kwargs"]["api_key"] is None

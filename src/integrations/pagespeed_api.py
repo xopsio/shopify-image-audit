@@ -12,7 +12,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 import requests
 
@@ -343,12 +343,27 @@ class PageSpeedAPIClient:
                 if attempt < self.max_retries - 1:
                     time.sleep(self.retry_delay)
                     continue
-                raise
+                # requests embeds the full request URL (including ?key=...) in
+                # connection-error text — strip the key before it surfaces.
+                raise RuntimeError(self._redact_message(str(e))) from None
 
         # Should not reach here, but just in case
         if last_exception:
-            raise last_exception
+            raise RuntimeError(self._redact_message(str(last_exception))) from None
         raise RuntimeError("Unexpected error in PageSpeed API request")
+
+    def _redact_message(self, text: str) -> str:
+        """Remove the API key from an error message.
+
+        Connection errors include the full request URL in their text; the
+        key must never appear in CLI output or logs.
+        """
+        if not self.api_key:
+            return text
+        redacted = text.replace(self.api_key, "***")
+        # Also cover the percent-encoded form used in query strings.
+        encoded_key = quote(self.api_key, safe="")
+        return redacted.replace(encoded_key, "***")
 
     def _get_error_message(self, response: requests.Response) -> str:
         """Extract error message from response."""
