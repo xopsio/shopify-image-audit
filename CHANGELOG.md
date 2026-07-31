@@ -9,7 +9,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Empty — all Sprint 7 work shipped in v0.6.0. Bugfix release v0.6.1 below.
+Empty — all Sprint 8 work shipped in v0.7.0.
+
+---
+
+## [0.7.0] - 2026-07-31
+
+### Added (Sprint 8)
+- "Did you mean: X?" suggestions on every CLI typo site (`--device`,
+  `--strategy`, `--ranker`, shopify/history/schedule subcommands) via
+  `difflib.get_close_matches` — TD-1
+- `audit schedule run-all --parallel <N>` (deferred from Sprint 7; now
+  trivial thanks to the shared `run_parallel` helper) — TD-3
+- Shared `src/engine/_parallel.py::run_parallel(items, fn, *, parallel,
+  stop_on_error, cancelled_factory)` is now the single concurrency
+  primitive for `run_batch` and `run_all_schedules` — TD-3
+- `tests/conftest.py` + `tests/__init__.py`: single source of truth for
+  shared `REPO_ROOT`, `FIXTURES`, `cli_runner`, `sample_audit_result`,
+  `populated_history_dir` — TD-2
+- `pip install shopify-image-audit` no longer pulls WeasyPrint; PDF
+  export moved to optional `[pdf]` extra (`shopify-image-audit[pdf]`)
+  — TD-4
+- `src/audit/report.py::render_pdf_report` raises a friendly
+  `ImportError` with install instructions when WeasyPrint is missing
+  — TD-4
+- `docs/tutorial.md` — 6-step "from install to delivered report in <5min"
+  walkthrough — TD-4
+- `MANIFEST.in` (NEW) ships CHANGELOG, CONTRIBUTING, README (note:
+  schemas/docs ship via PyPI sdist only — wheel packaging of those is
+  deferred to Sprint 9 because setuptools.package-data is finicky) — TD-4
+
+### Changed
+- Test files: removed 8 duplicated `REPO_ROOT` declarations, 6 stale
+  `sys.path.insert()` calls — TD-2
+- `fixtures/` and `tests/fixtures/` consolidated (was inconsistent —
+  `test_core` pointed elsewhere) — TD-2
+
+### Stats
+- 665 tests pass (up from 656)
+- Ruff clean
+- Single concurrency primitive (`run_parallel`) replaces two copies
+- Test fixtures consolidated into one place
+
+[0.7.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.6.1...v0.7.0
+[0.6.1]: https://github.com/xopsio/shopify-image-audit/compare/v0.6.0...v0.6.1
 
 ---
 
