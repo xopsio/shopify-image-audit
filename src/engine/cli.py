@@ -63,6 +63,7 @@ from engine.cli_helpers._validators import (
     validate_out_path,
     validate_run_url,
 )
+from engine.config import get_config
 from engine.history import HistoryStore
 from integrations.pagespeed_api import PageSpeedAPIClient
 from integrations.shopify_admin import ShopifyAdminClient
@@ -101,6 +102,10 @@ app = typer.Typer(
     help="Shopify store image audit - Lighthouse-based analysis with heuristic and ML scoring.",
     add_completion=False,
 )
+
+#: Cached user config (config.toml) — see engine/config.py. Precedence at
+#: each call site: CLI flag > env var > config > built-in default.
+_cfg = get_config
 
 
 # ---------------------------------------------------------------------------
@@ -165,12 +170,19 @@ def _run_lighthouse(
 @handle_pipeline_errors(step_name="run")
 def run(
     url: str = typer.Argument(..., help="Shopify store URL to audit."),
-    device: str = typer.Option("mobile", "--device", help="Device type: mobile or desktop."),
+    device: str | None = typer.Option(
+        None, "--device",
+        help="Device type: mobile or desktop (default: config or mobile).",
+    ),
     runs: int = typer.Option(3, "--runs", help="Number of Lighthouse runs (default 3)."),
     out_dir: Path = typer.Option("artifacts", "--out-dir", help="Directory for output artifacts."),
     lhr: Path | None = typer.Option(None, "--lhr", help="Use an existing Lighthouse JSON instead of running live."),
 ) -> None:
     """Run Lighthouse audit on <url>, analyse images, and write results."""
+    # --- resolve config defaults (flag > env > config > default) ---
+    if device is None:
+        device = _cfg().defaults.device
+
     # --- validate URL scheme ---
     validate_run_url(url)
 
@@ -218,7 +230,10 @@ def run(
 @app.command()
 def measure(
     url: str = typer.Argument(..., help="URL to measure with PageSpeed Insights."),
-    strategy: str = typer.Option("mobile", "--strategy", help="Strategy: mobile or desktop (default: mobile)."),
+    strategy: str | None = typer.Option(
+        None, "--strategy",
+        help="Strategy: mobile or desktop (default: config or mobile).",
+    ),
     api_key: str | None = typer.Option(None, "--api-key", envvar="PAGESPEED_API_KEY",
                                        help="Google Cloud API key (optional, or set PAGESPEED_API_KEY)."),
     output: Path | None = typer.Option(None, "-o", "--output", help="Output JSON file (default: print to stdout)."),
@@ -228,6 +243,12 @@ def measure(
     ),
 ) -> None:
     """Fetch live performance metrics from Google PageSpeed Insights API."""
+    # --- resolve config defaults (flag > env > config > default) ---
+    if strategy is None:
+        strategy = _cfg().defaults.strategy
+    if api_key is None:
+        api_key = _cfg().pagespeed.api_key
+
     # --- validate URL (allow scheme-less for normalization by API) ---
     validate_measure_url(url)
 
@@ -287,9 +308,9 @@ def shopify(
         help="[batch] Path to a JSON file listing stores to audit. "
         "Each entry must have 'shop_domain' and 'access_token'.",
     ),
-    parallel: int = typer.Option(
-        1, "--parallel",
-        help="[batch] Number of concurrent store audits. 0 = unlimited (default 1, sequential).",
+    parallel: int | None = typer.Option(
+        None, "--parallel",
+        help="[batch] Number of concurrent store audits. 0 = unlimited (default: config or 1).",
     ),
     stop_on_error: bool = typer.Option(
         False, "--stop-on-error",
@@ -297,6 +318,13 @@ def shopify(
     ),
 ) -> None:
     """Interact with a Shopify store via the Admin API (auth, inventory, batch)."""
+    # --- resolve config defaults (flag > env > config > default) ---
+    if access_token is None:
+        access_token = _cfg().shopify.access_token
+    # `parallel == 0` is a valid "unlimited" value — never `or`-coalesce it.
+    if parallel is None:
+        parallel = _cfg().defaults.parallel
+
     if subcommand not in ("auth", "inventory", "batch"):
         rprint(
             f"[red]Error:[/red] Unknown shopify subcommand: {subcommand!r} "
@@ -475,6 +503,12 @@ def history(
 
     Requires at least one recorded baseline (via ``audit baseline``) for the store.
     """
+    # --- resolve config defaults (flag > env > config > default) ---
+    if history_dir is None:
+        cfg_history = _cfg().history.history_dir
+        if cfg_history is not None:
+            history_dir = Path(cfg_history)
+
     if subcommand not in ("list", "show", "diff"):
         rprint(
             f"[red]Error:[/red] Unknown history subcommand: {subcommand!r} "
@@ -668,7 +702,10 @@ def score(
 @app.command()
 def report(
     audit_result_json: Path = typer.Argument(..., help="Path to audit_result.json."),
-    output: Path = typer.Option("report.html", "-o", "--output", help="Output file (HTML or PDF based on --pdf)."),
+    output: Path | None = typer.Option(
+        None, "-o", "--output",
+        help="Output file (HTML or PDF based on --pdf; default: config or report.html).",
+    ),
     pdf: bool = typer.Option(False, "--pdf", help="Render the report as PDF instead of HTML."),
     brand_logo: Path | None = typer.Option(
         None, "--brand-logo",
@@ -681,6 +718,15 @@ def report(
 ) -> None:
     """Render an audit result JSON to an HTML report (or PDF with --pdf)."""
     from audit.report import _parse_brand_color, _read_brand_logo
+
+    # --- resolve config defaults (flag > env > config > default) ---
+    cfg = _cfg()
+    if output is None:
+        output = Path(cfg.report.output)
+    if brand_logo is None and cfg.report.brand_logo is not None:
+        brand_logo = Path(cfg.report.brand_logo)
+    if brand_color is None:
+        brand_color = cfg.report.brand_color
 
     if not audit_result_json.exists():
         rprint(f"[red]Error:[/red] File not found: {audit_result_json}")
@@ -746,7 +792,10 @@ def baseline(
     lhr_json: Path = typer.Argument(..., help="Path to a Lighthouse JSON / fixture report to use as the baseline."),
     save: Path = typer.Option(..., "--save", help="Where to write the baseline audit_result.json."),
     url: str | None = typer.Option(None, "--url", help="Override the store URL in the baseline meta."),
-    device: str = typer.Option("mobile", "--device", help="Device type: mobile or desktop."),
+    device: str | None = typer.Option(
+        None, "--device",
+        help="Device type: mobile or desktop (default: config or mobile).",
+    ),
     history_dir: Path | None = typer.Option(
         None, "--history-dir",
         help="Override the audit-history directory (default: $XDG_DATA_HOME/.shopify-image-audit/history/).",
@@ -757,6 +806,13 @@ def baseline(
     ),
 ) -> None:
     """Run an audit on <lhr_json> and store it as a reusable baseline."""
+    # --- resolve config defaults (flag > env > config > default) ---
+    cfg = _cfg()
+    if device is None:
+        device = cfg.defaults.device
+    if history_dir is None and cfg.history.history_dir is not None:
+        history_dir = Path(cfg.history.history_dir)
+
     if not lhr_json.exists():
         rprint(f"[red]Error:[/red] File not found: {lhr_json}")
         raise typer.Exit(code=EXIT_INVALID_ARGS) from None
@@ -804,7 +860,10 @@ def compare(
     pdf: bool = typer.Option(False, "--pdf", help="When --output is set, render a PDF instead of HTML."),
     json_out: Path | None = typer.Option(None, "--json",
                                             help="Also write the comparison result JSON to this file."),
-    strategy: str = typer.Option("mobile", "--strategy", help="PageSpeed strategy when <current> is a URL."),
+    strategy: str | None = typer.Option(
+        None, "--strategy",
+        help="PageSpeed strategy when <current> is a URL (default: config or mobile).",
+    ),
     api_key: str | None = typer.Option(None, "--api-key", envvar="PAGESPEED_API_KEY",
                                        help="Google Cloud API key for PageSpeed (optional, or set PAGESPEED_API_KEY)."),
     brand_logo: Path | None = typer.Option(
@@ -830,6 +889,17 @@ def compare(
     if not baseline_json.exists():
         rprint(f"[red]Error:[/red] baseline file not found: {baseline_json}")
         raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+
+    # --- resolve config defaults (flag > env > config > default) ---
+    cfg = _cfg()
+    if strategy is None:
+        strategy = cfg.defaults.strategy
+    if api_key is None:
+        api_key = cfg.pagespeed.api_key
+    if brand_logo is None and cfg.report.brand_logo is not None:
+        brand_logo = Path(cfg.report.brand_logo)
+    if brand_color is None:
+        brand_color = cfg.report.brand_color
 
     # --- detect URL vs path in <current> ---
     current_is_url = current.startswith(("http://", "https://"))
@@ -935,7 +1005,10 @@ def schedule(
         None, "--history-dir",
         help="[run-all] Override the audit-history directory.",
     ),
-    device: str = typer.Option("mobile", "--device", help="[add] Device: mobile or desktop."),
+    device: str | None = typer.Option(
+        None, "--device",
+        help="[add] Device: mobile or desktop (default: config or mobile).",
+    ),
     label: str | None = typer.Option(
         None, "--label",
         help="[add] Optional label for the schedule (e.g. 'Daily 09:00').",
@@ -944,9 +1017,9 @@ def schedule(
         None, "--api-key", envvar="PAGESPEED_API_KEY",
         help="[run-all] Google Cloud API key for PageSpeed (optional, or set PAGESPEED_API_KEY).",
     ),
-    parallel: int = typer.Option(
-        1, "--parallel",
-        help="[run-all] Number of concurrent store audits. 0 = unlimited (default 1, sequential).",
+    parallel: int | None = typer.Option(
+        None, "--parallel",
+        help="[run-all] Number of concurrent store audits. 0 = unlimited (default: config or 1).",
     ),
     stop_on_error: bool = typer.Option(
         False, "--stop-on-error",
@@ -960,6 +1033,18 @@ def schedule(
     command handles the 'what to run' half: persisting the schedule list
     and executing it via ``run-all``.
     """
+    # --- resolve config defaults (flag > env > config > default) ---
+    cfg = _cfg()
+    if device is None:
+        device = cfg.defaults.device
+    if history_dir is None and cfg.history.history_dir is not None:
+        history_dir = Path(cfg.history.history_dir)
+    if api_key is None:
+        api_key = cfg.pagespeed.api_key
+    # `parallel == 0` is a valid "unlimited" value — never `or`-coalesce it.
+    if parallel is None:
+        parallel = cfg.defaults.parallel
+
     if subcommand not in ("list", "add", "remove", "run-all"):
         rprint(
             f"[red]Error:[/red] Unknown schedule subcommand: {subcommand!r} "

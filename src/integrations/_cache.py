@@ -37,15 +37,22 @@ def _default_cache_dir() -> Path:
 
 
 def _env_ttl() -> int:
-    """Read the TTL from PAGESPEED_CACHE_TTL (default 3600; 0 disables)."""
+    """Resolve the cache TTL: PAGESPEED_CACHE_TTL env var > config > default.
+
+    ``0`` disables caching. The config layer is ``[pagespeed] cache_ttl``
+    from ``config.toml`` (Sprint 11, TD-2).
+    """
     raw = os.environ.get("PAGESPEED_CACHE_TTL")
-    if raw is None:
-        return _DEFAULT_TTL
-    try:
-        return max(0, int(raw))
-    except ValueError:
-        _log.warning("Invalid PAGESPEED_CACHE_TTL %r, using default", raw)
-        return _DEFAULT_TTL
+    if raw is not None:
+        try:
+            return max(0, int(raw))
+        except ValueError:
+            _log.warning("Invalid PAGESPEED_CACHE_TTL %r, using default", raw)
+            return _DEFAULT_TTL
+    from engine.config import get_config
+
+    cfg_ttl = get_config().pagespeed.cache_ttl
+    return cfg_ttl if cfg_ttl is not None else _DEFAULT_TTL
 
 
 class ResponseCache:
