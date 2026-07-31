@@ -942,6 +942,14 @@ def schedule(
         None, "--api-key",
         help="[run-all] Google Cloud API key for PageSpeed (optional).",
     ),
+    parallel: int = typer.Option(
+        1, "--parallel",
+        help="[run-all] Number of concurrent store audits. 0 = unlimited (default 1, sequential).",
+    ),
+    stop_on_error: bool = typer.Option(
+        False, "--stop-on-error",
+        help="[run-all] Abort on the first store failure (default: continue past failures).",
+    ),
 ) -> None:
     """Manage scheduled re-audits and run them on demand.
 
@@ -996,8 +1004,21 @@ def schedule(
         else:
             rprint(f"[green]Schedule removed:[/green] {shop_domain}")
     else:  # run-all
+        if parallel < 0:
+            rprint(f"[red]Error:[/red] --parallel must be >= 0, got {parallel}.")
+            rprint(
+                f"{format_suggestion(str(parallel), ['0', '1', '2'])}"
+            )
+            raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+
         history_store = HistoryStore(base_dir=history_dir)
-        results = run_all_schedules(store, history_store=history_store, api_key=api_key)
+        results = run_all_schedules(
+            store,
+            history_store=history_store,
+            api_key=api_key,
+            parallel=parallel,
+            stop_on_error=stop_on_error,
+        )
         if not results:
             rprint(f"[yellow]No schedules to run in {store.path}.[/yellow]")
         else:

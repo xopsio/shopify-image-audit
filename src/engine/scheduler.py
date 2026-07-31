@@ -34,6 +34,7 @@ from pathlib import Path
 from typing import Any
 
 from engine._logging import get_logger
+from engine._parallel import run_parallel
 
 _log = get_logger()
 
@@ -161,67 +162,93 @@ class ScheduleStore:
 # Runner
 # ---------------------------------------------------------------------------
 
+def _audit_one_schedule(
+    sched: ScheduleConfig,
+    *,
+    history_store: Any,
+    api_key: str | None,
+) -> ScheduleRunResult:
+    """Audit one scheduled store. Never raises — errors become ScheduleRunResult."""
+    # Local import to avoid a circular dependency at module load.
+    from engine.cli_helpers._dispatchers import fetch_url_as_audit
+
+    _log.info("Schedule run: %s (%s)", sched.shop_domain, sched.url)
+    try:
+        audit_result = fetch_url_as_audit(
+            sched.url, strategy=sched.device, api_key=api_key,
+        )
+    except (RuntimeError, ValueError) as exc:
+        _log.warning("Schedule %s failed: %s", sched.shop_domain, exc)
+        return ScheduleRunResult(
+            shop_domain=sched.shop_domain, success=False, error=str(exc),
+        )
+    except Exception as exc:  # noqa: BLE001 — surface any unexpected error
+        _log.error("Schedule %s unexpected error: %s", sched.shop_domain, exc)
+        return ScheduleRunResult(
+            shop_domain=sched.shop_domain, success=False,
+            error=f"Unexpected error: {exc}",
+        )
+
+    try:
+        history_path = history_store.record(audit_result, label=sched.label)
+        entries = history_store.list_entries(sched.shop_domain)
+        entry_id = entries[0].id if entries else None
+    except Exception as exc:  # noqa: BLE001 — history must never block
+        _log.error("Schedule %s history record failed: %s", sched.shop_domain, exc)
+        return ScheduleRunResult(
+            shop_domain=sched.shop_domain, success=False,
+            error=f"History record failed: {exc}",
+        )
+
+    _log.info("Schedule %s recorded: %s", sched.shop_domain, history_path)
+    return ScheduleRunResult(
+        shop_domain=sched.shop_domain, success=True, entry_id=entry_id,
+    )
+
+
 def run_all_schedules(
     schedule_store: ScheduleStore,
     *,
     history_store: Any,
     api_key: str | None = None,
+    parallel: int = 1,
+    stop_on_error: bool = False,
 ) -> list[ScheduleRunResult]:
     """Run every configured schedule and record results to history.
 
-    One store's failure does not abort the rest. Each result is recorded
-    to ``history_store`` (a :class:`~engine.history.HistoryStore`) when the
-    audit succeeds.
+    Args:
+        parallel: Number of concurrent workers. ``0`` means all schedules
+            concurrently (capped at ``len(schedules)``). ``1`` (default)
+            is sequential.
+        stop_on_error: If True, abort on the first failure; otherwise
+            continue and report all failures.
+
+    One store's failure does not abort the rest by default. Each result
+    is recorded to ``history_store`` (a :class:`~engine.history.HistoryStore`)
+    when the audit succeeds.
 
     Returns one :class:`ScheduleRunResult` per schedule, in config order.
     """
-    # Local import to avoid a circular dependency at module load.
-    from engine.cli_helpers._dispatchers import fetch_url_as_audit
-
     schedules = schedule_store.load()
-    results: list[ScheduleRunResult] = []
-    for sched in schedules:
-        _log.info("Schedule run: %s (%s)", sched.shop_domain, sched.url)
-        try:
-            audit_result = fetch_url_as_audit(
-                sched.url, strategy=sched.device, api_key=api_key,
-            )
-        except (RuntimeError, ValueError) as exc:
-            _log.warning("Schedule %s failed: %s", sched.shop_domain, exc)
-            results.append(ScheduleRunResult(
-                shop_domain=sched.shop_domain,
-                success=False,
-                error=str(exc),
-            ))
-            continue
-        except Exception as exc:  # noqa: BLE001 — surface any unexpected error
-            _log.error("Schedule %s unexpected error: %s", sched.shop_domain, exc)
-            results.append(ScheduleRunResult(
-                shop_domain=sched.shop_domain,
-                success=False,
-                error=f"Unexpected error: {exc}",
-            ))
-            continue
+    if not schedules:
+        return []
 
-        try:
-            history_path = history_store.record(audit_result, label=sched.label)
-            # Look up the entry id we just wrote.
-            entries = history_store.list_entries(sched.shop_domain)
-            entry_id = entries[0].id if entries else None
-        except Exception as exc:  # noqa: BLE001 — history must never block
-            _log.error("Schedule %s history record failed: %s", sched.shop_domain, exc)
-            results.append(ScheduleRunResult(
-                shop_domain=sched.shop_domain,
-                success=False,
-                error=f"History record failed: {exc}",
-            ))
-            continue
+    def _cancelled(s: ScheduleConfig) -> ScheduleRunResult:
+        return ScheduleRunResult(
+            shop_domain=s.shop_domain, success=False,
+            error="Cancelled due to --stop-on-error",
+        )
 
-        results.append(ScheduleRunResult(
-            shop_domain=sched.shop_domain,
-            success=True,
-            entry_id=entry_id,
-        ))
-        _log.info("Schedule %s recorded: %s", sched.shop_domain, history_path)
+    # Closure capture: scheduler needs history_store + api_key too.
+    def _runner(sched: ScheduleConfig) -> ScheduleRunResult:
+        return _audit_one_schedule(
+            sched, history_store=history_store, api_key=api_key,
+        )
 
-    return results
+    return run_parallel(
+        schedules,
+        _runner,
+        parallel=parallel,
+        stop_on_error=stop_on_error,
+        cancelled_factory=_cancelled if stop_on_error else None,
+    )

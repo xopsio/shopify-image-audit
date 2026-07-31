@@ -20,11 +20,11 @@ The file must contain a JSON array of objects with at least
 from __future__ import annotations
 
 import json
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from engine._parallel import run_parallel
 from integrations.shopify_admin import ShopifyAdminClient
 
 
@@ -154,47 +154,21 @@ def run_batch(
     if not stores:
         return BatchResult()
 
-    if parallel <= 1:
-        results: list[StoreResult] = []
-        for store in stores:
-            result = _audit_one_store(store)
-            results.append(result)
-            if stop_on_error and not result.success:
-                break
-        return BatchResult(results=results)
+    def _cancelled(store: StoreConfig) -> StoreResult:
+        return StoreResult(
+            shop_domain=store.shop_domain,
+            success=False,
+            error="Cancelled due to --stop-on-error",
+        )
 
-    # Parallel: ThreadPoolExecutor since Shopify API calls are I/O-bound.
-    workers = min(parallel, len(stores)) if parallel > 0 else len(stores)
-    results = [None] * len(stores)
-
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        future_to_idx = {
-            pool.submit(_audit_one_store, store): idx
-            for idx, store in enumerate(stores)
-        }
-        for future in as_completed(future_to_idx):
-            idx = future_to_idx[future]
-            result = future.result()
-            results[idx] = result
-            if stop_on_error and not result.success:
-                # Cancel pending futures; remaining slots stay None
-                for f in future_to_idx:
-                    f.cancel()
-                break
-
-    # Fill any cancelled slots with a placeholder failure so callers
-    # don't have to handle Nones.
-    final: list[StoreResult] = []
-    for idx, r in enumerate(results):
-        if r is None:
-            final.append(StoreResult(
-                shop_domain=stores[idx].shop_domain,
-                success=False,
-                error="Cancelled due to --stop-on-error",
-            ))
-        else:
-            final.append(r)
-    return BatchResult(results=final)
+    results = run_parallel(
+        stores,
+        _audit_one_store,
+        parallel=parallel,
+        stop_on_error=stop_on_error,
+        cancelled_factory=_cancelled if stop_on_error else None,
+    )
+    return BatchResult(results=results)
 
 
 def merge_inventory(results: list[StoreResult]) -> list[dict[str, Any]]:
