@@ -37,7 +37,7 @@ Verify the install:
 
 ```bash
 audit version          # Should print the package version
-pytest -q              # Should run all 600+ tests
+pytest -q              # Should run all 665+ tests
 ruff check src/ tests/ # Should report "All checks passed!"
 ```
 
@@ -65,7 +65,7 @@ Commit the updated `tests/__snapshots__/*.ambr` file alongside your change.
 
 ### 2.2 Coverage
 
-The CI run enforces `--cov-fail-under=85`. To see coverage locally:
+The CI run enforces `--cov-fail-under=90`. To see coverage locally:
 
 ```bash
 pytest --cov=src --cov-report=term-missing
@@ -112,6 +112,24 @@ Lines marked `Missing` are uncovered statements.
   - `ruff check src/ tests/` green
   - At least one new test (no untested code)
 - See [`docs/governance.md`](docs/governance.md) for the full workflow.
+
+---
+
+## 5b. Environment variables (canonical reference)
+
+Every env var the tool honors, in one place. Documented in detail at
+the call sites; this table is the lookup.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LOG_LEVEL` | `WARNING` | Logger level (`DEBUG` / `INFO` / `WARNING` / `ERROR`). |
+| `PAGESPEED_CACHE_TTL` | `3600` (1h) | PageSpeed response cache TTL in seconds. `0` disables. |
+| `PAGESPEED_API_KEY` | (none) | Google Cloud API key for higher PageSpeed rate limits. Equivalent to passing `--api-key` on `measure` / `compare` / `schedule run-all`. |
+| `XDG_DATA_HOME` | `~/.local/share` | Base directory for `schedules.json` + `history/` + `cache/`. |
+| `SHOPIFY_ACCESS_TOKEN` | (none) | Admin API token for `audit shopify auth` / `inventory`. Equivalent to `--access-token`. |
+
+Precedence: CLI flags > env var > default. If a user passes both
+`--api-key xxx` and `PAGESPEED_API_KEY=yyy`, the flag wins.
 
 ---
 

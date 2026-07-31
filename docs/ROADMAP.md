@@ -1,6 +1,6 @@
 # Roadmap — Shopify Image Audit
 
-**Last updated:** 2026-07-30 (Sprint 7 complete, v0.6.0 released)
+**Last updated:** 2026-07-31 (Sprint 9 complete, v0.7.1 released)
 **Owner:** ZCode (single-agent, governance v1.3)
 
 ---
@@ -114,15 +114,29 @@ the fourth targets scalability and recurring revenue.
 - ✅ Audit history + trend view (Sprint 4 TD-4)
 - 🔜 Scheduled re-audit (Sprint 5+, requires infra decisions)
 
+### Theme B — Workflow integration (post-Sprint 6)
+- ✅ Scheduled re-audit (Sprint 7, external-cron model — `audit schedule add/run-all`)
+- 🔜 In-process scheduler daemon — out of scope; external cron is sufficient
+
 ### Theme C — Smarter recommendations
 - ⚠️ Real ML ranker — partially addressed by weighted ensemble (deliberate, see decision log)
 - ✅ Recommendation prioritisation by ROI (Sprint 4 TD-3)
 - ❌ Image-optimisation automation hooks (out of scope — sister tool)
 
 ### Theme D — Reliability
-- ✅ CLI distribution (PyPI v0.2.0 / v0.3.0 / v0.4.0, trusted publishing)
-- ✅ Release automation (tag-driven, hardened)
+- ✅ CLI distribution (PyPI v0.2.0 → v0.7.0, trusted publishing)
+- ✅ Release automation (tag-driven, hardened, SLSA provenance in v0.6.0)
 - ✅ Snapshot tests for HTML report (Sprint 5 TD-1, syrupy, 22 golden files)
+- 🔜 SBOM generation — deferred (Sprint 10+; low priority)
+- 🔜 User-side TOML config — deferred (Sprint 10+)
+- 🔜 Mypy rollout — deferred (Sprint 10+ with TypedDict sweep)
+
+### Theme E — UX & DX (Sprint 8+)
+- ✅ "Did you mean: X?" suggestions on every typo site (Sprint 8 TD-1)
+- ✅ `tests/conftest.py` consolidation (Sprint 8 TD-2)
+- ✅ `run_parallel` shared helper (Sprint 8 TD-3)
+- ✅ `[pdf]` optional extra — saves ~150 MB on non-PDF installs (Sprint 8 TD-4)
+- ✅ `docs/tutorial.md` walkthrough (Sprint 8 TD-4)
 
 ---
 
@@ -131,9 +145,12 @@ the fourth targets scalability and recurring revenue.
 - **C# extension layer** — deferred indefinitely (Python tooling covers all needs)
 - **GPU acceleration** — not relevant (I/O-bound on PageSpeed)
 - **Automated image transformation** — different product (Shopify has built-in)
-- **Multi-store batch processing** — only relevant after per-store workflow proves
-- **OAuth flow for Shopify Admin** — token-only in v1
-- **Real ML model training** — hand-coded ensemble is deliberate
+- **Multi-store batch** — ✅ DONE in v0.5.0 (Sprint 6 TD-3): `audit shopify batch --stores-file`
+- **OAuth flow for Shopify Admin** — token-only in v1; custom-app tokens work
+- **Real ML model training** — hand-coded weighted ensemble is deliberate
+- **Async HTTP layer** — deferred (Sprint 10+); current `ThreadPoolExecutor` + `requests` covers the use case, and the on-disk PageSpeed cache mitigates the only real pain point (rate limits)
+- **Branded CSS themes per customer** — out of scope; `--brand-color` + `--brand-logo` cover the v1 customer need
+- **Standalone `docs/architecture.md`** — out of scope; the ASCII tree in `README.md` is enough for v1
 
 ---
 
@@ -148,6 +165,11 @@ the fourth targets scalability and recurring revenue.
 | 2026-07-30 | ML ranker is a weighted ensemble, not sklearn | Deterministic + testable beats opaque model |
 | 2026-07-30 | Branch protection enabled on `main` | First time CI actually protects the codebase |
 | 2026-07-30 | Structural build/publish split in release workflow | Shell-level dry_run was fragile; job-level if is stronger |
+| 2026-07-30 | SLSA build-provenance attestation on every release | `actions/attest-build-provenance@v2` non-blocking; PyPI consumers can verify build origin |
+| 2026-07-30 | External-cron model for scheduled re-audit | Avoids in-process daemon; standard cron + flock covers the use case; defers infra decisions (systemd / K8s) to a future sprint |
+| 2026-07-30 | On-disk PageSpeed response cache | Mitigates the only real pain point (free-tier rate limits); TTL-configurable via `PAGESPEED_CACHE_TTL`; `--no-cache` bypasses |
+| 2026-07-30 | `run_parallel` shared concurrency primitive | `batch.py` and `scheduler.py` share the same shape; one helper reduces drift |
+| 2026-07-31 | WeasyPrint moved to optional `[pdf]` extra | Saves ~150 MB on non-PDF installs; friendly `ImportError` with install hint when missing |
 
 ---
 
@@ -162,5 +184,7 @@ the fourth targets scalability and recurring revenue.
 | 5 | 2026-07 | ✅ Complete | 546 | 48 |
 | 6 | 2026-07 | ✅ Complete | 606 | 52 |
 | 7 | 2026-07 | ✅ Complete | 642 | 56 |
+| 8 | 2026-07 | ✅ Complete | 665 | 60 |
+| 9 | 2026-07 | ✅ Complete | 665 | 62 |
 
 See [`docs/`](.) for the full documentation tree.

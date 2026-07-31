@@ -145,8 +145,7 @@ cat > stores.json <<'EOF'
 ]
 EOF
 
-audit shopify batch --stores-file stores.json -o inventory.json \
-    --parallel 4 --access-token-fallback
+audit shopify batch --stores-file stores.json -o inventory.json --parallel 4
 ```
 
 Outputs one combined JSON with `shop_domain` stamped on every image.
