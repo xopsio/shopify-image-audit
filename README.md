@@ -235,6 +235,10 @@ merge. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
   - `schedules.json` written with `0600` permissions
   - Issue templates (bug report + feature request)
   - Doc hygiene: canonical env-var reference, drift-free test counts
+- ✅ Sprint 10 — Type safety + SBOM, v0.8.0 (672 tests)
+  - Mypy CI-gate, zero `type: ignore` comments
+  - `ImageDict` TypedDict contract across the pipeline
+  - CycloneDX SBOM in release artifacts (complements SLSA provenance)
 
 ---
 

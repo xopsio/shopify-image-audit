@@ -9,7 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Empty — all Sprint 9 work shipped in v0.7.1.
+Empty — all Sprint 10 work shipped in v0.8.0.
+
+---
+
+## [0.8.0] - 2026-08-01
+
+### Added (Sprint 10)
+- Mypy is a CI gate (`mypy src/` in CI, `[tool.mypy]` config) with the
+  goal of zero `type: ignore` comments — TD-1
+- `ImageDict` TypedDict (`core/image_signals.py`): the shared, typed
+  contract for the normalized image dict across parser, extractor,
+  rankers, orchestrator, baseline manager and report renderer — TD-1
+- CycloneDX SBOM (`dist/sbom.cyclonedx.json`) generated in the release
+  pipeline; ships in the release artifact and is covered by the SLSA
+  build-provenance attestation — TD-2
+
+### Fixed (Sprint 10)
+- `run_parallel` was typed `Callable[[T], T]` but callers map
+  item→result of different types; now correctly generic over two
+  type variables (surfaced by mypy) — TD-1
+- INP/FMP absent-vs-zero mapping in the PageSpeed client expressed as
+  `float | None` instead of assigning `None` into a `float` — TD-1
+- Dead `_CACHE_SUBDIR` constant removed; 4 unused `type: ignore`
+  comments deleted — TD-1
+
+### Stats
+- 672 tests pass (unchanged; pure hardening sprint)
+- `mypy src/`: Success, 29 files, zero ignore comments
+- Ruff clean
+- 65 PRs merged
 
 ---
 
@@ -79,6 +108,7 @@ Empty — all Sprint 9 work shipped in v0.7.1.
 - Single concurrency primitive (`run_parallel`) replaces two copies
 - Test fixtures consolidated into one place
 
+[0.8.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/xopsio/shopify-image-audit/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/xopsio/shopify-image-audit/compare/v0.6.0...v0.6.1
