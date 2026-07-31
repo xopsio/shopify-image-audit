@@ -9,7 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Empty — all Sprint 7 work shipped in v0.6.0.
+Empty — all Sprint 7 work shipped in v0.6.0. Bugfix release v0.6.1 below.
+
+---
+
+## [0.6.1] - 2026-07-31
+
+### Fixed
+- `_version.py` was not shipped in the wheel (`packages.find` didn't
+  discover bare top-level modules). Added `[tool.setuptools]
+  py-modules = ["_version"]`; verified to appear in `RECORD`.
+- `_version.get_version()` now reads `importlib.metadata.version()` as
+  primary path (works for pip/pipx/wheel installs), with `pyproject.toml`
+  parsing as a development-checkout fallback, then `"unknown"`.
+- `--no-cache` flag was documented but unimplemented on `audit measure`
+  and `audit compare`. Flag added; `ResponseCache` plumbed through
+  `fetch_url_as_audit()` and `fetch_lighthouse_json()`. Live-URL CLI
+  tests updated to pass `--no-cache` to avoid cross-test cache leakage.
+- `CHANGELOG.md` had two `[Unreleased]` reference definitions; removed
+  the stale one.
+
+### Stats
+- 642 tests pass (no regression)
+- Ruff clean
+
+[Unreleased]: https://github.com/xopsio/shopify-image-audit/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/xopsio/shopify-image-audit/compare/v0.6.0...v0.6.1
 
 ---
 
@@ -127,8 +152,6 @@ Empty — all Sprint 7 work shipped in v0.6.0.
 - 93% coverage (up from 91.24%)
 - `_table.py` coverage 68% → 100%
 - Ruff clean
-
-[Unreleased]: https://github.com/xopsio/shopify-image-audit/compare/v0.6.0...HEAD
 
 ---
 
