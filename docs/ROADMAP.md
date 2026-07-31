@@ -128,7 +128,7 @@ the fourth targets scalability and recurring revenue.
 - ✅ Release automation (tag-driven, hardened, SLSA provenance in v0.6.0)
 - ✅ Snapshot tests for HTML report (Sprint 5 TD-1, syrupy, 22 golden files)
 - ✅ SBOM generation (Sprint 10 TD-2, CycloneDX JSON in release artifacts)
-- 🔜 User-side TOML config — deferred (Sprint 11+)
+- ✅ User-side TOML config (Sprint 11 TD-1+TD-2, 13 keys / 5 sections, flag > env > config > default)
 - ✅ Mypy rollout (Sprint 10 TD-1) — CI-gate, zero ignore comments, `ImageDict` TypedDict contract; "strict" mode is a future follow-up
 
 ### Theme E — UX & DX (Sprint 8+)
@@ -172,6 +172,7 @@ the fourth targets scalability and recurring revenue.
 | 2026-07-31 | WeasyPrint moved to optional `[pdf]` extra | Saves ~150 MB on non-PDF installs; friendly `ImportError` with install hint when missing |
 | 2026-08-01 | Mypy as a CI gate, `ImageDict` TypedDict as the image-dict contract | Code was already ~100% annotated; the sweep surfaced 3 real type gaps (run_parallel's wrong generic, absent-vs-zero metric mapping, `_CACHE_SUBDIR` dead code) and removed all `type: ignore` comments |
 | 2026-08-01 | CycloneDX SBOM in release artifacts | Complements SLSA provenance with a dependency inventory; one step in the existing build job |
+| 2026-08-01 | User-side TOML config with flag > env > config > default precedence | The last user-visible deferred item; boolean flags (`no_cache`, `stop_on_error`, `pdf`) deliberately excluded because Typer has no reliable "unset" form |
 
 ---
 

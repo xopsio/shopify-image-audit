@@ -136,9 +136,49 @@ the call sites; this table is the lookup.
 | `PAGESPEED_API_KEY` | (none) | Google Cloud API key for higher PageSpeed rate limits. Equivalent to passing `--api-key` on `measure` / `compare` / `schedule run-all`. |
 | `XDG_DATA_HOME` | `~/.local/share` | Base directory for `schedules.json` + `history/` + `cache/`. |
 | `SHOPIFY_ACCESS_TOKEN` | (none) | Admin API token for `audit shopify auth` / `inventory`. Equivalent to `--access-token`. |
+| `SHOPIFY_IMAGE_AUDIT_CONFIG` | (none) | Override the config file location (default: `$XDG_CONFIG_HOME/shopify-image-audit/config.toml`). |
+| `XDG_CONFIG_HOME` | `~/.config` | Base directory for `config.toml` (Sprint 11). |
 
-Precedence: CLI flags > env var > default. If a user passes both
-`--api-key xxx` and `PAGESPEED_API_KEY=yyy`, the flag wins.
+Precedence: CLI flags > env var > config file > default. If a user passes
+both `--api-key xxx` and `PAGESPEED_API_KEY=yyy`, the flag wins; the env
+var wins over `[pagespeed] api_key` in `config.toml`.
+
+### 5b.1 Configuration file
+
+`~/.config/shopify-image-audit/config.toml` (or
+`$XDG_CONFIG_HOME/shopify-image-audit/config.toml`) sets repeated
+options. Example:
+
+```toml
+[defaults]
+device = "mobile"        # run / baseline / schedule add
+strategy = "mobile"      # measure / compare
+parallel = 4             # shopify batch / schedule run-all (0 = unlimited)
+
+[pagespeed]
+api_key = "AIza..."      # equivalent to --api-key / $PAGESPEED_API_KEY
+cache_ttl = 3600         # equivalent to $PAGESPEED_CACHE_TTL
+
+[shopify]
+access_token = "shpat_..."   # equivalent to --access-token
+
+[history]
+history_dir = "/srv/audit/history"   # overrides the XDG data dir
+
+[report]
+output = "report.html"   # default for `audit report -o`
+brand_color = "#ff6b35"
+brand_logo = "/etc/audit/logo.png"
+```
+
+Rules:
+
+- A broken config (unparsable TOML, unknown section, invalid value)
+  logs a warning and falls back to defaults — it never blocks a run.
+- The file may contain secrets (`api_key`, `access_token`); keep it
+  private: `chmod 600 ~/.config/shopify-image-audit/config.toml`.
+- `no_cache` / `stop_on_error` / `pdf` are **not** configurable
+  (boolean flags have no reliable unset form).
 
 ---
 

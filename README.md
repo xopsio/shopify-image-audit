@@ -140,6 +140,31 @@ ranker is a hand-coded feature ensemble, not a statistical model — see
 
 ---
 
+## Configuration
+
+Repeated options can be set once in
+`~/.config/shopify-image-audit/config.toml` (or
+`$XDG_CONFIG_HOME/shopify-image-audit/config.toml`):
+
+```toml
+[defaults]
+device = "mobile"    # run / baseline / schedule add
+strategy = "mobile"  # measure / compare
+parallel = 4         # shopify batch / schedule run-all (0 = unlimited)
+
+[pagespeed]
+api_key = "AIza..."  # or --api-key / $PAGESPEED_API_KEY
+
+[report]
+brand_color = "#ff6b35"   # report / compare branding
+```
+
+Precedence: **CLI flag > env var > config > default**. A broken config
+warns and falls back to defaults — it never blocks a run. Full reference
+(13 keys / 5 sections) in [CONTRIBUTING §5b](CONTRIBUTING.md).
+
+---
+
 ## Architecture
 
 ```

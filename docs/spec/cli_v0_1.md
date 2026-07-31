@@ -267,8 +267,17 @@ Prints the tool version, read from `pyproject.toml` at runtime.
 |----------|---------|-------------|
 | `LOG_LEVEL` | `WARNING` | Logging level (`DEBUG` for verbose output) |
 | `XDG_DATA_HOME` | `~/.local/share` | Base dir for schedules.json + history/ + cache/ |
+| `XDG_CONFIG_HOME` | `~/.config` | Base dir for config.toml |
+| `SHOPIFY_IMAGE_AUDIT_CONFIG` | (none) | Override the config.toml location |
 | `PAGESPEED_CACHE_TTL` | `3600` | PageSpeed response cache TTL in seconds (`0` disables) |
 | `SHOPIFY_ACCESS_TOKEN` | (none) | Admin API token for `audit shopify` commands |
+
+## Configuration file (config.toml)
+
+Repeated options can be set in `$XDG_CONFIG_HOME/shopify-image-audit/
+config.toml`. Precedence: **CLI flag > env var > config > default**.
+Full reference (13 keys / 5 sections) in CONTRIBUTING §5b.1; a broken
+config warns and falls back to defaults.
 
 ---
 
