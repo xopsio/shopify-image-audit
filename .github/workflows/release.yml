@@ -60,9 +60,17 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: python-package-distributions
-          path: |
-            dist/*
-            sbom/*
+          path: dist/*
+          if-no-files-found: error
+
+      # SBOM as a separate artifact so the publish job's dist/ download
+      # stays a flat list of wheel + sdist (pypa/gh-action-pypi-publish
+      # uploads everything in packages-dir and rejects non-dist files).
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom/*
           if-no-files-found: error
 
   publish:
