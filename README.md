@@ -3,7 +3,7 @@
 [![CI](https://github.com/xopsio/shopify-image-audit/actions/workflows/ci.yml/badge.svg)](https://github.com/xopsio/shopify-image-audit/actions)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
 [![ruff](https://img.shields.io/badge/lint-ruff-green)](https://docs.astral.sh/ruff/)
-[![tests](https://img.shields.io/badge/tests-665_passing-brightgreen)](#testing)
+[![tests](https://img.shields.io/badge/tests-672_passing-brightgreen)](#testing)
 
 A Lighthouse-based image audit tool for Shopify stores. Produces per-image
 scores, role assignments, optimisation recommendations, and a **before/after
@@ -48,7 +48,7 @@ pip install -e ".[dev]"
 
 # Verify the install
 audit version
-pytest -q                                              # 665 tests
+pytest -q                                              # 672 tests
 ```
 
 ---
@@ -163,7 +163,7 @@ src/
     └── shopify_admin.py      # Shopify Admin API (auth, products, theme_assets)
 
 src/audit/schemas/audit_result.schema.json  # JSON Schema contract (validated by tests)
-tests/                              # 665 tests, single-writer (ZCode)
+tests/                              # 672 tests, single-writer (ZCode)
 docs/examples/                       # live demo report + comparison JSON
 docs/integrations/                   # Shopify Admin API token guide
 ```
@@ -176,7 +176,7 @@ The codebase is governed by **a single ZCode agent** (see
 ## Testing
 
 ```bash
-pytest -q                                # 665 tests, single-writer discipline
+pytest -q                                # 672 tests, single-writer discipline
 pytest --cov=src --cov-report=term       # ~91% coverage
 ruff check src/ tests/                   # 0 violations
 ```
@@ -229,6 +229,12 @@ merge. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
   - `audit schedule run-all --parallel` (deferred from Sprint 7)
   - `[pdf]` extra — WeasyPrint no longer required by default
   - `docs/tutorial.md` walkthrough
+- ✅ Sprint 9 — Doc hygiene, wheel packaging, security polish, v0.7.1 (672 tests)
+  - JSON schema ships inside the wheel (`importlib.resources`-readable)
+  - `PAGESPEED_API_KEY` env var + API-key redaction in error messages
+  - `schedules.json` written with `0600` permissions
+  - Issue templates (bug report + feature request)
+  - Doc hygiene: canonical env-var reference, drift-free test counts
 
 ---
 
