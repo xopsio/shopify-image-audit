@@ -37,7 +37,7 @@ Verify the install:
 
 ```bash
 audit version          # Should print the package version
-pytest -q              # Should run all 665+ tests
+pytest -q              # Should run all 672+ tests
 ruff check src/ tests/ # Should report "All checks passed!"
 ```
 

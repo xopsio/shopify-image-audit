@@ -9,7 +9,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Empty — all Sprint 8 work shipped in v0.7.0.
+Empty — all Sprint 9 work shipped in v0.7.1.
+
+---
+
+## [0.7.1] - 2026-07-31
+
+### Fixed (Sprint 9)
+- JSON Schema contract now ships **inside the wheel** (was sdist-only via
+  `MANIFEST.in`): schema moved to `src/audit/schemas/`, shipped via
+  `[tool.setuptools.package-data]`, read via `importlib.resources` —
+  TD-2
+- `schedules.json` (holds Shopify access tokens) is written with
+  `0600` permissions on POSIX — TD-3
+- PageSpeed API key never leaks into error messages: requests
+  connection errors embed the full request URL (`?key=...`), which is
+  now redacted before the exception surfaces — TD-3
+
+### Added (Sprint 9)
+- `PAGESPEED_API_KEY` env var as fallback for all three `--api-key`
+  flags (`measure`, `compare`, `schedule run-all`). Precedence:
+  CLI flag > env var — TD-3
+- `.github/ISSUE_TEMPLATE/` — bug report + feature request forms — TD-4
+- Doc hygiene: test-count/coverage-gate drift fixed, CONTRIBUTING
+  "Configuration" section (canonical env-var reference), tutorial
+  phantom-flag fix, CLI spec additions — TD-1
+
+### Stats
+- 672 tests pass (up from 665)
+- Ruff clean
+- Schema reachable from an installed wheel via `importlib.resources`
+- 64 PRs merged
 
 ---
 
@@ -49,6 +79,7 @@ Empty — all Sprint 8 work shipped in v0.7.0.
 - Single concurrency primitive (`run_parallel`) replaces two copies
 - Test fixtures consolidated into one place
 
+[0.7.1]: https://github.com/xopsio/shopify-image-audit/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/xopsio/shopify-image-audit/compare/v0.6.0...v0.6.1
 
