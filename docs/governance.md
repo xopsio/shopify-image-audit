@@ -92,7 +92,7 @@ shopify-image-audit/
 ### Before Merge to Main
 
 - [ ] All tests pass (currently 179/179)
-- [ ] Pydantic models validate against `schemas/audit_result.schema.json`
+- [ ] Pydantic models validate against `src/audit/schemas/audit_result.schema.json`
 - [ ] CLI commands work end-to-end
 - [ ] `ruff` clean on changed files
 - [ ] Behaviour-preserving refactors verified against a golden/baseline output

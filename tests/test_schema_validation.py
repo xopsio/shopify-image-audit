@@ -9,19 +9,24 @@ real pipeline on the existing fixtures.
 The Pydantic models in ``audit.models`` mirror the schema, but this is the
 independent cross-check that the *contract* (schema) and the *output*
 (pipeline) agree.
+
+The schema is loaded via ``importlib.resources`` so this test doubles as the
+wheel-packaging regression check: it fails if the schema is not shipped inside
+the ``audit`` package (Sprint 9, TD-2).
 """
 
 from __future__ import annotations
 
 import json
+from importlib.resources import files
 
 import pytest
 from jsonschema import Draft202012Validator
 
 from engine.audit_orchestrator import run_audit
-from tests import FIXTURES, REPO_ROOT
+from tests import FIXTURES
 
-SCHEMA_PATH = REPO_ROOT / "schemas" / "audit_result.schema.json"
+SCHEMA_PATH = files("audit").joinpath("schemas/audit_result.schema.json")
 
 
 @pytest.fixture(scope="module")

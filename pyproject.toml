@@ -71,6 +71,11 @@ include-package-data = true
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+# JSON Schema contract ships inside the wheel so installed users can read it
+# via importlib.resources (Sprint 9, TD-2 — previously sdist-only via MANIFEST.in).
+audit = ["schemas/*.json"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]

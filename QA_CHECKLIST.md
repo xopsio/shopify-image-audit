@@ -24,7 +24,7 @@
 - [x] `src/core/` (image_extractor + performance_scorer) integrated into pipeline and covered by `tests/test_core.py` (governance v1.2)
 
 ## WS-001 (Contracts)
-- [x] `schemas/audit_result.schema.json` exists and matches v0.1 payload
+- [x] `src/audit/schemas/audit_result.schema.json` exists and matches v0.1 payload
 - [x] `docs/spec/cli_v0_1.md` documents commands/flags/examples
 - [x] `docs/runbook/measurement_protocol.md` documents measurement determinism
 
