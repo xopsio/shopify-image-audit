@@ -24,6 +24,12 @@ families with subcommands): `run`, `extract`, `score`, `report`, `measure`,
 
 Runs Lighthouse and writes raw results.
 
+**Prerequisites:** The `lighthouse` Node CLI must be on `PATH`. Install
+with `npm i -g lighthouse`. If the binary is missing, the command
+exits `10` with a hint. To bypass the live audit and use a pre-existing
+Lighthouse report, pass `--lhr <path>` — this also lets you re-run the
+audit pipeline on a stored report (e.g. from a CI archive).
+
 **Flags:**
 - `--device mobile|desktop` (default `mobile`)
 - `--runs 3` (default 3)
@@ -31,6 +37,8 @@ Runs Lighthouse and writes raw results.
 - `--lhr <path>` (use an existing Lighthouse JSON instead of running live)
 
 **Exit codes:** `0` success · `2` invalid args · `10` lighthouse failure.
+
+---
 
 ---
 
@@ -56,6 +64,13 @@ Assigns `role`, `score` (0–100), and recommendations per image.
 ### `audit report <audit_result.json>`
 
 Renders an HTML or PDF report.
+
+**Input format:** accepts any of:
+- A validated `AuditResult` JSON produced by `audit baseline` /
+  `audit run` / `audit compare` (the canonical format).
+- A raw Lighthouse / fixture report (loaded via `load_baseline` → falls
+  through to the audit pipeline).
+The input is auto-detected; no flag is needed.
 
 **Flags:**
 - `-o, --output <path>` (default `report.html`; auto-switches to `report.pdf` with `--pdf`)
@@ -122,6 +137,14 @@ estimate + per-image deltas). Units mirror `Vitals`: ms for LCP/INP/TTFB,
 unitless for CLS. `per_image` field is a list of `ImageDelta` objects.
 
 **Exit codes:** `0` success · `2` invalid args · `10` backend failure.
+
+**Partial-success note:** when `<current>` is a live URL and the PageSpeed
+fetch fails (rate limit, network error, malformed response), the entire
+compare aborts with exit `10` — the baseline alone is not enough to
+produce a meaningful comparison. To get partial output in such a case,
+re-run `audit run <url>` separately to inspect the URL's current state,
+then `audit compare baseline.json /path/to/new/lhr.json` (passing the
+fresh LHR via `--lhr`-style input).
 
 ---
 
@@ -204,7 +227,10 @@ delegated to cron / systemd timer — see
 Rich table of configured schedules (from `schedules.json`).
 
 #### `audit schedule add <shop_domain> <url>`
-Adds a schedule entry.
+Adds a schedule entry. If a schedule for the same `shop_domain`
+already exists, the new entry **replaces** it (the previous URL/device
+is discarded). Use `audit schedule list` to inspect what's configured
+before re-adding.
 
 **Flags:**
 - `--device mobile|desktop` (default `mobile`)

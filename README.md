@@ -48,7 +48,7 @@ pip install -e ".[dev]"
 
 # Verify the install
 audit version
-pytest -q                                              # 642 tests
+pytest -q                                              # 665 tests
 ```
 
 ---
@@ -163,7 +163,7 @@ src/
     └── shopify_admin.py      # Shopify Admin API (auth, products, theme_assets)
 
 schemas/audit_result.schema.json    # JSON Schema contract (validated by tests)
-tests/                              # 642 tests, single-writer (ZCode)
+tests/                              # 665 tests, single-writer (ZCode)
 docs/examples/                       # live demo report + comparison JSON
 docs/integrations/                   # Shopify Admin API token guide
 ```
