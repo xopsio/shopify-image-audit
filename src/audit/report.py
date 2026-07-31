@@ -858,9 +858,8 @@ def render_pdf_report(html_content: str, output_path: Path | str) -> Path:
     Returns the resolved output path.
 
     Raises:
-        ImportError: if WeasyPrint is not installed (the runtime dependency
-            ``weasyprint>=69.0,<70`` should make this impossible in practice;
-            it surfaces here only if the install is broken).
+        ImportError: if WeasyPrint is not installed. Install the
+            optional ``[pdf]`` extra: ``pip install shopify-image-audit[pdf]``
         weasyprint.urls.FatalURLFetchingError: if the HTML references a
             resource outside the allowed ``data:`` protocol.
         OSError: if WeasyPrint cannot write the PDF (e.g. fontconfig or
@@ -870,8 +869,16 @@ def render_pdf_report(html_content: str, output_path: Path | str) -> Path:
     output.parent.mkdir(parents=True, exist_ok=True)
 
     # Lazy import so CLI commands that never produce a PDF don't pay the
-    # ~200 ms WeasyPrint import cost.
-    import weasyprint
+    # ~200 ms WeasyPrint import cost. WeasyPrint is in the optional
+    # `[pdf]` extra; without it the user gets a friendly hint.
+    try:
+        import weasyprint
+    except ImportError as exc:
+        raise ImportError(
+            "PDF export requires WeasyPrint. Install with:\n"
+            "    pip install shopify-image-audit[pdf]\n"
+            "On Linux you'll also need: libpango-1.0-0, libcairo2, libgdk-pixbuf-2.0-0"
+        ) from exc
 
     url_fetcher = _create_pdf_url_fetcher()
     weasyprint.HTML(string=html_content, url_fetcher=url_fetcher).write_pdf(target=str(output))

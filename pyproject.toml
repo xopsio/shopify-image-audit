@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "shopify-image-audit"
-version = "0.6.1"
+version = "0.7.0"
 description = "Shopify store image audit - Lighthouse-based analysis with heuristic and ML scoring"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -38,15 +38,14 @@ dependencies = [
     "typer>=0.12,<1",
     "rich>=13.7,<14",
     "requests>=2.31,<3",
-    "weasyprint>=69.0,<70",
 ]
 
-[project.urls]
-Homepage = "https://github.com/xopsio/shopify-image-audit"
-Repository = "https://github.com/xopsio/shopify-image-audit"
-Issues = "https://github.com/xopsio/shopify-image-audit/issues"
-
 [project.optional-dependencies]
+# PDF export requires WeasyPrint + native libraries
+# (libpango, libcairo, libgdk-pixbuf). Install with:
+#   pip install shopify-image-audit[pdf]
+pdf = ["weasyprint>=69.0,<70"]
+
 dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
@@ -55,19 +54,22 @@ dev = [
     "responses>=0.25",
     "build>=1.0",
     "twine>=5.0",
-]
+]  # + "shopify-image-audit[pdf]" for the PDF-rendering test suite
 
 [project.scripts]
 audit = "engine.cli:main"
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[project.urls]
+Homepage = "https://github.com/xopsio/shopify-image-audit"
+Repository = "https://github.com/xopsio/shopify-image-audit"
+Issues = "https://github.com/xopsio/shopify-image-audit/issues"
 
-# Top-level modules in src/ that are not part of a package (no __init__.py)
-# but still need to ship in the wheel. _version.py provides get_version()
-# used by the CLI version command and the HTML report footer.
 [tool.setuptools]
 py-modules = ["_version"]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

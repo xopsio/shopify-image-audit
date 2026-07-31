@@ -3,7 +3,7 @@
 [![CI](https://github.com/xopsio/shopify-image-audit/actions/workflows/ci.yml/badge.svg)](https://github.com/xopsio/shopify-image-audit/actions)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
 [![ruff](https://img.shields.io/badge/lint-ruff-green)](https://docs.astral.sh/ruff/)
-[![tests](https://img.shields.io/badge/tests-642_passing-brightgreen)](#testing)
+[![tests](https://img.shields.io/badge/tests-665_passing-brightgreen)](#testing)
 
 A Lighthouse-based image audit tool for Shopify stores. Produces per-image
 scores, role assignments, optimisation recommendations, and a **before/after
@@ -176,7 +176,7 @@ The codebase is governed by **a single ZCode agent** (see
 ## Testing
 
 ```bash
-pytest -q                                # 642 tests, single-writer discipline
+pytest -q                                # 665 tests, single-writer discipline
 pytest --cov=src --cov-report=term       # ~91% coverage
 ruff check src/ tests/                   # 0 violations
 ```
@@ -222,6 +222,13 @@ merge. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
   - Dependabot + SLSA build-provenance attestation
   - PageSpeed response cache (`PAGESPEED_CACHE_TTL`)
   - Report footer version drift fixed
+- ✅ Sprint 8 — UX polish, test architecture, shared run_parallel, v0.7.0 (665 tests)
+  - "Did you mean: X?" suggestions on every typo site
+  - `tests/conftest.py` + `tests/__init__.py` (single source of truth for `REPO_ROOT` + fixtures)
+  - Shared `run_parallel` helper (batch + scheduler share it)
+  - `audit schedule run-all --parallel` (deferred from Sprint 7)
+  - `[pdf]` extra — WeasyPrint no longer required by default
+  - `docs/tutorial.md` walkthrough
 
 ---
 
