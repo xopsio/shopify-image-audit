@@ -21,9 +21,8 @@ Empty — all Sprint 10 work shipped in v0.8.0.
 - `ImageDict` TypedDict (`core/image_signals.py`): the shared, typed
   contract for the normalized image dict across parser, extractor,
   rankers, orchestrator, baseline manager and report renderer — TD-1
-- CycloneDX SBOM (`dist/sbom.cyclonedx.json`) generated in the release
-  pipeline; ships in the release artifact and is covered by the SLSA
-  build-provenance attestation — TD-2
+- CycloneDX SBOM generated in the release pipeline and uploaded as a
+  standalone release artifact (`sbom/sbom.cyclonedx.json`) — TD-2
 
 ### Fixed (Sprint 10)
 - `run_parallel` was typed `Callable[[T], T]` but callers map
