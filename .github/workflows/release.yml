@@ -43,22 +43,26 @@ jobs:
 
       # CycloneDX SBOM (Sprint 10, TD-2): install the freshly built wheel
       # (runtime deps only — no dev tools) and scan the environment, so the
-      # SBOM lists exactly the shipped runtime dependency tree. The artifact
-      # is also covered by the SLSA attestation below.
+      # SBOM lists exactly the shipped runtime dependency tree.
+      # NOTE: output goes to sbom/, NOT dist/ — pypa/gh-action-pypi-publish
+      # uploads every file in dist/ and would reject the JSON.
       - name: Generate CycloneDX SBOM
         run: |
+          mkdir -p sbom
           python -m pip install --quiet dist/*.whl
           python -m pip install --quiet cyclonedx-bom
           cyclonedx-py environment --pyproject pyproject.toml \
-            --output-reproducible -o dist/sbom.cyclonedx.json
-          python -m json.tool dist/sbom.cyclonedx.json > /dev/null
-          python -c "import json; d=json.load(open('dist/sbom.cyclonedx.json')); assert d.get('components'), 'SBOM has no components'"
+            --output-reproducible -o sbom/sbom.cyclonedx.json
+          python -m json.tool sbom/sbom.cyclonedx.json > /dev/null
+          python -c "import json; d=json.load(open('sbom/sbom.cyclonedx.json')); assert d.get('components'), 'SBOM has no components'"
 
       - name: Upload distribution artifacts
         uses: actions/upload-artifact@v4
         with:
           name: python-package-distributions
-          path: dist/*
+          path: |
+            dist/*
+            sbom/*
           if-no-files-found: error
 
   publish:
@@ -81,9 +85,11 @@ jobs:
           path: dist
 
       # SLSA build-provenance attestation: cryptographically signs the
-      # artifacts so downstream consumers can verify their origin. Uses
-      # the existing OIDC id-token. Non-blocking so provenance failure
-      # doesn't block the PyPI publish.
+      # wheel + sdist so downstream consumers can verify their origin.
+      # (The SBOM in sbom/ is a derived artifact; it rides along in the
+      # release artifact without its own attestation.) Uses the existing
+      # OIDC id-token. Non-blocking so provenance failure doesn't block
+      # the PyPI publish.
       - name: Generate build provenance attestation
         uses: actions/attest-build-provenance@v2
         continue-on-error: true
