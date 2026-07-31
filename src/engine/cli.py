@@ -50,6 +50,7 @@ from engine.cli_helpers._errors import (
     handle_pipeline_errors,
     handle_shopify_errors,
 )
+from engine.cli_helpers._suggest import format_suggestion
 from engine.cli_helpers._table import (
     print_audit_results,
     print_audit_summary,
@@ -178,7 +179,10 @@ def run(
 
     # --- validate args ---
     if device not in ("mobile", "desktop"):
-        rprint(f"[red]Error:[/red] --device must be 'mobile' or 'desktop', got '{device}'.")
+        rprint(
+            f"[red]Error:[/red] --device must be 'mobile' or 'desktop', "
+            f"got '{device}'.{format_suggestion(device, ['mobile', 'desktop'])}"
+        )
         raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
     if runs < 1:
@@ -228,7 +232,10 @@ def measure(
 
     # --- validate strategy ---
     if strategy not in ("mobile", "desktop"):
-        rprint(f"[red]Error:[/red] --strategy must be 'mobile' or 'desktop', got '{strategy}'.")
+        rprint(
+            f"[red]Error:[/red] --strategy must be 'mobile' or 'desktop', "
+            f"got '{strategy}'.{format_suggestion(strategy, ['mobile', 'desktop'])}"
+        )
         raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
     # --- validate output path safety ---
@@ -290,8 +297,11 @@ def shopify(
 ) -> None:
     """Interact with a Shopify store via the Admin API (auth, inventory, batch)."""
     if subcommand not in ("auth", "inventory", "batch"):
-        rprint(f"[red]Error:[/red] Unknown shopify subcommand: {subcommand!r} "
-               "(use 'auth', 'inventory', or 'batch').")
+        rprint(
+            f"[red]Error:[/red] Unknown shopify subcommand: {subcommand!r} "
+            f"(use 'auth', 'inventory', or 'batch')."
+            f"{format_suggestion(subcommand, ['auth', 'inventory', 'batch'])}"
+        )
         raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
     # batch subcommand has its own dispatch path
@@ -465,8 +475,11 @@ def history(
     Requires at least one recorded baseline (via ``audit baseline``) for the store.
     """
     if subcommand not in ("list", "show", "diff"):
-        rprint(f"[red]Error:[/red] Unknown history subcommand: {subcommand!r} "
-               "(use 'list', 'show', or 'diff').")
+        rprint(
+            f"[red]Error:[/red] Unknown history subcommand: {subcommand!r} "
+            f"(use 'list', 'show', or 'diff')."
+            f"{format_suggestion(subcommand, ['list', 'show', 'diff'])}"
+        )
         raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
     store = HistoryStore(base_dir=history_dir)
@@ -627,7 +640,10 @@ def score(
         raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
     if ranker not in ("heuristic", "ml"):
-        rprint(f"[red]Error:[/red] --ranker must be 'heuristic' or 'ml', got '{ranker}'.")
+        rprint(
+            f"[red]Error:[/red] --ranker must be 'heuristic' or 'ml', "
+            f"got '{ranker}'.{format_suggestion(ranker, ['heuristic', 'ml'])}"
+        )
         raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
     if ranker == "ml":
@@ -745,7 +761,10 @@ def baseline(
         raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
     if device not in ("mobile", "desktop"):
-        rprint(f"[red]Error:[/red] --device must be 'mobile' or 'desktop', got '{device}'.")
+        rprint(
+            f"[red]Error:[/red] --device must be 'mobile' or 'desktop', "
+            f"got '{device}'.{format_suggestion(device, ['mobile', 'desktop'])}"
+        )
         raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
     # --- validate --save path safety ---
@@ -932,12 +951,18 @@ def schedule(
     and executing it via ``run-all``.
     """
     if subcommand not in ("list", "add", "remove", "run-all"):
-        rprint(f"[red]Error:[/red] Unknown schedule subcommand: {subcommand!r} "
-               "(use 'list', 'add', 'remove', or 'run-all').")
+        rprint(
+            f"[red]Error:[/red] Unknown schedule subcommand: {subcommand!r} "
+            f"(use 'list', 'add', 'remove', or 'run-all')."
+            f"{format_suggestion(subcommand, ['list', 'add', 'remove', 'run-all'])}"
+        )
         raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
     if device not in ("mobile", "desktop"):
-        rprint(f"[red]Error:[/red] --device must be 'mobile' or 'desktop', got '{device}'.")
+        rprint(
+            f"[red]Error:[/red] --device must be 'mobile' or 'desktop', "
+            f"got '{device}'.{format_suggestion(device, ['mobile', 'desktop'])}"
+        )
         raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
     from engine.scheduler import ScheduleConfig, ScheduleStore, run_all_schedules
