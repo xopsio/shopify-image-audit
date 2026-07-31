@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from core.image_extractor import extract_images
+from core.image_signals import ImageDict
 
 
 def safe_int(value: Any) -> int | None:
@@ -38,14 +39,14 @@ def _normalize_image(
     natural_width: int | None = None,
     natural_height: int | None = None,
     is_lcp_candidate: bool = False,
-) -> dict[str, Any]:
+) -> ImageDict:
     """Build a single normalized image dict (no role/score/recommendation yet).
 
     Kept for the simplified fixture format path so output stays byte-for-byte
     compatible with previous behaviour; the Lighthouse path now shares
     ``core.image_extractor``'s implementation.
     """
-    out: dict[str, Any] = {
+    out: ImageDict = {
         "src": url,
         "bytes": bytes_,
         "mime": mime,
@@ -62,7 +63,7 @@ def _normalize_image(
     return out
 
 
-def _parse_fixture_format(data: dict[str, Any]) -> tuple[list[dict[str, Any]], str | None]:
+def _parse_fixture_format(data: dict[str, Any]) -> tuple[list[ImageDict], str | None]:
     """
     Parse simplified fixture format: { "lcpCandidate": { "url": "..." }, "images": [ ... ] }.
     Returns (normalized_images, lcp_element_url).
@@ -72,7 +73,7 @@ def _parse_fixture_format(data: dict[str, Any]) -> tuple[list[dict[str, Any]], s
     if isinstance(lcp, dict) and lcp.get("url"):
         lcp_url = lcp.get("url")
 
-    images: list[dict[str, Any]] = []
+    images: list[ImageDict] = []
     raw_images = data.get("images") or data.get("resources") or []
     for item in raw_images:
         if not isinstance(item, dict):
@@ -101,7 +102,7 @@ def _parse_fixture_format(data: dict[str, Any]) -> tuple[list[dict[str, Any]], s
     return images, lcp_url
 
 
-def parse(data: dict[str, Any]) -> list[dict[str, Any]]:
+def parse(data: dict[str, Any]) -> list[ImageDict]:
     """
     Parse Lighthouse or fixture JSON (already loaded as dict).
     Returns list of normalized images; one may have is_lcp_candidate=True (v0.1 heuristic).
@@ -129,7 +130,7 @@ def parse(data: dict[str, Any]) -> list[dict[str, Any]]:
     return []
 
 
-def parse_file(path: str | Path) -> list[dict[str, Any]]:
+def parse_file(path: str | Path) -> list[ImageDict]:
     """Load JSON from file and return normalized images + LCP candidate marked."""
     with open(path, encoding="utf-8") as f:
         data = json.load(f)

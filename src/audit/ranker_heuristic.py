@@ -8,9 +8,9 @@ Role assignment and image-area helpers are shared with the ML ranker via
 
 from __future__ import annotations
 
-from typing import Any
+from typing import cast
 
-from core.image_signals import assign_role, displayed_area
+from core.image_signals import ImageDict, assign_role, displayed_area
 
 # Re-export so callers can import the role vocabulary from this module too
 # (the ML ranker exposes the same ROLES tuple for compatibility).
@@ -32,7 +32,7 @@ _displayed_area = displayed_area
 _assign_role = assign_role
 
 
-def _score_image(img: dict[str, Any], role: str) -> int:
+def _score_image(img: ImageDict, role: str) -> int:
     """
     Heuristic score 0-100.
     Higher = better (reasonable size, optimized). Lower = waste, oversized, bad LCP.
@@ -41,23 +41,26 @@ def _score_image(img: dict[str, Any], role: str) -> int:
     area = _displayed_area(img)
     is_lcp = img.get("is_lcp_candidate") is True
 
-    # Base from bytes vs area: bytes per 1k px
+    # Base from bytes vs area: bytes per 1k px. bpp and score are floats
+    # internally; the final return clamps to int (0-100 contract).
+    bpp: float
     if area <= 0:
-        bpp = 999_999
+        bpp = 999_999.0
     else:
         bpp = bytes_ / (area / 1000.0)
 
     # Rough targets: < 50 bytes/1k px good, > 200 bad
+    score: float
     if bpp <= 30:
-        score = 95
+        score = 95.0
     elif bpp <= 60:
-        score = 85
+        score = 85.0
     elif bpp <= 120:
-        score = 70
+        score = 70.0
     elif bpp <= 250:
-        score = 50
+        score = 50.0
     else:
-        score = max(0, 40 - (bpp / 100))
+        score = max(0.0, 40 - (bpp / 100))
 
     # LCP penalty if very heavy
     if is_lcp and bytes_ > 500_000:
@@ -68,7 +71,7 @@ def _score_image(img: dict[str, Any], role: str) -> int:
     return min(100, max(0, int(score)))
 
 
-def _recommendation(img: dict[str, Any], role: str, score: int) -> str:
+def _recommendation(img: ImageDict, role: str, score: int) -> str:
     """Short recommendation string."""
     bytes_ = img.get("bytes") or 0
     is_lcp = img.get("is_lcp_candidate") is True
@@ -90,15 +93,17 @@ def _recommendation(img: dict[str, Any], role: str, score: int) -> str:
     return "Review size and format for better performance"
 
 
-def rank(images: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def rank(images: list[ImageDict]) -> list[ImageDict]:
     """
     Add role, score (0-100), and recommendation to each normalized image.
     Input: list from parser (src, bytes, mime, is_lcp_candidate, optional dimensions).
     Output: same list with role, score, recommendation set (schema-ready).
     """
-    result: list[dict[str, Any]] = []
+    result: list[ImageDict] = []
     for i, img in enumerate(images):
-        row = dict(img)
+        # Runtime copy: fixtures may carry extra keys beyond ImageDict; the
+        # copy still satisfies the ImageDict contract.
+        row = cast(ImageDict, dict(img))
         role = _assign_role(row, i)
         score = _score_image(row, role)
         row["role"] = role

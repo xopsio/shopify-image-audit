@@ -19,7 +19,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from audit.models import (
     AuditResult,
@@ -31,6 +31,7 @@ from audit.models import (
     MetricDelta,
     VitalsDelta,
 )
+from core.image_signals import ImageDict
 
 # ---------------------------------------------------------------------------
 # Persistence
@@ -171,17 +172,17 @@ def _delta(before: float, after: float, *, lower_is_better: bool) -> MetricDelta
     )
 
 
-def _avg_score(images: list[dict[str, Any]]) -> float:
+def _avg_score(images: list[ImageDict]) -> float:
     if not images:
         return 0.0
     return sum(img.get("score", 0) for img in images) / len(images)
 
 
-def _total_bytes(images: list[dict[str, Any]]) -> int:
+def _total_bytes(images: list[ImageDict]) -> int:
     return sum(img.get("bytes", 0) for img in images)
 
 
-def _total_waste(images: list[dict[str, Any]]) -> int:
+def _total_waste(images: list[ImageDict]) -> int:
     return sum(img.get("waste_bytes_est", 0) or 0 for img in images)
 
 
@@ -224,7 +225,7 @@ def _strip_query_params(src: str) -> str:
     return src.split("?", 1)[0]
 
 
-def _image_key(img: dict[str, Any]) -> str:
+def _image_key(img: ImageDict) -> str:
     """Stable identifier for matching an image across two AuditResults.
 
     Hash over (normalised src, bytes, mime). This tolerates CDN
@@ -278,8 +279,8 @@ def _per_image_recommendation(status: str, mime_before: str | None,
 
 
 def _match_images(
-    before_imgs: list[dict[str, Any]],
-    after_imgs: list[dict[str, Any]],
+    before_imgs: list[ImageDict],
+    after_imgs: list[ImageDict],
 ) -> list[ImageDelta]:
     """Pair images between before/after and produce per-image deltas.
 
@@ -296,14 +297,14 @@ def _match_images(
     "added". Matched pairs get bytes/score deltas.
     """
     # Index after-images by key for fast lookup (primary match).
-    after_by_key: dict[str, dict[str, Any]] = {}
+    after_by_key: dict[str, ImageDict] = {}
     for img in after_imgs:
         key = _image_key(img)
         if key not in after_by_key:
             after_by_key[key] = img
 
     # Secondary index: normalised src -> image (for fallback match).
-    after_by_src: dict[str, dict[str, Any]] = {}
+    after_by_src: dict[str, ImageDict] = {}
     for img in after_imgs:
         src = _strip_query_params(str(img.get("src", "")))
         if src and src not in after_by_src:
@@ -332,7 +333,8 @@ def _match_images(
                 match_key=b_key,
                 src=str(b_img.get("src", "")),
                 role_before=b_img.get("role"),
-                before=b_img,
+                # ImageDelta.before is the schema's loose dict contract.
+                before=cast(dict[str, Any], b_img),
                 status="removed",
                 mime_before=b_img.get("mime"),
                 recommendation=_per_image_recommendation(
@@ -363,8 +365,8 @@ def _match_images(
             src=str(a_img.get("src") or b_img.get("src", "")),
             role_before=b_img.get("role"),
             role_after=a_img.get("role"),
-            before=b_img,
-            after=a_img,
+            before=cast(dict[str, Any], b_img),
+            after=cast(dict[str, Any], a_img),
             bytes_delta=a_bytes - b_bytes,
             score_delta=a_score - b_score,
             mime_before=b_img.get("mime"),
@@ -383,7 +385,7 @@ def _match_images(
             match_key=a_key,
             src=str(a_img.get("src", "")),
             role_after=a_img.get("role"),
-            after=a_img,
+            after=cast(dict[str, Any], a_img),
             bytes_delta=a_bytes,
             mime_after=a_img.get("mime"),
             status="added",

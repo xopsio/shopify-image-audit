@@ -173,19 +173,16 @@ class PageSpeedAPIClient:
         # Core Web Vitals (in seconds, except CLS which is unitless 0-1)
         lcp = get_metric_value("largest-contentful-paint", 0.0) / 1000  # ms to s
         cls = get_metric_value("cumulative-layout-shift", 0.0)
-        inp = get_metric_value("interaction-to-next-paint")
-        if inp > 0:
-            inp = inp / 1000  # ms to s
-        else:
-            inp = None
+        # INP may be absent from the response: get_metric_value yields 0.0
+        # then, which maps to None (absent, not zero).
+        inp_raw = get_metric_value("interaction-to-next-paint")
+        inp: float | None = inp_raw / 1000 if inp_raw > 0 else None
 
         # Additional metrics
         fcp = get_metric_value("first-contentful-paint", 0.0) / 1000
-        fmp = get_metric_value("first-meaningful-paint")
-        if fmp > 0:
-            fmp = fmp / 1000
-        else:
-            fmp = None
+        # Same absent-vs-zero mapping for FMP.
+        fmp_raw = get_metric_value("first-meaningful-paint")
+        fmp: float | None = fmp_raw / 1000 if fmp_raw > 0 else None
 
         speed_index = get_metric_value("speed-index", 0.0) / 1000
         tti = get_metric_value("interactive", 0.0) / 1000

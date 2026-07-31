@@ -30,17 +30,18 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import TypeVar
 
-T = TypeVar("T")
+T = TypeVar("T")  # input item type
+R = TypeVar("R")  # result type (fn's return)
 
 
 def run_parallel(
     items: list[T],
-    fn: Callable[[T], T],
+    fn: Callable[[T], R],
     *,
     parallel: int = 1,
     stop_on_error: bool = False,
-    cancelled_factory: Callable[[T], T] | None = None,
-) -> list[T]:
+    cancelled_factory: Callable[[T], R] | None = None,
+) -> list[R]:
     """Execute ``fn(item)`` for each item in ``items``, optionally in parallel.
 
     Args:
@@ -71,7 +72,7 @@ def run_parallel(
 
     # Sequential — worker count clamped to 1.
     if parallel <= 1:
-        results: list[T] = []
+        results: list[R] = []
         for item in items:
             result = fn(item)
             results.append(result)
@@ -84,7 +85,7 @@ def run_parallel(
 
     # Parallel — ThreadPoolExecutor (I/O-bound workload).
     workers = min(parallel, len(items)) if parallel > 0 else len(items)
-    slots: list[T | None] = [None] * len(items)
+    slots: list[R | None] = [None] * len(items)
     last_completed = -1
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
@@ -104,7 +105,7 @@ def run_parallel(
 
     # Fill skipped slots with cancelled_factory if provided; otherwise
     # drop them (sequential-style output).
-    out: list[T] = []
+    out: list[R] = []
     for idx, slot in enumerate(slots):
         if slot is not None:
             out.append(slot)

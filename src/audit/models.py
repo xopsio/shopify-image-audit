@@ -23,11 +23,11 @@ class _ExcludeNoneModel(BaseModel):
     missing keys remain optional and default to ``None``.
     """
 
-    def model_dump(self, **kwargs: Any) -> dict[str, Any]:  # type: ignore[override]
+    def model_dump(self, **kwargs: Any) -> dict[str, Any]:
         kwargs.setdefault("exclude_none", True)
         return super().model_dump(**kwargs)
 
-    def model_dump_json(self, **kwargs: Any) -> str:  # type: ignore[override]
+    def model_dump_json(self, **kwargs: Any) -> str:
         kwargs.setdefault("exclude_none", True)
         return super().model_dump_json(**kwargs)
 
