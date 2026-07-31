@@ -15,11 +15,15 @@ from __future__ import annotations
 import json
 import tempfile
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from audit.models import AuditResult
 from core.baseline_manager import load_baseline
 from engine.audit_orchestrator import run_audit
 from integrations.pagespeed_api import fetch_lighthouse_json
+
+if TYPE_CHECKING:
+    from integrations._cache import ResponseCache
 
 
 def load_or_audit_file(path: Path | str) -> AuditResult:
@@ -36,15 +40,22 @@ def load_or_audit_file(path: Path | str) -> AuditResult:
 
 
 def fetch_url_as_audit(url: str, *, strategy: str = "mobile",
-                       api_key: str | None = None) -> AuditResult:
+                       api_key: str | None = None,
+                       cache: ResponseCache | None = None) -> AuditResult:
     """Fetch a live URL via PageSpeed API and run the audit pipeline on it.
 
     The PageSpeed API returns a ``lighthouseResult`` dict; we write it to a
     temp file (because ``run_audit`` takes a path), feed it through the
     pipeline, and clean up. The ``url`` and ``device`` are propagated to the
     resulting ``AuditResult.meta`` so the report reflects the live source.
+
+    Args:
+        cache: Optional :class:`~integrations._cache.ResponseCache`. When
+            provided, the raw Lighthouse JSON is read from / written to the
+            cache so repeated ``audit compare <url>`` invocations within the
+            TTL don't re-hit the network.
     """
-    lhr = fetch_lighthouse_json(url, strategy=strategy, api_key=api_key)
+    lhr = fetch_lighthouse_json(url, strategy=strategy, api_key=api_key, cache=cache)
     with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False,
                                      encoding="utf-8") as fh:
         json.dump(lhr, fh)

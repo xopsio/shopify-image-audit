@@ -501,7 +501,7 @@ class TestCompareWithLiveURL:
         runner = CliRunner()
         result = runner.invoke(app, [
             "compare", "before.json", "https://demo.myshopify.com",
-            "--strategy", "mobile",
+            "--strategy", "mobile", "--no-cache",
         ])
         # Exit code 0 = success (a happy-path LCP improvement is expected).
         assert result.exit_code == 0, result.stdout
@@ -533,7 +533,7 @@ class TestCompareWithLiveURL:
         runner = CliRunner()
         result = runner.invoke(app, [
             "compare", "before.json", "https://demo.myshopify.com",
-            "-o", "report.html",
+            "-o", "report.html", "--no-cache",
         ])
         assert result.exit_code == 0, result.stdout
         html = (tmp_path / "report.html").read_text(encoding="utf-8")
@@ -565,6 +565,7 @@ class TestCompareWithLiveURL:
         runner = CliRunner()
         result = runner.invoke(app, [
             "compare", "before.json", "https://demo.myshopify.com",
+            "--no-cache",
         ])
         assert result.exit_code == 10
         assert "PageSpeed API" in result.stdout
@@ -585,7 +586,7 @@ class TestCompareWithLiveURL:
         runner = CliRunner()
         result = runner.invoke(app, [
             "compare", "before.json", "https://demo.myshopify.com",
-            "--strategy", "tablet",
+            "--strategy", "tablet", "--no-cache",
         ])
         assert result.exit_code == 2
 

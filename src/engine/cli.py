@@ -217,6 +217,10 @@ def measure(
     strategy: str = typer.Option("mobile", "--strategy", help="Strategy: mobile or desktop (default: mobile)."),
     api_key: str | None = typer.Option(None, "--api-key", help="Google Cloud API key (optional)."),
     output: Path | None = typer.Option(None, "-o", "--output", help="Output JSON file (default: print to stdout)."),
+    no_cache: bool = typer.Option(
+        False, "--no-cache",
+        help="Bypass the on-disk PageSpeed response cache (always fetch fresh).",
+    ),
 ) -> None:
     """Fetch live performance metrics from Google PageSpeed Insights API."""
     # --- validate URL (allow scheme-less for normalization by API) ---
@@ -231,8 +235,9 @@ def measure(
     if output is not None:
         validate_out_path(output)
 
-    # --- fetch metrics ---
-    client = PageSpeedAPIClient(api_key=api_key)
+    # --- fetch metrics (consult cache unless --no-cache) ---
+    cache = None if no_cache else _build_pagespeed_cache()
+    client = PageSpeedAPIClient(api_key=api_key, cache=cache)
     metrics = client.get_metrics(url, strategy=strategy)
 
     # --- output ---
@@ -789,6 +794,10 @@ def compare(
         None, "--brand-color",
         help="Brand primary colour as hex (e.g. '#ff6b35'). Invalid values are ignored.",
     ),
+    no_cache: bool = typer.Option(
+        False, "--no-cache",
+        help="Bypass the on-disk PageSpeed response cache (always fetch fresh).",
+    ),
 ) -> None:
     """Compare a baseline audit against a current audit (before/after).
 
@@ -814,7 +823,8 @@ def compare(
     before = load_or_audit_file(baseline_json)
     if current_is_url:
         rprint(f"[cyan]Fetching live metrics for {current} (strategy={strategy})...[/cyan]")
-        after = fetch_url_as_audit(current, strategy=strategy, api_key=api_key)
+        cache = None if no_cache else _build_pagespeed_cache()
+        after = fetch_url_as_audit(current, strategy=strategy, api_key=api_key, cache=cache)
     else:
         current_path = Path(current)
         if not current_path.exists():
@@ -981,6 +991,16 @@ def _default_schedule_dir() -> Path:
     """Default schedule config dir (sibling of the history dir)."""
     from engine.history import _default_history_dir
     return _default_history_dir().parent
+
+
+def _build_pagespeed_cache():
+    """Construct the default on-disk PageSpeed response cache.
+
+    Returns ``None`` when caching is disabled (``PAGESPEED_CACHE_TTL=0``).
+    """
+    from integrations._cache import ResponseCache
+    cache = ResponseCache()
+    return cache if cache.ttl > 0 else None
 
 
 def _schedule_list(schedules: list) -> None:
