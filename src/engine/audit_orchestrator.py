@@ -10,12 +10,13 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from audit.models import AuditResult, ImageRole
 from audit.parser import parse
 from audit.ranker_heuristic import rank as rank_heuristic
 from audit.ranker_ml import rank as rank_ml
+from core.image_signals import ImageDict
 from engine._logging import get_logger
 
 _log = get_logger()
@@ -27,9 +28,13 @@ _log = get_logger()
 _VALID_ROLES = {r.value for r in ImageRole}
 
 
-def _sanitise_image(img: dict[str, Any]) -> dict[str, Any]:
-    """Ensure every image dict is compliant with the schema before validation."""
-    out: dict[str, Any] = {}
+def _sanitise_image(img: dict[str, Any]) -> ImageDict:
+    """Ensure every image dict is compliant with the schema before validation.
+
+    The input may be a raw/legacy dict (``url``/``mimeType`` keys) as well as
+    a normalized one — this is the last normalisation point before Pydantic.
+    """
+    out: ImageDict = {}
 
     out["src"] = img.get("src") or img.get("url") or ""
     original_role = img.get("role", "unknown")
@@ -57,7 +62,7 @@ def _sanitise_image(img: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-def _estimate_waste(img: dict[str, Any]) -> int:
+def _estimate_waste(img: ImageDict) -> int:
     """Rough waste-bytes estimate: difference between actual bytes and a target."""
     bytes_ = img.get("bytes", 0)
     dw = img.get("displayed_width") or img.get("natural_width") or 0
@@ -70,7 +75,7 @@ def _estimate_waste(img: dict[str, Any]) -> int:
     return max(0, bytes_ - target)
 
 
-def _build_summary(images: list[dict[str, Any]]) -> dict[str, Any]:
+def _build_summary(images: list[ImageDict]) -> dict[str, list[str]]:
     """Derive top_issues from the ranked image list."""
     issues: list[str] = []
 
@@ -164,18 +169,19 @@ def run_audit(
     with open(lhr_path, encoding="utf-8") as f:
         raw: dict[str, Any] = json.load(f)
 
-    # 2. parse → list[dict]  (normalized images, no role/score yet)
-    parsed_images: list[dict[str, Any]] = parse(raw)
+    # 2. parse → list[ImageDict]  (normalized images, no role/score yet)
+    parsed_images: list[ImageDict] = parse(raw)
     _log.debug("parse stage: %d image(s) extracted", len(parsed_images))
 
-    # 3. rank  → list[dict]  (role, score, recommendation added)
-    ranked_images: list[dict[str, Any]] = rank_fn(parsed_images)
+    # 3. rank  → list[ImageDict]  (role, score, recommendation added)
+    ranked_images: list[ImageDict] = rank_fn(parsed_images)
     _log.debug("rank stage: %d image(s) scored", len(ranked_images))
 
     # 4. add waste estimate & sanitise
-    sanitised: list[dict[str, Any]] = []
+    sanitised: list[ImageDict] = []
     for img in ranked_images:
-        clean = _sanitise_image(img)
+        # _sanitise_image also accepts raw/legacy keys (url, mimeType).
+        clean = _sanitise_image(cast(dict[str, Any], img))
         if "waste_bytes_est" not in clean:
             clean["waste_bytes_est"] = _estimate_waste(clean)
         sanitised.append(clean)

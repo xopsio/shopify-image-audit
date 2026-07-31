@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from core.image_signals import ImageDict
+
 
 def _safe_int(value: Any) -> int | None:
     """Convert value to int safely; return None if conversion fails."""
@@ -22,7 +24,7 @@ def _normalize_image(
     natural_width: int | None = None,
     natural_height: int | None = None,
     is_lcp_candidate: bool = False,
-) -> dict[str, Any]:
+) -> ImageDict:
     """
     Build a single normalized image dict.
 
@@ -32,7 +34,7 @@ def _normalize_image(
     This extractor is responsible for the shared image attributes; role/score
     are assigned in later ranking/scoring stages.
     """
-    out: dict[str, Any] = {
+    out: ImageDict = {
         "src": url,
         "bytes": int(bytes_) if bytes_ is not None else 0,
         "mime": mime,
@@ -84,7 +86,7 @@ def _extract_lcp_url(lhr: dict[str, Any]) -> str | None:
     return None
 
 
-def _collect_image_items(lhr: dict[str, Any]) -> list[dict[str, Any]]:
+def _collect_image_items(lhr: dict[str, Any]) -> list[ImageDict]:
     """
     Collect raw image resource entries from Lighthouse audits.
 
@@ -106,7 +108,7 @@ def _collect_image_items(lhr: dict[str, Any]) -> list[dict[str, Any]]:
     if not isinstance(items, list):
         return []
 
-    result: list[dict[str, Any]] = []
+    result: list[ImageDict] = []
     seen_src: set[str] = set()
 
     for item in items:
@@ -150,7 +152,7 @@ def _collect_image_items(lhr: dict[str, Any]) -> list[dict[str, Any]]:
     return result
 
 
-def _displayed_area(img: dict[str, Any]) -> int:
+def _displayed_area(img: ImageDict) -> int:
     """Displayed pixel area; 0 if dimensions missing."""
     w = img.get("displayed_width") or img.get("natural_width") or 0
     h = img.get("displayed_height") or img.get("natural_height") or 0
@@ -164,7 +166,7 @@ def _displayed_area(img: dict[str, Any]) -> int:
     return w_int * h_int
 
 
-def _mark_lcp_candidate(images: list[dict[str, Any]], lcp_url: str | None) -> None:
+def _mark_lcp_candidate(images: list[ImageDict], lcp_url: str | None) -> None:
     """
     Mutate images in-place to set is_lcp_candidate using:
     1) Exact URL match if lcp_url is provided.
@@ -197,7 +199,7 @@ def _mark_lcp_candidate(images: list[dict[str, Any]], lcp_url: str | None) -> No
     images[best_index]["is_lcp_candidate"] = True
 
 
-def extract_images(lighthouse_json: dict[str, Any]) -> list[dict[str, Any]]:
+def extract_images(lighthouse_json: dict[str, Any]) -> list[ImageDict]:
     """
     Extract normalized image dicts from a Lighthouse JSON report.
 

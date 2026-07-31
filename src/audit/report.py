@@ -17,6 +17,8 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
+from core.image_signals import ImageDict
+
 # ---------------------------------------------------------------------------
 # Web Vitals thresholds
 # ---------------------------------------------------------------------------
@@ -132,7 +134,7 @@ def _read_brand_logo(path: str | Path) -> tuple[str, str] | None:
 # Aggregate stats
 # ---------------------------------------------------------------------------
 
-def _aggregate_stats(images: list[dict[str, Any]]) -> dict[str, Any]:
+def _aggregate_stats(images: list[ImageDict]) -> dict[str, Any]:
     """Compute summary statistics for the stats grid."""
     total_images = len(images)
     total_bytes = sum(img["bytes"] for img in images)
@@ -696,7 +698,7 @@ def _render_per_image_deltas(per_image: list[dict[str, Any]]) -> str:
 """
 
 
-def _render_image_row(img: dict[str, Any]) -> str:
+def _render_image_row(img: ImageDict) -> str:
     score_class = "high" if img["score"] >= 75 else "medium" if img["score"] >= 50 else "low"
     src_display = img["src"][-50:] if len(img["src"]) > 50 else img["src"]
 
@@ -713,12 +715,12 @@ def _render_image_row(img: dict[str, Any]) -> str:
                     <td class="bytes">{img['bytes'] / 1024:.1f} KB</td>
                     <td>{dimensions}</td>
                     <td class="bytes">{img.get('waste_bytes_est', 0) / 1024:.1f} KB</td>
-                    <td class="recommendation">{escape(img.get('recommendation', '—'))}</td>
+                    <td class="recommendation">{escape(img.get('recommendation') or '—')}</td>
                 </tr>
 """
 
 
-def _render_image_table(images: list[dict[str, Any]]) -> str:
+def _render_image_table(images: list[ImageDict]) -> str:
     rows = "".join(_render_image_row(img) for img in images)
     return f"""        <h2>🖼️ Image Details</h2>
         <table>

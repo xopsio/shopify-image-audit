@@ -127,9 +127,9 @@ the fourth targets scalability and recurring revenue.
 - ✅ CLI distribution (PyPI v0.2.0 → v0.7.0, trusted publishing)
 - ✅ Release automation (tag-driven, hardened, SLSA provenance in v0.6.0)
 - ✅ Snapshot tests for HTML report (Sprint 5 TD-1, syrupy, 22 golden files)
-- 🔜 SBOM generation — deferred (Sprint 10+; low priority)
-- 🔜 User-side TOML config — deferred (Sprint 10+)
-- 🔜 Mypy rollout — deferred (Sprint 10+ with TypedDict sweep)
+- ✅ SBOM generation (Sprint 10 TD-2, CycloneDX JSON in release artifacts)
+- 🔜 User-side TOML config — deferred (Sprint 11+)
+- ✅ Mypy rollout (Sprint 10 TD-1) — CI-gate, zero ignore comments, `ImageDict` TypedDict contract; "strict" mode is a future follow-up
 
 ### Theme E — UX & DX (Sprint 8+)
 - ✅ "Did you mean: X?" suggestions on every typo site (Sprint 8 TD-1)
@@ -170,6 +170,8 @@ the fourth targets scalability and recurring revenue.
 | 2026-07-30 | On-disk PageSpeed response cache | Mitigates the only real pain point (free-tier rate limits); TTL-configurable via `PAGESPEED_CACHE_TTL`; `--no-cache` bypasses |
 | 2026-07-30 | `run_parallel` shared concurrency primitive | `batch.py` and `scheduler.py` share the same shape; one helper reduces drift |
 | 2026-07-31 | WeasyPrint moved to optional `[pdf]` extra | Saves ~150 MB on non-PDF installs; friendly `ImportError` with install hint when missing |
+| 2026-08-01 | Mypy as a CI gate, `ImageDict` TypedDict as the image-dict contract | Code was already ~100% annotated; the sweep surfaced 3 real type gaps (run_parallel's wrong generic, absent-vs-zero metric mapping, `_CACHE_SUBDIR` dead code) and removed all `type: ignore` comments |
+| 2026-08-01 | CycloneDX SBOM in release artifacts | Complements SLSA provenance with a dependency inventory; one step in the existing build job |
 
 ---
 

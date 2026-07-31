@@ -33,9 +33,9 @@ penalty when bytes > 300_000.
 from __future__ import annotations
 
 import math
-from typing import Any
+from typing import cast
 
-from core.image_signals import _safe_int, assign_role, displayed_area
+from core.image_signals import ImageDict, _safe_int, assign_role, displayed_area
 
 # Same role vocabulary as ranker_heuristic (and the ImageRole enum).
 ROLES = (
@@ -104,7 +104,7 @@ def _f_format(mime: str) -> float:
     return 0.0
 
 
-def _f_dim_match(img: dict[str, Any]) -> float:
+def _f_dim_match(img: ImageDict) -> float:
     """Match between natural and displayed dimensions.
 
     1.0 = perfect (within 1.5x); 0.0 = ratio >= 4 (image 4x or more oversized).
@@ -132,7 +132,7 @@ def _f_dim_match(img: dict[str, Any]) -> float:
     return 1.0 - (ratio - 1.5) / (4.0 - 1.5)
 
 
-def _features(img: dict[str, Any]) -> dict[str, float]:
+def _features(img: ImageDict) -> dict[str, float]:
     """Return the full normalised feature vector for an image.
 
     Exposed for explainability + tests.
@@ -174,7 +174,7 @@ def _score_from_features(f: dict[str, float], *, is_lcp: bool, bytes_: int) -> i
 # Role assignment (mirrors heuristic thresholds for cross-ranker consistency)
 # ---------------------------------------------------------------------------
 
-def _role_from_features(img: dict[str, Any], features: dict[str, float], index: int) -> str:
+def _role_from_features(img: ImageDict, features: dict[str, float], index: int) -> str:
     """Assign a role using the shared heuristic from ``core.image_signals``.
 
     Kept as a thin shim with the original signature for backwards compat
@@ -220,16 +220,18 @@ def _recommendation(score: int, is_lcp: bool, features: dict[str, float],
 # Public API (drop-in for audit.ranker_heuristic.rank)
 # ---------------------------------------------------------------------------
 
-def rank(images: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def rank(images: list[ImageDict]) -> list[ImageDict]:
     """
     Add role, score, and recommendation to each image, preserving all input keys.
 
     Mirrors the contract of ``audit.ranker_heuristic.rank`` so it can be used as
     a drop-in replacement. See ``audit_orchestrator.run_audit(ranker='ml')``.
     """
-    result: list[dict[str, Any]] = []
+    result: list[ImageDict] = []
     for i, img in enumerate(images):
-        row = dict(img)  # preserve all input keys
+        # Runtime copy: fixtures may carry extra keys beyond ImageDict; the
+        # copy still satisfies the ImageDict contract.
+        row = cast(ImageDict, dict(img))  # preserve all input keys
         feats = _features(img)
         bytes_ = _safe_int(img.get("bytes"))
         is_lcp = bool(img.get("is_lcp_candidate"))
@@ -241,6 +243,6 @@ def rank(images: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return result
 
 
-def ml_features(img: dict[str, Any]) -> dict[str, float]:
+def ml_features(img: ImageDict) -> dict[str, float]:
     """Public accessor for the per-image feature vector (explainability)."""
     return _features(img)

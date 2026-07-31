@@ -18,7 +18,7 @@ to remove duplication and provide a stable contract for any future ranker.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, TypedDict
 
 # Role vocabulary. Kept in sync with audit.models.ImageRole and the ROLES
 # tuple in each ranker module.
@@ -28,6 +28,30 @@ ROLE_PRODUCT_PRIMARY = "product_primary"
 ROLE_PRODUCT_SECONDARY = "product_secondary"
 ROLE_DECORATIVE = "decorative"
 ROLE_UNKNOWN = "unknown"
+
+
+class ImageDict(TypedDict, total=False):
+    """Normalized image dict — the shared contract between parser,
+    extractor, rankers, orchestrator and report renderer.
+
+    Field names mirror ``audit_result.schema.json``'s image object.
+    ``total=False`` because the fields are added progressively along the
+    pipeline (extractor → ranker → orchestrator) before final validation
+    into ``audit.models.ImageItem``.
+    """
+
+    src: str
+    bytes: int
+    mime: str
+    displayed_width: int | None
+    displayed_height: int | None
+    natural_width: int | None
+    natural_height: int | None
+    is_lcp_candidate: bool
+    role: str
+    score: int
+    waste_bytes_est: int
+    recommendation: str | None
 
 
 def _safe_int(value: Any) -> int:
@@ -44,7 +68,7 @@ def _safe_int(value: Any) -> int:
         return 0
 
 
-def displayed_area(img: dict[str, Any]) -> int:
+def displayed_area(img: ImageDict) -> int:
     """Displayed pixel area, or 0 when dimensions are missing/invalid.
 
     Both width and height must be positive ints (> 0) for the area to be
@@ -55,7 +79,7 @@ def displayed_area(img: dict[str, Any]) -> int:
     return w * h if w > 0 and h > 0 else 0
 
 
-def assign_role(img: dict[str, Any], index: int) -> str:
+def assign_role(img: ImageDict, index: int) -> str:
     """Assign a role to ``img`` based on its props and its position in the list.
 
     Uses the same vocabulary and thresholds as the original heuristic

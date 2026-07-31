@@ -39,6 +39,7 @@ Verify the install:
 audit version          # Should print the package version
 pytest -q              # Should run all 672+ tests
 ruff check src/ tests/ # Should report "All checks passed!"
+mypy src/              # Should report "Success: no issues found"
 ```
 
 ---
@@ -72,6 +73,14 @@ pytest --cov=src --cov-report=term-missing
 ```
 
 Lines marked `Missing` are uncovered statements.
+
+### 2.3 Type checking
+
+`mypy src/` is a CI gate (Sprint 10). The config lives in
+`[tool.mypy]` in `pyproject.toml`; the goal is zero `# type: ignore`
+comments. The normalized image dict is typed as `ImageDict`
+(`core/image_signals.py`) — when touching the pipeline, keep dict
+values inside that contract instead of widening to `dict[str, Any]`.
 
 ---
 

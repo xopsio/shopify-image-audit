@@ -27,9 +27,6 @@ from engine.history import _default_history_dir
 
 _log = get_logger()
 
-#: Subdirectory under the app data dir for the cache.
-_CACHE_SUBDIR = "cache" / Path("pagespeed")  # type: ignore[assignment]
-
 #: Default TTL in seconds. Override with PAGESPEED_CACHE_TTL env var.
 _DEFAULT_TTL = 3600
 
@@ -102,7 +99,7 @@ class ResponseCache:
                        url, age, self.ttl)
             return None
         _log.debug("Cache hit: %s age=%.0fs", url, age)
-        return entry.get("data")  # type: ignore[return-value]
+        return entry.get("data")
 
     def set(self, url: str, strategy: str, data: dict[str, Any]) -> None:
         """Store a response in the cache. No-op when caching is disabled."""
