@@ -23,10 +23,10 @@ import responses
 from typer.testing import CliRunner
 
 from engine.cli import app
+from tests import FIXTURES
 
 runner = CliRunner()
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 # ---------------------------------------------------------------------------
@@ -154,7 +154,7 @@ class TestMeasureCommand:
 class TestExtractCommand:
     def test_extract_happy_path(self, tmp_path: Path) -> None:
         """extract should output parsed image data from a Lighthouse JSON fixture."""
-        fixture = REPO_ROOT / "fixtures" / "bad_hero_lcp.json"
+        fixture = FIXTURES / "bad_hero_lcp.json"
         result = runner.invoke(app, ["extract", str(fixture)])
         assert result.exit_code == 0
         # Output is JSON list of image dicts
@@ -261,7 +261,7 @@ class TestHistoryCliDispatcher:
     def test_history_list_with_entries(self, tmp_path: Path) -> None:
         """Record a baseline first, then list."""
         # Use a real LHR fixture and a custom history dir
-        fixture = REPO_ROOT / "fixtures" / "bad_hero_lcp.json"
+        fixture = FIXTURES / "bad_hero_lcp.json"
         result = runner.invoke(app, [
             "baseline", str(fixture),
             "--save", "baseline.json",
@@ -280,7 +280,7 @@ class TestHistoryCliDispatcher:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Record a baseline first, then generate a trend HTML."""
-        fixture = REPO_ROOT / "fixtures" / "bad_hero_lcp.json"
+        fixture = FIXTURES / "bad_hero_lcp.json"
         result = runner.invoke(app, [
             "baseline", str(fixture),
             "--save", "baseline.json",
@@ -309,7 +309,7 @@ class TestBaselineRecordsHistory:
     """The baseline command must record a snapshot to HistoryStore."""
 
     def test_baseline_writes_to_history_dir(self, tmp_path: Path) -> None:
-        fixture = REPO_ROOT / "fixtures" / "bad_hero_lcp.json"
+        fixture = FIXTURES / "bad_hero_lcp.json"
         history_dir = tmp_path / "history"
         result = runner.invoke(app, [
             "baseline", str(fixture),

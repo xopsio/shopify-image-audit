@@ -14,16 +14,14 @@ independent cross-check that the *contract* (schema) and the *output*
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pytest
 from jsonschema import Draft202012Validator
 
 from engine.audit_orchestrator import run_audit
+from tests import FIXTURES, REPO_ROOT
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = REPO_ROOT / "schemas" / "audit_result.schema.json"
-FIXTURES = REPO_ROOT / "fixtures"
 
 
 @pytest.fixture(scope="module")
