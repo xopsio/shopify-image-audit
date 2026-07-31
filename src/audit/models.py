@@ -1,6 +1,6 @@
 """
 Pydantic v2 models for Shopify Image Audit – strictly derived from
-schemas/audit_result.schema.json (single source of truth).
+audit/schemas/audit_result.schema.json (single source of truth).
 
 No extra="allow", no fallbacks, no hacks.
 """
@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 class _ExcludeNoneModel(BaseModel):
     """Base model that omits ``None``-valued optional fields on serialization.
 
-    The JSON schema (``schemas/audit_result.schema.json``) declares optional
+    The JSON schema (``audit/schemas/audit_result.schema.json``) declares optional
     fields as plain ``integer``/``string`` (no ``null``). Pydantic v2 does not
     honour ``exclude_none`` as a ``model_config`` key, so we enable it by
     default at the serialization boundary. ``model_validate`` is unaffected:

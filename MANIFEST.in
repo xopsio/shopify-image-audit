@@ -1,7 +1,6 @@
 include CHANGELOG.md
 include CONTRIBUTING.md
 include README.md
-include schemas/*.json
 include docs/*.md
 include docs/**/*.md
 

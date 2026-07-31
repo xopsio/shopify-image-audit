@@ -162,7 +162,7 @@ src/
     ├── pagespeed_api.py      # PageSpeed Insights (measure + fetch_lighthouse_json)
     └── shopify_admin.py      # Shopify Admin API (auth, products, theme_assets)
 
-schemas/audit_result.schema.json    # JSON Schema contract (validated by tests)
+src/audit/schemas/audit_result.schema.json  # JSON Schema contract (validated by tests)
 tests/                              # 665 tests, single-writer (ZCode)
 docs/examples/                       # live demo report + comparison JSON
 docs/integrations/                   # Shopify Admin API token guide

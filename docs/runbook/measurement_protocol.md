@@ -28,7 +28,7 @@ Goal: repeatable Lighthouse-based measurements for image-audit reports.
 
 - Save raw Lighthouse JSON per run (into `fixtures/` or `artifacts/`).
 - Produce a single `audit_result.json` matching the JSON schema
-  (`schemas/audit_result.schema.json`).
+  (`src/audit/schemas/audit_result.schema.json`).
 - The HTML report footer shows the actual tool version (read from
   `pyproject.toml` at runtime).
 

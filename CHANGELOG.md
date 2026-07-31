@@ -35,9 +35,7 @@ Empty — all Sprint 8 work shipped in v0.7.0.
   — TD-4
 - `docs/tutorial.md` — 6-step "from install to delivered report in <5min"
   walkthrough — TD-4
-- `MANIFEST.in` (NEW) ships CHANGELOG, CONTRIBUTING, README (note:
-  schemas/docs ship via PyPI sdist only — wheel packaging of those is
-  deferred to Sprint 9 because setuptools.package-data is finicky) — TD-4
+- `MANIFEST.in` (NEW) ships CHANGELOG, CONTRIBUTING, README — TD-4
 
 ### Changed
 - Test files: removed 8 duplicated `REPO_ROOT` declarations, 6 stale
