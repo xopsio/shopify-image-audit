@@ -9,7 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Empty — all Sprint 10 work shipped in v0.8.0.
+Empty — all Sprint 11 work shipped in v0.9.0.
+
+---
+
+## [0.9.0] - 2026-08-01
+
+### Added (Sprint 11)
+- User-side TOML config: `$XDG_CONFIG_HOME/shopify-image-audit/
+  config.toml` with 13 keys / 5 sections (`[defaults]`, `[pagespeed]`,
+  `[shopify]`, `[history]`, `[report]`) — TD-1+TD-2
+- Precedence chain is **CLI flag > env var > config > default**,
+  verified by tests at every layer — TD-1+TD-2
+- `SHOPIFY_IMAGE_AUDIT_CONFIG` env var overrides the config file
+  location — TD-1
+- A broken config (unparsable TOML, unknown section, invalid value)
+  warns and falls back to defaults — it never blocks a run — TD-1
+
+### Notes
+- `no_cache` / `stop_on_error` / `pdf` are deliberately NOT
+  configurable: Typer boolean flags have no reliable "unset" form, so a
+  config value could never be overridden back off from the CLI — TD-2
+
+### Stats
+- 695 tests pass (up from 672; +23 config tests)
+- `mypy src/`: Success, 30 files, zero ignore comments
+- Ruff clean
+- 72 PRs merged
 
 ---
 
@@ -107,6 +133,7 @@ Empty — all Sprint 10 work shipped in v0.8.0.
 - Single concurrency primitive (`run_parallel`) replaces two copies
 - Test fixtures consolidated into one place
 
+[0.9.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/xopsio/shopify-image-audit/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.6.1...v0.7.0
