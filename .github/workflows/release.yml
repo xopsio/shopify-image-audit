@@ -41,6 +41,19 @@ jobs:
       - name: Validate distribution metadata
         run: python -m twine check dist/*
 
+      # CycloneDX SBOM (Sprint 10, TD-2): install the freshly built wheel
+      # (runtime deps only — no dev tools) and scan the environment, so the
+      # SBOM lists exactly the shipped runtime dependency tree. The artifact
+      # is also covered by the SLSA attestation below.
+      - name: Generate CycloneDX SBOM
+        run: |
+          python -m pip install --quiet dist/*.whl
+          python -m pip install --quiet cyclonedx-bom
+          cyclonedx-py environment --pyproject pyproject.toml \
+            --output-reproducible -o dist/sbom.cyclonedx.json
+          python -m json.tool dist/sbom.cyclonedx.json > /dev/null
+          python -c "import json; d=json.load(open('dist/sbom.cyclonedx.json')); assert d.get('components'), 'SBOM has no components'"
+
       - name: Upload distribution artifacts
         uses: actions/upload-artifact@v4
         with:
