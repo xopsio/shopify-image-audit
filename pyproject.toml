@@ -63,6 +63,12 @@ audit = "engine.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+# Top-level modules in src/ that are not part of a package (no __init__.py)
+# but still need to ship in the wheel. _version.py provides get_version()
+# used by the CLI version command and the HTML report footer.
+[tool.setuptools]
+py-modules = ["_version"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]

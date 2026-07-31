@@ -102,7 +102,7 @@ class TestMeasureCommand:
             },
             status=200,
         )
-        result = runner.invoke(app, ["measure", "https://demo.myshopify.com"])
+        result = runner.invoke(app, ["measure", "https://demo.myshopify.com", "--no-cache"])
         assert result.exit_code == 0
         # Stdout should contain the metrics JSON
         assert "lcp" in result.stdout.lower() or "1800" in result.stdout
@@ -134,7 +134,7 @@ class TestMeasureCommand:
         monkeypatch.chdir(tmp_path)
         result = runner.invoke(
             app,
-            ["measure", "https://demo.myshopify.com", "-o", "metrics.json"],
+            ["measure", "https://demo.myshopify.com", "-o", "metrics.json", "--no-cache"],
         )
         assert result.exit_code == 0, f"Output: {result.stdout}"
         assert output.exists()
@@ -142,7 +142,7 @@ class TestMeasureCommand:
         assert "lcp_ms" in payload or "lcp" in str(payload).lower()
 
     def test_measure_invalid_strategy_exits_2(self) -> None:
-        result = runner.invoke(app, ["measure", "https://demo.myshopify.com", "--strategy", "tablet"])
+        result = runner.invoke(app, ["measure", "https://demo.myshopify.com", "--strategy", "tablet", "--no-cache"])
         assert result.exit_code == 2
         assert "strategy" in result.stdout.lower() or "invalid" in result.stdout.lower()
 

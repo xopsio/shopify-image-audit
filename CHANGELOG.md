@@ -107,10 +107,6 @@ Empty — all Sprint 7 work shipped in v0.6.0.
 
 ---
 
-[Unreleased]: https://github.com/xopsio/shopify-image-audit/compare/v0.5.0...HEAD
-
----
-
 ## [0.5.0] - 2026-07-30
 
 ### Added (Sprint 6)

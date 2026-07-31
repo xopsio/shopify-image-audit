@@ -395,6 +395,7 @@ def fetch_lighthouse_json(
     *,
     timeout: int = DEFAULT_TIMEOUT,
     max_retries: int = DEFAULT_RETRIES,
+    cache: ResponseCache | None = None,
 ) -> dict:
     """
     Fetch a full Lighthouse JSON report for ``url`` from the PageSpeed Insights API.
@@ -420,6 +421,15 @@ def fetch_lighthouse_json(
     )
     # Validate + normalise the URL (raises ValueError on bad input).
     url = client._validate_url(url)
+
+    # Consult cache before any network I/O.
+    if cache is not None:
+        cached = cache.get(url, strategy)
+        if cached is not None:
+            lhr = cached.get("lighthouseResult", cached)
+            if isinstance(lhr, dict):
+                return lhr
+
     client._wait_for_rate_limit()
 
     params = client._build_params(url, strategy)
@@ -458,6 +468,9 @@ def fetch_lighthouse_json(
             lhr = data.get("lighthouseResult")
             if not isinstance(lhr, dict):
                 raise RuntimeError("PageSpeed API response missing 'lighthouseResult'")
+            # Cache the raw response for future calls.
+            if cache is not None:
+                cache.set(url, strategy, data)
             return lhr
         except requests.exceptions.RequestException as e:
             last_exception = e
