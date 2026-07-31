@@ -133,6 +133,16 @@ class ScheduleStore:
         self._base.mkdir(parents=True, exist_ok=True)
         payload = [s.to_dict() for s in schedules]
         self._path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        # schedules.json holds Shopify access tokens — keep it private on
+        # POSIX. Windows lacks POSIX modes, so failure is non-fatal.
+        try:
+            self._path.chmod(0o600)
+        except OSError as exc:
+            _log.warning(
+                "Could not set 0600 permissions on %s: %s — the schedule file "
+                "may be readable by other users. Run `chmod 600 %s` manually.",
+                self._path, exc, self._path,
+            )
         return self._path
 
     def add(self, config: ScheduleConfig) -> list[ScheduleConfig]:

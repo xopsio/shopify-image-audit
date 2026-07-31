@@ -6,6 +6,7 @@ re-audit via the external-cron model.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from unittest.mock import patch
 
@@ -104,6 +105,15 @@ class TestScheduleStore:
         assert len(loaded) == 2
         assert loaded[0].shop_domain == "a.myshopify.com"
         assert loaded[0].label == "Daily"
+
+    def test_saved_file_is_private(self, tmp_path: Path) -> None:
+        """schedules.json holds access tokens — must be 0600 on POSIX (TD-3)."""
+        if os.name == "nt":
+            pytest.skip("POSIX permission bits not applicable on Windows")
+        store = ScheduleStore(tmp_path)
+        store.save([ScheduleConfig("a.myshopify.com", "https://a", access_token="tok")])
+        mode = store.path.stat().st_mode & 0o777
+        assert mode == 0o600
 
     def test_add_new(self, tmp_path: Path) -> None:
         store = ScheduleStore(tmp_path)

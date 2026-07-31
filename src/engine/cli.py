@@ -219,7 +219,8 @@ def run(
 def measure(
     url: str = typer.Argument(..., help="URL to measure with PageSpeed Insights."),
     strategy: str = typer.Option("mobile", "--strategy", help="Strategy: mobile or desktop (default: mobile)."),
-    api_key: str | None = typer.Option(None, "--api-key", help="Google Cloud API key (optional)."),
+    api_key: str | None = typer.Option(None, "--api-key", envvar="PAGESPEED_API_KEY",
+                                       help="Google Cloud API key (optional, or set PAGESPEED_API_KEY)."),
     output: Path | None = typer.Option(None, "-o", "--output", help="Output JSON file (default: print to stdout)."),
     no_cache: bool = typer.Option(
         False, "--no-cache",
@@ -804,7 +805,8 @@ def compare(
     json_out: Path | None = typer.Option(None, "--json",
                                             help="Also write the comparison result JSON to this file."),
     strategy: str = typer.Option("mobile", "--strategy", help="PageSpeed strategy when <current> is a URL."),
-    api_key: str | None = typer.Option(None, "--api-key", help="Google Cloud API key for PageSpeed (optional)."),
+    api_key: str | None = typer.Option(None, "--api-key", envvar="PAGESPEED_API_KEY",
+                                       help="Google Cloud API key for PageSpeed (optional, or set PAGESPEED_API_KEY)."),
     brand_logo: Path | None = typer.Option(
         None, "--brand-logo",
         help="Path to a brand logo (PNG, JPG, GIF, WebP, SVG). Used when -o/--pdf writes a report.",
@@ -939,8 +941,8 @@ def schedule(
         help="[add] Optional label for the schedule (e.g. 'Daily 09:00').",
     ),
     api_key: str | None = typer.Option(
-        None, "--api-key",
-        help="[run-all] Google Cloud API key for PageSpeed (optional).",
+        None, "--api-key", envvar="PAGESPEED_API_KEY",
+        help="[run-all] Google Cloud API key for PageSpeed (optional, or set PAGESPEED_API_KEY).",
     ),
     parallel: int = typer.Option(
         1, "--parallel",
