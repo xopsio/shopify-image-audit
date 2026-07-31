@@ -37,7 +37,7 @@ Verify the install:
 
 ```bash
 audit version          # Should print the package version
-pytest -q              # Should run all 672+ tests
+pytest -q              # Should run all 695+ tests
 ruff check src/ tests/ # Should report "All checks passed!"
 mypy src/              # Should report "Success: no issues found"
 ```

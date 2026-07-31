@@ -3,7 +3,7 @@
 [![CI](https://github.com/xopsio/shopify-image-audit/actions/workflows/ci.yml/badge.svg)](https://github.com/xopsio/shopify-image-audit/actions)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
 [![ruff](https://img.shields.io/badge/lint-ruff-green)](https://docs.astral.sh/ruff/)
-[![tests](https://img.shields.io/badge/tests-672_passing-brightgreen)](#testing)
+[![tests](https://img.shields.io/badge/tests-695_passing-brightgreen)](#testing)
 
 A Lighthouse-based image audit tool for Shopify stores. Produces per-image
 scores, role assignments, optimisation recommendations, and a **before/after
@@ -48,7 +48,7 @@ pip install -e ".[dev]"
 
 # Verify the install
 audit version
-pytest -q                                              # 672 tests
+pytest -q                                              # 695 tests
 ```
 
 ---
@@ -188,7 +188,7 @@ src/
     └── shopify_admin.py      # Shopify Admin API (auth, products, theme_assets)
 
 src/audit/schemas/audit_result.schema.json  # JSON Schema contract (validated by tests)
-tests/                              # 672 tests, single-writer (ZCode)
+tests/                              # 695 tests, single-writer (ZCode)
 docs/examples/                       # live demo report + comparison JSON
 docs/integrations/                   # Shopify Admin API token guide
 ```
@@ -201,7 +201,7 @@ The codebase is governed by **a single ZCode agent** (see
 ## Testing
 
 ```bash
-pytest -q                                # 672 tests, single-writer discipline
+pytest -q                                # 695 tests, single-writer discipline
 pytest --cov=src --cov-report=term       # ~91% coverage
 ruff check src/ tests/                   # 0 violations
 ```
@@ -264,6 +264,10 @@ merge. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
   - Mypy CI-gate, zero `type: ignore` comments
   - `ImageDict` TypedDict contract across the pipeline
   - CycloneDX SBOM in release artifacts (complements SLSA provenance)
+- ✅ Sprint 11 — User-side TOML config, v0.9.0 (695 tests)
+  - `~/.config/shopify-image-audit/config.toml` (13 keys / 5 sections)
+  - Precedence: CLI flag > env var > config > default
+  - Broken config warns + falls back — never blocks a run
 
 ---
 
