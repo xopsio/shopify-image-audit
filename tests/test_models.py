@@ -8,7 +8,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from audit.models import AuditResult, ImageItem, ImageRole, Meta, Vitals
+from audit.models import AuditResult, ImageDelta, ImageItem, ImageRole, Meta, Vitals
 from audit.parser import parse_file
 from audit.ranker_heuristic import rank
 from engine.audit_orchestrator import run_audit
@@ -116,3 +116,51 @@ class TestAuditResult:
                     "extra_field": "should_fail",
                 }
             )
+
+
+# ---------------------------------------------------------------------------
+# ImageDelta (Sprint 14 schema tightening)
+# ---------------------------------------------------------------------------
+
+
+class TestImageDelta:
+    def test_before_after_accept_imageitem_dicts(self) -> None:
+        """before/after are now ImageItem models (Sprint 14)."""
+        img_dict = {
+            "src": "https://x/y.jpg",
+            "bytes": 1000,
+            "mime": "image/jpeg",
+            "role": "hero",
+            "score": 90,
+        }
+        delta = ImageDelta(
+            match_key="key",
+            src=img_dict["src"],
+            status="improved",
+            before=ImageItem.model_validate(img_dict),
+            after=ImageItem.model_validate(img_dict),
+        )
+        assert isinstance(delta.before, ImageItem)
+        assert isinstance(delta.after, ImageItem)
+        assert delta.before.role == ImageRole.hero
+        assert delta.after.score == 90
+
+    def test_before_after_none_for_added_removed(self) -> None:
+        """None is still valid (matches 'added' / 'removed' status)."""
+        delta_added = ImageDelta(match_key="k", src="x.jpg", status="added", before=None, after=None)
+        delta_removed = ImageDelta(match_key="k", src="x.jpg", status="removed", before=None, after=None)
+        assert delta_added.before is None
+        assert delta_removed.after is None
+
+    def test_extra_key_on_imageitem_is_rejected(self) -> None:
+        """extra='forbid' on ImageItem rejects unknown keys (Sprint 14 guarantee)."""
+        bad = {
+            "src": "https://x/y.jpg",
+            "bytes": 1000,
+            "mime": "image/jpeg",
+            "role": "hero",
+            "score": 90,
+            "bogus_extra": "should_fail",
+        }
+        with pytest.raises(ValidationError, match="bogus_extra"):
+            ImageItem.model_validate(bad)
