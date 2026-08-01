@@ -314,6 +314,11 @@ merge. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
   - Tokens persisted to `tokens.json` (mode 0600)
   - `docs/integrations/SHOPIFY_OAUTH.md` covers setup + troubleshooting
   - Closes the long-deferred "OAuth flow" roadmap item
+- ✅ Sprint 21 — Batch auto-token from TokensStore, v0.16.1 (785 tests)
+  - `audit shopify batch` falls back to `tokens.json` when a
+    `stores-file` entry has no `access_token`
+  - Credential-free `stores.json` shareable across a team
+  - Explicit `access_token` still wins (backwards compatible)
 
 ---
 

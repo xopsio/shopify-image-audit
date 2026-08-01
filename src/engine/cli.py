@@ -389,7 +389,8 @@ def shopify(
         None,
         "--stores-file",
         help="[batch] Path to a JSON file listing stores to audit. "
-        "Each entry must have 'shop_domain' and 'access_token'.",
+        "Each entry must have 'shop_domain'; 'access_token' is optional "
+        "(falls back to tokens.json from `audit shopify login`).",
     ),
     parallel: int | None = typer.Option(
         None,

@@ -7,9 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [0.16.1] - 2026-08-01
 
-Empty — all Sprint 20 work shipped in v0.16.0.
+### Added (Sprint 21)
+- `audit shopify batch --stores-file` now reads access tokens
+  automatically from `tokens.json` when a store entry has no
+  `access_token` — log each store in once with
+  `audit shopify login <store>` and batch audits work with a
+  credential-free `stores-file` — TD-1
+- Explicit `access_token` still wins over the persisted token
+  (backwards compatible with existing `stores.json` files) — TD-1
+
+### Changed (Sprint 21)
+- `StoreConfig.access_token` is now optional (`str | None`)
+- `--stores-file` help text documents the optional token — TD-2
+- `docs/integrations/SHOPIFY_ADMIN.md` gains a batch-audit section
+  with a credential-free stores-file example; `SHOPIFY_OAUTH.md`
+  deferred list updated — TD-4
 
 ---
 
