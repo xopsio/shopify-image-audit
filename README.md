@@ -304,6 +304,11 @@ merge. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
   - Slim client-side output shapes typed separately
   - All `total=False` — `.get(...)`-based reads and partial mocks work
 - ✅ Sprint 19 — Shopify Admin OAuth, v0.15.0 (752 tests)
+- ✅ Sprint 20 — Token encryption, v0.16.0 (780 tests)
+  - `tokens.json` encrypted at rest with Fernet (AES-128-CBC + HMAC)
+  - Key stored in system keyring (macOS Keychain / Windows Credential
+    Manager / Linux Secret Service) — zero prompts on desktop
+  - `$SHOPIFY_AUDIT_TOKENS_DISABLED=1` opt-out for CI
   - `audit shopify login <store>` automates the manual custom-app flow
   - Embedded loopback HTTP server with CSRF state (constant-time check)
   - Tokens persisted to `tokens.json` (mode 0600)
