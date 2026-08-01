@@ -303,6 +303,12 @@ merge. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
   - Typed contracts for `shop`/`products`/`themes`/`theme_assets`
   - Slim client-side output shapes typed separately
   - All `total=False` — `.get(...)`-based reads and partial mocks work
+- ✅ Sprint 19 — Shopify Admin OAuth, v0.15.0 (752 tests)
+  - `audit shopify login <store>` automates the manual custom-app flow
+  - Embedded loopback HTTP server with CSRF state (constant-time check)
+  - Tokens persisted to `tokens.json` (mode 0600)
+  - `docs/integrations/SHOPIFY_OAUTH.md` covers setup + troubleshooting
+  - Closes the long-deferred "OAuth flow" roadmap item
 
 ---
 

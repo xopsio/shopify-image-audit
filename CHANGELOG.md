@@ -9,7 +9,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Empty — all Sprint 18 work shipped in v0.14.0.
+Empty — all Sprint 19 work shipped in v0.15.0.
+
+---
+
+## [0.15.0] - 2026-08-01
+
+### Added (Sprint 19)
+- `audit shopify login <store>` — automates the custom-app token flow
+  that previously required 10 manual steps in the Shopify admin. Opens
+  the user's browser to the official OAuth authorize URL, waits on a
+  local HTTP server for the redirect, exchanges the code for an
+  access token, and persists the token in `tokens.json` (mode 0600).
+  Closes the long-deferred "OAuth flow for Shopify Admin" roadmap
+  item — TD-4
+- New `integrations/shopify_oauth.py` — `build_authorize_url`,
+  `exchange_code_for_token`, `generate_state` (`secrets.token_urlsafe(32)`),
+  and `validate_state` (`secrets.compare_digest` for constant-time CSRF
+  check) — TD-1
+- New `integrations/oauth_callback_server.py` — embedded
+  `ThreadingHTTPServer` bound to `127.0.0.1` (port auto-selected in
+  `18765-18774`) with 60-second timeout, idempotent stop, and
+  context-manager support — TD-2
+- New `engine/tokens.py` — `TokensStore` (`{shop_domain: access_token}`
+  map, JSON-on-disk with `chmod 0o600`, Windows non-fatal). Distinct
+  from `ScheduleStore` so schedule metadata and credentials can be
+  shared independently — TD-3
+- `ShopifyConfig` gains `client_id`, `client_secret`, `redirect_uri`,
+  `scopes` fields (config / env / flag precedence preserved) — TD-3
+- `audit shopify auth <store>` and `audit shopify inventory <store>`
+  automatically read the token from `TokensStore` when no
+  `--access-token` is supplied — TD-4
+- New `docs/integrations/SHOPIFY_OAUTH.md` (~150 lines) covers setup,
+  security properties, headless-mode, and troubleshooting — TD-6
+
+### Security
+- CSRF state uses `secrets.compare_digest` (constant time)
+- Callback server binds to `127.0.0.1` only (no external interface)
+- Access tokens are never logged
+- `tokens.json` is created with mode `0600` on POSIX (Windows non-fatal)
+- Token **encryption** is explicitly out of scope for v0.15.0 and
+  tracked as a deferred roadmap item
+
+### Stats
+- 752 tests pass (up from 726; +26 across `test_shopify_oauth`,
+  `test_oauth_callback_server`, `test_tokens`)
+- `mypy src/` (strict): Success, 33 source files, zero ignores
+- Ruff check + format clean
+- 83 PRs merged
 
 ---
 
