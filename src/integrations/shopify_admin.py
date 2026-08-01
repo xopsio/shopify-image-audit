@@ -168,7 +168,7 @@ class ShopifyAdminClient:
 
     # ----- HTTP request helper ---------------------------------------------
 
-    def _request(self, method: str, path: str, **params: Any) -> dict:
+    def _request(self, method: str, path: str, **params: Any) -> dict[str, Any]:
         """Make an authenticated Admin API request with retry logic.
 
         ``path`` is the URL path after ``/admin/api/2024-10`` (e.g.
@@ -225,7 +225,7 @@ class ShopifyAdminClient:
                 body = response.text[:200] if response.text else "(empty body)"
                 raise RuntimeError(f"Shopify API error {response.status_code}: {body}")
 
-            data = response.json()
+            data: dict[str, Any] = response.json()
             # Shopify returns {"errors": "..."} on auth/permission errors
             # even with HTTP 200 in some cases. Treat that as an error.
             if "errors" in data and "shop" not in data:

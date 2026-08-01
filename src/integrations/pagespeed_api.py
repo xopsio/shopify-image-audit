@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from urllib.parse import quote, urlparse
 
 import requests
@@ -60,7 +60,7 @@ class PageSpeedMetrics:
     strategy: str  # "mobile" or "desktop"
     fetch_time: str  # ISO timestamp of when the test was run
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "url": self.url,
@@ -133,9 +133,9 @@ class PageSpeedAPIClient:
         if elapsed < self._min_request_interval:
             time.sleep(self._min_request_interval - elapsed)
 
-    def _build_params(self, url: str, strategy: str = "mobile") -> dict:
+    def _build_params(self, url: str, strategy: str = "mobile") -> dict[str, str]:
         """Build query parameters for the API request."""
-        params = {
+        params: dict[str, str] = {
             "url": url,
             "category": "performance",  # Only fetch performance metrics
             "strategy": strategy,  # mobile or desktop
@@ -144,7 +144,7 @@ class PageSpeedAPIClient:
             params["key"] = self.api_key
         return params
 
-    def _parse_response(self, data: dict, url: str, strategy: str) -> PageSpeedMetrics:
+    def _parse_response(self, data: dict[str, Any], url: str, strategy: str) -> PageSpeedMetrics:
         """Parse API response into structured metrics."""
         lighthouse_result = data.get("lighthouseResult", {})
 
@@ -359,9 +359,9 @@ class PageSpeedAPIClient:
     def _get_error_message(self, response: requests.Response) -> str:
         """Extract error message from response."""
         try:
-            data = response.json()
+            data: dict[str, Any] = response.json()
             if "error" in data:
-                return data["error"].get("message", "Unknown error")
+                return str(data["error"].get("message", "Unknown error"))
         except Exception:
             pass
         return response.text[:200] if response.text else "No error message"
@@ -402,7 +402,7 @@ def fetch_lighthouse_json(
     timeout: int = DEFAULT_TIMEOUT,
     max_retries: int = DEFAULT_RETRIES,
     cache: ResponseCache | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """
     Fetch a full Lighthouse JSON report for ``url`` from the PageSpeed Insights API.
 

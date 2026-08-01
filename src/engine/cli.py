@@ -65,6 +65,7 @@ from engine.cli_helpers._validators import (
 )
 from engine.config import get_config
 from engine.history import HistoryStore
+from integrations._cache import ResponseCache
 from integrations.pagespeed_api import PageSpeedAPIClient
 from integrations.shopify_admin import ShopifyAdminClient
 
@@ -577,7 +578,7 @@ def history(
     raise typer.Exit(code=EXIT_OK) from None
 
 
-def _history_list(hostname: str, entries: list) -> None:
+def _history_list(hostname: str, entries: list[Any]) -> None:
     """Print a table of history entries for a hostname."""
     from rich.table import Table
 
@@ -614,7 +615,7 @@ def _history_list(hostname: str, entries: list) -> None:
     console.print(table)
 
 
-def _history_show(hostname: str, entries: list, *, output: Path | None = None) -> None:
+def _history_show(hostname: str, entries: list[Any], *, output: Path | None = None) -> None:
     """Generate a trend HTML report for a hostname's audit history."""
     from engine.history import generate_trend_html
 
@@ -1205,18 +1206,16 @@ def _default_schedule_dir() -> Path:
     return _default_history_dir().parent
 
 
-def _build_pagespeed_cache():
+def _build_pagespeed_cache() -> ResponseCache | None:
     """Construct the default on-disk PageSpeed response cache.
 
     Returns ``None`` when caching is disabled (``PAGESPEED_CACHE_TTL=0``).
     """
-    from integrations._cache import ResponseCache
-
     cache = ResponseCache()
     return cache if cache.ttl > 0 else None
 
 
-def _schedule_list(schedules: list) -> None:
+def _schedule_list(schedules: list[Any]) -> None:
     """Print a Rich table of configured schedules."""
     from rich.table import Table
 

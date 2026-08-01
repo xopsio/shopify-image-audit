@@ -15,9 +15,12 @@ import base64
 import json
 from html import escape
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from core.image_signals import ImageDict
+
+if TYPE_CHECKING:
+    from audit.models import ComparisonResult
 
 # ---------------------------------------------------------------------------
 # Web Vitals thresholds
@@ -494,7 +497,14 @@ def _render_issues(summary: dict[str, Any]) -> str:
 """
 
 
-def _render_comparison_delta_row(label: str, before: float, after: float, delta: float, delta_pct, fmt: str) -> str:
+def _render_comparison_delta_row(
+    label: str,
+    before: float,
+    after: float,
+    delta: float,
+    delta_pct: float | None,
+    fmt: str,
+) -> str:
     """Render one before/after metric row in the comparison table."""
     if delta_pct is not None:
         pct_str = f" ({delta_pct:+.0f}%)"
@@ -520,7 +530,9 @@ def _render_comparison_delta_row(label: str, before: float, after: float, delta:
 """
 
 
-def _render_comparison_section(comparison) -> str:
+def _render_comparison_section(
+    comparison: ComparisonResult | dict[str, Any] | None,
+) -> str:
     """Render the before/after comparison section.
 
     Returns an empty string when ``comparison`` is None (the default, so
@@ -787,7 +799,7 @@ def _render_footer(audit_result: dict[str, Any]) -> str:
 
 def generate_html_report(
     audit_result: dict[str, Any],
-    comparison=None,
+    comparison: ComparisonResult | dict[str, Any] | None = None,
     *,
     brand_logo: tuple[str, str] | None = None,
     brand_color: str | None = None,
