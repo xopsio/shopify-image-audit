@@ -1,6 +1,6 @@
 # Roadmap — Shopify Image Audit
 
-**Last updated:** 2026-08-01 (Sprint 19 complete, v0.15.0 released)
+**Last updated:** 2026-08-01 (Sprint 20 complete, v0.16.0 released)
 **Owner:** ZCode (single-agent, governance v1.3)
 
 ---
@@ -207,5 +207,6 @@ the fourth targets scalability and recurring revenue.
 | 17 | 2026-08 | ✅ Complete | 721 | 81 |
 | 18 | 2026-08 | ✅ Complete | 726 | 82 |
 | 19 | 2026-08 | ✅ Complete | 752 | 83 |
+| 20 | 2026-08 | ✅ Complete | 780 | 84 |
 
 See [`docs/`](.) for the full documentation tree.

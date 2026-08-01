@@ -9,7 +9,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Empty — all Sprint 19 work shipped in v0.15.0.
+Empty — all Sprint 20 work shipped in v0.16.0.
+
+---
+
+## [0.16.0] - 2026-08-01
+
+### Added (Sprint 20)
+- `tokens.json` is now **encrypted at rest** with Fernet
+  (AES-128-CBC + HMAC). The key lives in the platform's system
+  keyring (macOS Keychain / Windows Credential Manager / Linux
+  Secret Service), so desktop users see no prompts — TD-1..3
+- New `engine/_crypto.py` module: `get_or_create_fernet_key`,
+  `encrypt_mapping`, `decrypt_mapping`, `derive_key_from_passphrase`
+  (scrypt fallback for headless Linux) — TD-1
+- `$SHOPIFY_AUDIT_TOKENS_DISABLED=1` opt-out for CI environments
+  without D-Bus / Secret Service — TD-3
+- `handle_shopify_errors` decorator now distinguishes
+  token-decryption failures ("Token decryption failed: run
+  `audit shopify login <store>` to refresh") from generic API
+  errors — TD-4
+
+### Changed (Sprint 20)
+- New runtime dependencies: `cryptography>=42,<46`,
+  `keyring>=24,<26`, `secretstorage>=3.3` (Linux only) — TD-2
+- `docs/integrations/SHOPIFY_OAUTH.md` Token storage section
+  documents the on-disk envelope and disable flag — TD-6
+
+### Security
+- `grep tokens.json` no longer reveals access tokens
+- `chmod 0600` preserved (POSIX)
+- Access tokens never logged (unchanged since Sprint 19)
+
+### Stats
+- 780 tests pass (up from 752; +28 across `test_crypto` and
+  `test_tokens` encryption tests)
+- `mypy src/` (strict): Success, 34 source files, zero ignores
+- Ruff check + format clean
+- 84 PRs merged
 
 ---
 
