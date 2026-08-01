@@ -9,7 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Empty — all Sprint 13 work shipped in v0.10.0.
+Empty — all Sprint 14 work shipped in v0.10.1.
+
+---
+
+## [0.10.1] - 2026-08-01
+
+### Changed (Sprint 14)
+- `ImageDelta.before` / `.after` tightened from `dict[str, Any] | None`
+  to `ImageItem | None` — every image reaching `_match_images` is
+  already a validated `ImageItem` (audit confirmed: 12 payload keys,
+  all ImageItem fields). Closes the Sprint 13 strict-mypy follow-up —
+  TD-1
+- `core.baseline_manager.py` drops `typing.cast` (4 sites) and
+  `typing.Any` (no longer used); `ImageItem.model_validate` replaces
+  the `cast(dict[str, Any], img)` pattern — TD-2
+
+### Fixed (Sprint 14)
+- 6 test fixtures in `test_baseline_manager.py` gained the two missing
+  ImageItem-required fields (`role`, `score`). The minimal dicts
+  previously violated the new constraint — TD-3
+
+### Stats
+- 698 tests pass (up from 695; +3 `TestImageDelta` cases)
+- `mypy src/` (strict): Success, 30 files, zero ignores
+- Ruff check + format clean
+- 78 PRs merged
 
 ---
 
@@ -180,6 +205,7 @@ Empty — all Sprint 13 work shipped in v0.10.0.
 - Single concurrency primitive (`run_parallel`) replaces two copies
 - Test fixtures consolidated into one place
 
+[0.10.1]: https://github.com/xopsio/shopify-image-audit/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/xopsio/shopify-image-audit/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.8.0...v0.9.0

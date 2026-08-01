@@ -277,6 +277,11 @@ merge. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
   - `ParamSpec` + `TypeVar` preserves decorator signatures
   - 26 mechanical annotation fixes (`dict[str, Any]`, `list[Any]`,
     return-type annotations)
+- ✅ Sprint 14 — ImageDelta schema, v0.10.1 (698 tests)
+  - `ImageDelta.before`/`.after` are `ImageItem` (was `dict[str, Any]`)
+  - Closes the Sprint 13 strict-mypy follow-up — no more `cast()` in
+    `baseline_manager.py`
+  - `extra="forbid"` on `ImageItem` now protects against future drift
 
 ---
 
