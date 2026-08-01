@@ -234,6 +234,10 @@ class ImageDelta(_ExcludeNoneModel):
     One of ``before`` / ``after`` may be None for added or removed images.
     ``match_key`` identifies which before-image pairs with which after-image
     (see ``core.baseline_manager._image_key`` for the hashing scheme).
+
+    ``before`` / ``after`` carry the full ``ImageItem`` payload (Sprint 14
+    schema tightening): the audit pipeline guarantees that every image
+    reaching ``compare()`` is already a validated ``ImageItem``.
     """
 
     model_config = {"extra": "forbid"}
@@ -243,8 +247,8 @@ class ImageDelta(_ExcludeNoneModel):
     role_before: str | None = None
     role_after: str | None = None
 
-    before: dict[str, Any] | None = None
-    after: dict[str, Any] | None = None
+    before: ImageItem | None = None
+    after: ImageItem | None = None
 
     bytes_delta: int | None = None
     score_delta: int | None = None

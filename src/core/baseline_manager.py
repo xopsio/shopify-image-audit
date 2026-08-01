@@ -19,7 +19,6 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-from typing import Any, cast
 
 from audit.models import (
     AuditResult,
@@ -27,6 +26,7 @@ from audit.models import (
     ComparisonResult,
     ComparisonSummary,
     ImageDelta,
+    ImageItem,
     ImageStatsDelta,
     MetricDelta,
     VitalsDelta,
@@ -343,8 +343,7 @@ def _match_images(
                     match_key=b_key,
                     src=str(b_img.get("src", "")),
                     role_before=b_img.get("role"),
-                    # ImageDelta.before is the schema's loose dict contract.
-                    before=cast(dict[str, Any], b_img),
+                    before=ImageItem.model_validate(b_img),
                     status="removed",
                     mime_before=b_img.get("mime"),
                     recommendation=_per_image_recommendation(
@@ -383,8 +382,8 @@ def _match_images(
                 src=str(a_img.get("src") or b_img.get("src", "")),
                 role_before=b_img.get("role"),
                 role_after=a_img.get("role"),
-                before=cast(dict[str, Any], b_img),
-                after=cast(dict[str, Any], a_img),
+                before=ImageItem.model_validate(b_img),
+                after=ImageItem.model_validate(a_img),
                 bytes_delta=a_bytes - b_bytes,
                 score_delta=a_score - b_score,
                 mime_before=b_img.get("mime"),
@@ -405,7 +404,7 @@ def _match_images(
                 match_key=a_key,
                 src=str(a_img.get("src", "")),
                 role_after=a_img.get("role"),
-                after=cast(dict[str, Any], a_img),
+                after=ImageItem.model_validate(a_img),
                 bytes_delta=a_bytes,
                 mime_after=a_img.get("mime"),
                 status="added",

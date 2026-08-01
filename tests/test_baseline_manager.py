@@ -31,6 +31,12 @@ from core.baseline_manager import (
     save_baseline,
 )
 
+
+def _img(src: str, bytes_: int = 1000, mime: str = "image/jpeg", **kw: object) -> dict:
+    """ImageItem-shaped dict with the 5 required fields plus any extras."""
+    return {"src": src, "bytes": bytes_, "mime": mime, "role": "hero", "score": 75, **kw}
+
+
 BEFORE_AFTER = Path(__file__).resolve().parents[1] / "fixtures" / "before_after"
 
 
@@ -536,18 +542,20 @@ class TestMatchImages:
 
     def test_perfect_match(self) -> None:
         """Same src (with different cache-bust query params) and same bytes/mime -> paired."""
-        before = [{"src": "https://x/a.jpg", "bytes": 1000, "mime": "image/jpeg"}]
-        after = [{"src": "https://x/a.jpg?v=2", "bytes": 1000, "mime": "image/jpeg"}]
+        before = [_img("https://x/a.jpg", bytes_=1000)]
+        after = [_img("https://x/a.jpg?v=2", bytes_=1000)]
         deltas = _match_images(before, after)
         assert len(deltas) == 1
-        assert deltas[0].before == before[0]
-        assert deltas[0].after == after[0]
+        # ImageDelta.before/after are now ImageItem models (Sprint 14).
+        assert deltas[0].before is not None and deltas[0].after is not None
+        assert deltas[0].before.model_dump() == before[0]
+        assert deltas[0].after.model_dump() == after[0]
         assert deltas[0].bytes_delta == 0
         assert deltas[0].status == "unchanged"
 
     def test_size_reduction_is_improved(self) -> None:
-        before = [{"src": "https://x/hero.jpg", "bytes": 1_200_000, "mime": "image/jpeg"}]
-        after = [{"src": "https://x/hero.webp", "bytes": 95_000, "mime": "image/webp"}]
+        before = [_img("https://x/hero.jpg", bytes_=1_200_000)]
+        after = [_img("https://x/hero.webp", bytes_=95_000, mime="image/webp", score=90)]
         deltas = _match_images(before, after)
         # Different bytes+mime -> different _image_key -> "removed" + "added"
         # NOT "improved" (which requires same key). This is by design: format
@@ -558,7 +566,7 @@ class TestMatchImages:
     def test_added_only(self) -> None:
         deltas = _match_images(
             [],
-            [{"src": "https://x/new.jpg", "bytes": 500, "mime": "image/jpeg"}],
+            [_img("https://x/new.jpg", bytes_=500)],
         )
         assert len(deltas) == 1
         assert deltas[0].status == "added"
@@ -567,7 +575,7 @@ class TestMatchImages:
 
     def test_removed_only(self) -> None:
         deltas = _match_images(
-            [{"src": "https://x/old.jpg", "bytes": 1000, "mime": "image/jpeg"}],
+            [_img("https://x/old.jpg", bytes_=1000)],
             [],
         )
         assert len(deltas) == 1
@@ -578,14 +586,14 @@ class TestMatchImages:
     def test_mixed_add_remove_keep(self) -> None:
         """3 before, 3 after: 1 kept, 1 removed (no match), 1 added, 1 regressed (5x growth)."""
         before = [
-            {"src": "https://x/keep.jpg", "bytes": 1000, "mime": "image/jpeg"},
-            {"src": "https://x/removed.jpg", "bytes": 2000, "mime": "image/jpeg"},
-            {"src": "https://x/grew.jpg", "bytes": 100, "mime": "image/jpeg"},
+            _img("https://x/keep.jpg", bytes_=1000),
+            _img("https://x/removed.jpg", bytes_=2000),
+            _img("https://x/grew.jpg", bytes_=100),
         ]
         after = [
-            {"src": "https://x/keep.jpg", "bytes": 1000, "mime": "image/jpeg"},
-            {"src": "https://x/grew.jpg", "bytes": 500, "mime": "image/jpeg"},
-            {"src": "https://x/added.jpg", "bytes": 300, "mime": "image/webp"},
+            _img("https://x/keep.jpg", bytes_=1000),
+            _img("https://x/grew.jpg", bytes_=500),
+            _img("https://x/added.jpg", bytes_=300, mime="image/webp"),
         ]
         deltas = _match_images(before, after)
         statuses = {d.status for d in deltas}
