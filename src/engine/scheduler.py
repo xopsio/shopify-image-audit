@@ -43,6 +43,7 @@ _log = get_logger()
 # Config model
 # ---------------------------------------------------------------------------
 
+
 @dataclass(frozen=True)
 class ScheduleConfig:
     """One store to re-audit on a schedule."""
@@ -64,9 +65,7 @@ class ScheduleConfig:
                 access_token=data.get("access_token"),
             )
         except KeyError as exc:
-            raise ValueError(
-                f"Missing required key {exc.args[0]!r} in schedule entry"
-            ) from exc
+            raise ValueError(f"Missing required key {exc.args[0]!r} in schedule entry") from exc
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
@@ -77,6 +76,7 @@ class ScheduleConfig:
 # ---------------------------------------------------------------------------
 # Run result
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class ScheduleRunResult:
@@ -91,6 +91,7 @@ class ScheduleRunResult:
 # ---------------------------------------------------------------------------
 # Store
 # ---------------------------------------------------------------------------
+
 
 class ScheduleStore:
     """Filesystem-backed schedule config store.
@@ -141,7 +142,9 @@ class ScheduleStore:
             _log.warning(
                 "Could not set 0600 permissions on %s: %s — the schedule file "
                 "may be readable by other users. Run `chmod 600 %s` manually.",
-                self._path, exc, self._path,
+                self._path,
+                exc,
+                self._path,
             )
         return self._path
 
@@ -172,6 +175,7 @@ class ScheduleStore:
 # Runner
 # ---------------------------------------------------------------------------
 
+
 def _audit_one_schedule(
     sched: ScheduleConfig,
     *,
@@ -185,17 +189,22 @@ def _audit_one_schedule(
     _log.info("Schedule run: %s (%s)", sched.shop_domain, sched.url)
     try:
         audit_result = fetch_url_as_audit(
-            sched.url, strategy=sched.device, api_key=api_key,
+            sched.url,
+            strategy=sched.device,
+            api_key=api_key,
         )
     except (RuntimeError, ValueError) as exc:
         _log.warning("Schedule %s failed: %s", sched.shop_domain, exc)
         return ScheduleRunResult(
-            shop_domain=sched.shop_domain, success=False, error=str(exc),
+            shop_domain=sched.shop_domain,
+            success=False,
+            error=str(exc),
         )
     except Exception as exc:  # noqa: BLE001 — surface any unexpected error
         _log.error("Schedule %s unexpected error: %s", sched.shop_domain, exc)
         return ScheduleRunResult(
-            shop_domain=sched.shop_domain, success=False,
+            shop_domain=sched.shop_domain,
+            success=False,
             error=f"Unexpected error: {exc}",
         )
 
@@ -206,13 +215,16 @@ def _audit_one_schedule(
     except Exception as exc:  # noqa: BLE001 — history must never block
         _log.error("Schedule %s history record failed: %s", sched.shop_domain, exc)
         return ScheduleRunResult(
-            shop_domain=sched.shop_domain, success=False,
+            shop_domain=sched.shop_domain,
+            success=False,
             error=f"History record failed: {exc}",
         )
 
     _log.info("Schedule %s recorded: %s", sched.shop_domain, history_path)
     return ScheduleRunResult(
-        shop_domain=sched.shop_domain, success=True, entry_id=entry_id,
+        shop_domain=sched.shop_domain,
+        success=True,
+        entry_id=entry_id,
     )
 
 
@@ -245,14 +257,17 @@ def run_all_schedules(
 
     def _cancelled(s: ScheduleConfig) -> ScheduleRunResult:
         return ScheduleRunResult(
-            shop_domain=s.shop_domain, success=False,
+            shop_domain=s.shop_domain,
+            success=False,
             error="Cancelled due to --stop-on-error",
         )
 
     # Closure capture: scheduler needs history_store + api_key too.
     def _runner(sched: ScheduleConfig) -> ScheduleRunResult:
         return _audit_one_schedule(
-            sched, history_store=history_store, api_key=api_key,
+            sched,
+            history_store=history_store,
+            api_key=api_key,
         )
 
     return run_parallel(

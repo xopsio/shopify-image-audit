@@ -242,10 +242,7 @@ class TestRank:
         assert 0 <= result[0]["score"] <= 100
 
     def test_multiple_images_preserve_order(self):
-        images = [
-            {"src": f"image{i}.jpg", "bytes": 50_000, "mime": "image/jpeg"}
-            for i in range(5)
-        ]
+        images = [{"src": f"image{i}.jpg", "bytes": 50_000, "mime": "image/jpeg"} for i in range(5)]
         result = rank(images)
         assert len(result) == 5
         for i, img in enumerate(result):
@@ -329,4 +326,3 @@ class TestRank:
         for img in result:
             assert 0 <= img["score"] <= 100
             assert img["recommendation"]
-

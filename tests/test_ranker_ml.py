@@ -29,10 +29,14 @@ from audit.ranker_ml import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _webp(bytes_=50_000, w=800, h=600, nw=None, nh=None, lcp=False) -> dict:
     return {
-        "src": "x.webp", "bytes": bytes_, "mime": "image/webp",
-        "displayed_width": w, "displayed_height": h,
+        "src": "x.webp",
+        "bytes": bytes_,
+        "mime": "image/webp",
+        "displayed_width": w,
+        "displayed_height": h,
         "natural_width": nw if nw is not None else w,
         "natural_height": nh if nh is not None else h,
         "is_lcp_candidate": lcp,
@@ -41,9 +45,13 @@ def _webp(bytes_=50_000, w=800, h=600, nw=None, nh=None, lcp=False) -> dict:
 
 def _jpeg(bytes_=200_000, w=800, h=600, lcp=False) -> dict:
     return {
-        "src": "x.jpg", "bytes": bytes_, "mime": "image/jpeg",
-        "displayed_width": w, "displayed_height": h,
-        "natural_width": w, "natural_height": h,
+        "src": "x.jpg",
+        "bytes": bytes_,
+        "mime": "image/jpeg",
+        "displayed_width": w,
+        "displayed_height": h,
+        "natural_width": w,
+        "natural_height": h,
         "is_lcp_candidate": lcp,
     }
 
@@ -51,6 +59,7 @@ def _jpeg(bytes_=200_000, w=800, h=600, lcp=False) -> dict:
 # ---------------------------------------------------------------------------
 # Test f_size
 # ---------------------------------------------------------------------------
+
 
 class TestFSize:
     def test_small_is_one(self) -> None:
@@ -77,6 +86,7 @@ class TestFSize:
 # Test f_density
 # ---------------------------------------------------------------------------
 
+
 class TestFDensity:
     def test_dense_image_zero(self) -> None:
         # 600 KB / 600x600 area (360k px) = 1666 bpp -> 0
@@ -102,6 +112,7 @@ class TestFDensity:
 # Test f_format
 # ---------------------------------------------------------------------------
 
+
 class TestFFormat:
     def test_modern_full_score(self) -> None:
         for mime in ("image/webp", "image/avif", "image/jxl", "image/svg+xml"):
@@ -122,33 +133,46 @@ class TestFFormat:
 # Test f_dim_match
 # ---------------------------------------------------------------------------
 
+
 class TestFDimMatch:
     def test_perfect_match(self) -> None:
-        assert _f_dim_match({"displayed_width": 800, "displayed_height": 600,
-                             "natural_width": 800, "natural_height": 600}) == 1.0
+        assert (
+            _f_dim_match({"displayed_width": 800, "displayed_height": 600, "natural_width": 800, "natural_height": 600})
+            == 1.0
+        )
 
     def test_close_match(self) -> None:
         # 1.5x is still "1.0"
-        assert _f_dim_match({"displayed_width": 800, "displayed_height": 600,
-                             "natural_width": 1200, "natural_height": 900}) == 1.0
+        assert (
+            _f_dim_match(
+                {"displayed_width": 800, "displayed_height": 600, "natural_width": 1200, "natural_height": 900}
+            )
+            == 1.0
+        )
 
     def test_severe_mismatch(self) -> None:
         # 4x or worse -> 0.0
-        assert _f_dim_match({"displayed_width": 800, "displayed_height": 600,
-                             "natural_width": 3200, "natural_height": 2400}) == 0.0
+        assert (
+            _f_dim_match(
+                {"displayed_width": 800, "displayed_height": 600, "natural_width": 3200, "natural_height": 2400}
+            )
+            == 0.0
+        )
 
     def test_missing_dims_returns_one(self) -> None:
         assert _f_dim_match({"displayed_width": 800, "displayed_height": 600}) == 1.0
 
     def test_partial_penalty(self) -> None:
-        s = _f_dim_match({"displayed_width": 600, "displayed_height": 600,
-                         "natural_width": 1200, "natural_height": 1200})
+        s = _f_dim_match(
+            {"displayed_width": 600, "displayed_height": 600, "natural_width": 1200, "natural_height": 1200}
+        )
         assert 0.0 < s < 1.0
 
 
 # ---------------------------------------------------------------------------
 # Test _features
 # ---------------------------------------------------------------------------
+
 
 class TestFeatures:
     def test_returns_all_signals(self) -> None:
@@ -169,6 +193,7 @@ class TestFeatures:
 # ---------------------------------------------------------------------------
 # Test rank()
 # ---------------------------------------------------------------------------
+
 
 class TestRank:
     def test_empty_list(self) -> None:
@@ -212,16 +237,23 @@ class TestRank:
 
     def test_does_not_introduce_extra_keys(self) -> None:
         r = rank([_webp()])[0]
-        added = set(r.keys()) - {"src", "bytes", "mime",
-                                  "displayed_width", "displayed_height",
-                                  "natural_width", "natural_height",
-                                  "is_lcp_candidate"}
+        added = set(r.keys()) - {
+            "src",
+            "bytes",
+            "mime",
+            "displayed_width",
+            "displayed_height",
+            "natural_width",
+            "natural_height",
+            "is_lcp_candidate",
+        }
         assert added == {"role", "score", "recommendation"}
 
 
 # ---------------------------------------------------------------------------
 # Differential assertions (validate that the score RESPECTS known physics)
 # ---------------------------------------------------------------------------
+
 
 class TestScorePhysics:
     def test_modern_format_helps(self) -> None:
@@ -245,23 +277,30 @@ class TestScorePhysics:
         assert r[0]["score"] > r[1]["score"]
 
     def test_svg_beats_huge_jpeg(self) -> None:
-        svg = {"src": "l.svg", "bytes": 5_000, "mime": "image/svg+xml",
-               "displayed_width": 200, "displayed_height": 60}
+        svg = {"src": "l.svg", "bytes": 5_000, "mime": "image/svg+xml", "displayed_width": 200, "displayed_height": 60}
         jpg = _jpeg(bytes_=2_000_000, w=1200, h=600)
         r = rank([svg, jpg])
         assert r[0]["score"] > r[1]["score"] + 30
 
     def test_oversized_hero_penalised(self) -> None:
         bad = {
-            "src": "h.jpg", "bytes": 1_200_000, "mime": "image/jpeg",
-            "displayed_width": 1200, "displayed_height": 600,
-            "natural_width": 4800, "natural_height": 2400,
+            "src": "h.jpg",
+            "bytes": 1_200_000,
+            "mime": "image/jpeg",
+            "displayed_width": 1200,
+            "displayed_height": 600,
+            "natural_width": 4800,
+            "natural_height": 2400,
             "is_lcp_candidate": True,
         }
         good = {
-            "src": "h.jpg", "bytes": 95_000, "mime": "image/webp",
-            "displayed_width": 1200, "displayed_height": 600,
-            "natural_width": 1200, "natural_height": 600,
+            "src": "h.jpg",
+            "bytes": 95_000,
+            "mime": "image/webp",
+            "displayed_width": 1200,
+            "displayed_height": 600,
+            "natural_width": 1200,
+            "natural_height": 600,
             "is_lcp_candidate": True,
         }
         r = rank([bad, good])
@@ -275,9 +314,14 @@ class TestScorePhysics:
         assert r[0]["score"] < 50
 
     def test_oversized_dim_reduces_dim_match(self) -> None:
-        img = {"bytes": 50_000, "mime": "image/webp",
-               "displayed_width": 600, "displayed_height": 600,
-               "natural_width": 3000, "natural_height": 3000}
+        img = {
+            "bytes": 50_000,
+            "mime": "image/webp",
+            "displayed_width": 600,
+            "displayed_height": 600,
+            "natural_width": 3000,
+            "natural_height": 3000,
+        }
         assert _f_dim_match(img) == 0.0
 
 
@@ -285,27 +329,32 @@ class TestScorePhysics:
 # Role assignment
 # ---------------------------------------------------------------------------
 
+
 class TestRoles:
     def test_large_lcp_is_hero(self) -> None:
         from audit.ranker_ml import _role_from_features
+
         img = _webp(bytes_=200_000, w=1200, h=600, lcp=True)
         feats = _features(img)
         assert _role_from_features(img, feats, 0) == "hero"
 
     def test_lcp_is_above_fold(self) -> None:
         from audit.ranker_ml import _role_from_features
+
         img = _webp(bytes_=50_000, w=200, h=200, lcp=True)
         feats = _features(img)
         assert _role_from_features(img, feats, 0) == "above_fold"
 
     def test_small_is_decorative(self) -> None:
         from audit.ranker_ml import _role_from_features
+
         img = _webp(bytes_=2_000, w=100, h=20)
         feats = _features(img)
         assert _role_from_features(img, feats, 0) == "decorative"
 
     def test_large_no_lcp_is_unknown_or_product(self) -> None:
         from audit.ranker_ml import _role_from_features
+
         img = _webp(bytes_=80_000, w=600, h=600)
         feats = _features(img)
         role = _role_from_features(img, feats, 0)
@@ -316,20 +365,24 @@ class TestRoles:
 # Recommendation text
 # ---------------------------------------------------------------------------
 
+
 class TestRecommendation:
     def test_high_score_says_ok(self) -> None:
         from audit.ranker_ml import _recommendation
+
         feats = {"f_size": 1.0, "f_density": 1.0, "f_format": 1.0, "f_dim_match": 1.0}
         assert _recommendation(90, False, feats, 50_000) == "OK"
 
     def test_lcp_heavy_image(self) -> None:
         from audit.ranker_ml import _recommendation
+
         feats = {"f_size": 0.0, "f_density": 0.0, "f_format": 0.0, "f_dim_match": 1.0}
         rec = _recommendation(10, True, feats, 1_200_000)
         assert "LCP" in rec
 
     def test_legacy_format_recommended_to_convert(self) -> None:
         from audit.ranker_ml import _recommendation
+
         feats = {"f_size": 0.5, "f_density": 0.5, "f_format": 0.0, "f_dim_match": 1.0}
         rec = _recommendation(40, False, feats, 100_000)
         assert "WebP" in rec or "AVIF" in rec

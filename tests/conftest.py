@@ -37,6 +37,7 @@ FIXTURES: Path = REPO_ROOT / "fixtures"
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def fixtures_dir() -> Path:
     """Path to the top-level ``fixtures/`` directory."""
@@ -63,24 +64,31 @@ def sample_audit_result() -> AuditResult:
     ``tests/test_history.py``, ``tests/test_history_diff.py``,
     ``tests/test_scheduler.py``.
     """
-    return AuditResult.model_validate({
-        "meta": {
-            "url": "https://demo.myshopify.com",
-            "timestamp_utc": "2026-07-30T15:00:00Z",
-            "device": "mobile", "runs": 1, "tool": "lighthouse",
-        },
-        "vitals": {"lcp_ms": 1800.0, "cls": 0.05, "inp_ms": 120.0, "ttfb_ms": 400.0},
-        "images": [
-            {
-                "src": "https://cdn.example.com/hero.jpg", "role": "hero",
-                "score": 80, "bytes": 95_000, "mime": "image/webp",
-                "is_lcp_candidate": True,
-                "waste_bytes_est": 10_000,
-                "recommendation": "Convert to WebP",
+    return AuditResult.model_validate(
+        {
+            "meta": {
+                "url": "https://demo.myshopify.com",
+                "timestamp_utc": "2026-07-30T15:00:00Z",
+                "device": "mobile",
+                "runs": 1,
+                "tool": "lighthouse",
             },
-        ],
-        "summary": {"top_issues": []},
-    })
+            "vitals": {"lcp_ms": 1800.0, "cls": 0.05, "inp_ms": 120.0, "ttfb_ms": 400.0},
+            "images": [
+                {
+                    "src": "https://cdn.example.com/hero.jpg",
+                    "role": "hero",
+                    "score": 80,
+                    "bytes": 95_000,
+                    "mime": "image/webp",
+                    "is_lcp_candidate": True,
+                    "waste_bytes_est": 10_000,
+                    "recommendation": "Convert to WebP",
+                },
+            ],
+            "summary": {"top_issues": []},
+        }
+    )
 
 
 @pytest.fixture

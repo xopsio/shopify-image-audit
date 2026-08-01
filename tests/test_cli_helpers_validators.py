@@ -25,6 +25,7 @@ from engine.cli_helpers._validators import (
 # _is_windows_absolute_path
 # ---------------------------------------------------------------------------
 
+
 class TestIsWindowsAbsolutePath:
     """The detection function only activates on Windows; on Linux/macOS it
     always returns False regardless of input shape."""
@@ -34,6 +35,7 @@ class TestIsWindowsAbsolutePath:
             pass
         # On any non-Windows runtime the function must short-circuit to False.
         import os
+
         if os.name != "nt":
             assert _is_windows_absolute_path("/usr/local/bin") is False
             assert _is_windows_absolute_path("C:\\foo") is False  # even if it looks Windows
@@ -42,6 +44,7 @@ class TestIsWindowsAbsolutePath:
 # ---------------------------------------------------------------------------
 # validate_out_path
 # ---------------------------------------------------------------------------
+
 
 class TestValidateOutPath:
     def test_relative_path_returned_as_path(self, tmp_path: Path, monkeypatch) -> None:
@@ -95,6 +98,7 @@ class TestValidateOutPath:
 # require_exists
 # ---------------------------------------------------------------------------
 
+
 class TestRequireExists:
     def test_existing_file_returns_path(self, tmp_path: Path) -> None:
         p = tmp_path / "exists.txt"
@@ -124,21 +128,28 @@ class TestRequireExists:
 # validate_url_scheme / validate_run_url / validate_measure_url
 # ---------------------------------------------------------------------------
 
+
 class TestValidateRunUrl:
-    @pytest.mark.parametrize("url", [
-        "https://example.com",
-        "http://example.com",
-        "https://example.com/path?q=1",
-    ])
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://example.com",
+            "http://example.com",
+            "https://example.com/path?q=1",
+        ],
+    )
     def test_accepts_http_and_https(self, url: str) -> None:
         validate_run_url(url)  # must not raise
 
-    @pytest.mark.parametrize("url", [
-        "ftp://example.com",
-        "example.com",
-        "",
-        "javascript:alert(1)",
-    ])
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "ftp://example.com",
+            "example.com",
+            "",
+            "javascript:alert(1)",
+        ],
+    )
     def test_rejects_invalid_scheme(self, url: str) -> None:
         with pytest.raises(Exit) as exc:
             validate_run_url(url)

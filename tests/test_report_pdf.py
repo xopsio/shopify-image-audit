@@ -29,6 +29,7 @@ weasyprint = pytest.importorskip("weasyprint")
 # PDF resource fetcher
 # ---------------------------------------------------------------------------
 
+
 class TestPdfUrlFetcher:
     @pytest.mark.parametrize(
         "url",
@@ -92,6 +93,7 @@ class TestPdfUrlFetcher:
 # ---------------------------------------------------------------------------
 # render_pdf_report (unit)
 # ---------------------------------------------------------------------------
+
 
 class TestRenderPdfReport:
     def test_minimal_html_produces_valid_pdf(self, tmp_path: Path) -> None:
@@ -162,39 +164,51 @@ runner = CliRunner()
 def audit_result_file(tmp_path: Path) -> Path:
     """A valid AuditResult JSON for the CLI tests."""
     path = tmp_path / "audit_result.json"
-    path.write_text(json.dumps({
-        "meta": {
-            "url": "https://example.com",
-            "timestamp_utc": "2026-01-01T00:00:00Z",
-            "device": "mobile",
-            "runs": 1,
-            "tool": "lighthouse",
-        },
-        "vitals": {"lcp_ms": 2500.0, "cls": 0.05, "inp_ms": 150.0, "ttfb_ms": 600.0},
-        "images": [
+    path.write_text(
+        json.dumps(
             {
-                "src": "https://example.com/hero.webp",
-                "role": "hero", "score": 85, "bytes": 95000,
-                "mime": "image/webp", "is_lcp_candidate": True,
-            },
-        ],
-        "summary": {"top_issues": []},
-    }))
+                "meta": {
+                    "url": "https://example.com",
+                    "timestamp_utc": "2026-01-01T00:00:00Z",
+                    "device": "mobile",
+                    "runs": 1,
+                    "tool": "lighthouse",
+                },
+                "vitals": {"lcp_ms": 2500.0, "cls": 0.05, "inp_ms": 150.0, "ttfb_ms": 600.0},
+                "images": [
+                    {
+                        "src": "https://example.com/hero.webp",
+                        "role": "hero",
+                        "score": 85,
+                        "bytes": 95000,
+                        "mime": "image/webp",
+                        "is_lcp_candidate": True,
+                    },
+                ],
+                "summary": {"top_issues": []},
+            }
+        )
+    )
     return path
 
 
 class TestReportPdfCli:
-    def test_report_pdf_flag_creates_pdf(
-        self, audit_result_file: Path, tmp_path: Path, monkeypatch
-    ) -> None:
+    def test_report_pdf_flag_creates_pdf(self, audit_result_file: Path, tmp_path: Path, monkeypatch) -> None:
         from engine.cli import app
 
         # chdir so the relative -o target is valid (path-safety check).
         monkeypatch.chdir(audit_result_file.parent)
 
-        result = runner.invoke(app, [
-            "report", audit_result_file.name, "--pdf", "-o", "report.pdf",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "report",
+                audit_result_file.name,
+                "--pdf",
+                "-o",
+                "report.pdf",
+            ],
+        )
         assert result.exit_code == 0, result.stdout
         out_pdf = audit_result_file.parent / "report.pdf"
         assert out_pdf.exists()
@@ -202,9 +216,7 @@ class TestReportPdfCli:
         # Cleanup the test artefact so other tests in this dir are unaffected.
         out_pdf.unlink(missing_ok=True)
 
-    def test_report_pdf_default_output_filename(
-        self, audit_result_file: Path, monkeypatch, tmp_path: Path
-    ) -> None:
+    def test_report_pdf_default_output_filename(self, audit_result_file: Path, monkeypatch, tmp_path: Path) -> None:
         """With --pdf and no -o, default is report.pdf (not report.html)."""
         from engine.cli import app
 
@@ -214,24 +226,26 @@ class TestReportPdfCli:
         assert (tmp_path / "report.pdf").exists()
         assert not (tmp_path / "report.html").exists()
 
-    def test_report_without_pdf_still_writes_html(
-        self, audit_result_file: Path, tmp_path: Path
-    ) -> None:
+    def test_report_without_pdf_still_writes_html(self, audit_result_file: Path, tmp_path: Path) -> None:
         """Backward compat: without --pdf, behaviour is unchanged (HTML)."""
         from engine.cli import app
 
-        result = runner.invoke(app, [
-            "report", str(audit_result_file), "-o", str(tmp_path / "report.html"),
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "report",
+                str(audit_result_file),
+                "-o",
+                str(tmp_path / "report.html"),
+            ],
+        )
         assert result.exit_code == 0, result.stdout
         html = (tmp_path / "report.html").read_text()
         assert "<!DOCTYPE html>" in html
 
 
 class TestComparePdfCli:
-    def test_compare_pdf_flag_creates_pdf(
-        self, tmp_path: Path, monkeypatch
-    ) -> None:
+    def test_compare_pdf_flag_creates_pdf(self, tmp_path: Path, monkeypatch) -> None:
         """``compare --output file.html --pdf`` writes a PDF to that path."""
         from engine.cli import app
 
@@ -242,31 +256,56 @@ class TestComparePdfCli:
 
         before = tmp_path / "before.json"
         after = tmp_path / "after.json"
-        before.write_text(json.dumps({
-            "meta": {"url": "https://b.example", "timestamp_utc": "2026-01-01T00:00:00Z",
-                     "device": "mobile", "runs": 1, "tool": "lighthouse"},
-            "vitals": {"lcp_ms": 4200.0, "cls": 0.18, "inp_ms": 320.0, "ttfb_ms": 900.0},
-            "images": [], "summary": {"top_issues": []},
-        }))
-        after.write_text(json.dumps({
-            "meta": {"url": "https://a.example", "timestamp_utc": "2026-01-02T00:00:00Z",
-                     "device": "mobile", "runs": 1, "tool": "lighthouse"},
-            "vitals": {"lcp_ms": 1800.0, "cls": 0.04, "inp_ms": 180.0, "ttfb_ms": 620.0},
-            "images": [], "summary": {"top_issues": []},
-        }))
+        before.write_text(
+            json.dumps(
+                {
+                    "meta": {
+                        "url": "https://b.example",
+                        "timestamp_utc": "2026-01-01T00:00:00Z",
+                        "device": "mobile",
+                        "runs": 1,
+                        "tool": "lighthouse",
+                    },
+                    "vitals": {"lcp_ms": 4200.0, "cls": 0.18, "inp_ms": 320.0, "ttfb_ms": 900.0},
+                    "images": [],
+                    "summary": {"top_issues": []},
+                }
+            )
+        )
+        after.write_text(
+            json.dumps(
+                {
+                    "meta": {
+                        "url": "https://a.example",
+                        "timestamp_utc": "2026-01-02T00:00:00Z",
+                        "device": "mobile",
+                        "runs": 1,
+                        "tool": "lighthouse",
+                    },
+                    "vitals": {"lcp_ms": 1800.0, "cls": 0.04, "inp_ms": 180.0, "ttfb_ms": 620.0},
+                    "images": [],
+                    "summary": {"top_issues": []},
+                }
+            )
+        )
 
-        result = runner.invoke(app, [
-            "compare", "before.json", "after.json",
-            "-o", "comparison.pdf", "--pdf",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "compare",
+                "before.json",
+                "after.json",
+                "-o",
+                "comparison.pdf",
+                "--pdf",
+            ],
+        )
         assert result.exit_code == 0, result.stdout
         out_pdf = tmp_path / "comparison.pdf"
         assert out_pdf.exists()
         assert out_pdf.read_bytes()[:4] == b"%PDF"
 
-    def test_compare_without_pdf_writes_html(
-        self, tmp_path: Path, monkeypatch
-    ) -> None:
+    def test_compare_without_pdf_writes_html(self, tmp_path: Path, monkeypatch) -> None:
         """Backward compat: without --pdf, --output writes HTML."""
         from engine.cli import app
 
@@ -274,21 +313,48 @@ class TestComparePdfCli:
 
         before = tmp_path / "b.json"
         after = tmp_path / "a.json"
-        before.write_text(json.dumps({
-            "meta": {"url": "https://b", "timestamp_utc": "2026-01-01T00:00:00Z",
-                     "device": "mobile", "runs": 1, "tool": "lighthouse"},
-            "vitals": {"lcp_ms": 1000.0, "cls": 0.0, "inp_ms": 100.0, "ttfb_ms": 200.0},
-            "images": [], "summary": {"top_issues": []},
-        }))
-        after.write_text(json.dumps({
-            "meta": {"url": "https://a", "timestamp_utc": "2026-01-02T00:00:00Z",
-                     "device": "mobile", "runs": 1, "tool": "lighthouse"},
-            "vitals": {"lcp_ms": 1000.0, "cls": 0.0, "inp_ms": 100.0, "ttfb_ms": 200.0},
-            "images": [], "summary": {"top_issues": []},
-        }))
-        result = runner.invoke(app, [
-            "compare", "b.json", "a.json", "-o", "comparison.html",
-        ])
+        before.write_text(
+            json.dumps(
+                {
+                    "meta": {
+                        "url": "https://b",
+                        "timestamp_utc": "2026-01-01T00:00:00Z",
+                        "device": "mobile",
+                        "runs": 1,
+                        "tool": "lighthouse",
+                    },
+                    "vitals": {"lcp_ms": 1000.0, "cls": 0.0, "inp_ms": 100.0, "ttfb_ms": 200.0},
+                    "images": [],
+                    "summary": {"top_issues": []},
+                }
+            )
+        )
+        after.write_text(
+            json.dumps(
+                {
+                    "meta": {
+                        "url": "https://a",
+                        "timestamp_utc": "2026-01-02T00:00:00Z",
+                        "device": "mobile",
+                        "runs": 1,
+                        "tool": "lighthouse",
+                    },
+                    "vitals": {"lcp_ms": 1000.0, "cls": 0.0, "inp_ms": 100.0, "ttfb_ms": 200.0},
+                    "images": [],
+                    "summary": {"top_issues": []},
+                }
+            )
+        )
+        result = runner.invoke(
+            app,
+            [
+                "compare",
+                "b.json",
+                "a.json",
+                "-o",
+                "comparison.html",
+            ],
+        )
         assert result.exit_code == 0, result.stdout
         out_html = tmp_path / "comparison.html"
         assert out_html.exists()

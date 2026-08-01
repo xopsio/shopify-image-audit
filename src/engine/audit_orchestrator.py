@@ -133,6 +133,7 @@ def _extract_vitals(data: dict[str, Any]) -> dict[str, Any]:
 # public API
 # ---------------------------------------------------------------------------
 
+
 def run_audit(
     lhr_path: str | Path,
     *,
@@ -162,8 +163,7 @@ def run_audit(
     rank_fn = rank_ml if ranker == "ml" else rank_heuristic
 
     lhr_path = Path(lhr_path)
-    _log.info("run_audit start: path=%s url=%s device=%s runs=%d ranker=%s",
-              lhr_path, url, device, runs, ranker)
+    _log.info("run_audit start: path=%s url=%s device=%s runs=%d ranker=%s", lhr_path, url, device, runs, ranker)
 
     # 1. load raw JSON
     with open(lhr_path, encoding="utf-8") as f:
@@ -211,7 +211,5 @@ def run_audit(
     }
 
     result = AuditResult.model_validate(payload)
-    _log.info("run_audit complete: %d images, LCP=%sms",
-              len(result.images), int(result.vitals.lcp_ms))
+    _log.info("run_audit complete: %d images, LCP=%sms", len(result.images), int(result.vitals.lcp_ms))
     return result
-

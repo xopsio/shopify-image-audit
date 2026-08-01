@@ -219,7 +219,7 @@ class PageSpeedAPIClient:
         # (e.g., "example.com" is valid, "/path" or "https://" is not)
         if not parsed.scheme:
             # Must have something that looks like a hostname
-            if not url or url.startswith('/') or '://' in url:
+            if not url or url.startswith("/") or "://" in url:
                 raise ValueError("URL must include a hostname")
         else:
             # For URLs with scheme, must have a netloc (hostname)
@@ -273,8 +273,7 @@ class PageSpeedAPIClient:
 
         # Make request with retries
         last_exception: Exception | None = None
-        _log.info("PageSpeed request: url=%s strategy=%s attempt=1/%d",
-                  url, strategy, self.max_retries)
+        _log.info("PageSpeed request: url=%s strategy=%s attempt=1/%d", url, strategy, self.max_retries)
         for attempt in range(self.max_retries):
             try:
                 self._last_request_time = time.time()
@@ -301,16 +300,13 @@ class PageSpeedAPIClient:
                         time.sleep(self.retry_delay * (attempt + 1))
                         continue
                     raise RuntimeError(
-                        f"PageSpeed API service unavailable. Status: {response.status_code}. "
-                        f"Please try again later."
+                        f"PageSpeed API service unavailable. Status: {response.status_code}. Please try again later."
                     )
 
                 # Check for other errors
                 if response.status_code != 200:
                     error_msg = self._get_error_message(response)
-                    raise RuntimeError(
-                        f"PageSpeed API error: {response.status_code} - {error_msg}"
-                    )
+                    raise RuntimeError(f"PageSpeed API error: {response.status_code} - {error_msg}")
 
                 # Parse response
                 data = response.json()
@@ -327,9 +323,7 @@ class PageSpeedAPIClient:
                 return self._parse_response(data, url, strategy)
 
             except requests.exceptions.Timeout:
-                last_exception = requests.exceptions.Timeout(
-                    f"Request timed out after {self.timeout} seconds"
-                )
+                last_exception = requests.exceptions.Timeout(f"Request timed out after {self.timeout} seconds")
                 if attempt < self.max_retries - 1:
                     time.sleep(self.retry_delay)
                     continue
@@ -429,7 +423,9 @@ def fetch_lighthouse_json(
     # Build a one-shot client with explicit timeout/retries so the caller can
     # dial them without instantiating PageSpeedAPIClient themselves.
     client = PageSpeedAPIClient(
-        api_key=api_key, timeout=timeout, max_retries=max_retries,
+        api_key=api_key,
+        timeout=timeout,
+        max_retries=max_retries,
     )
     # Validate + normalise the URL (raises ValueError on bad input).
     url = client._validate_url(url)
@@ -456,27 +452,20 @@ def fetch_lighthouse_json(
                 if attempt < client.max_retries - 1:
                     time.sleep(client.retry_delay * (attempt + 1))
                     continue
-                raise RuntimeError(
-                    f"PageSpeed API rate limit exceeded. Status: {response.status_code}."
-                )
+                raise RuntimeError(f"PageSpeed API rate limit exceeded. Status: {response.status_code}.")
             if response.status_code == 503:
                 if attempt < client.max_retries - 1:
                     time.sleep(client.retry_delay * (attempt + 1))
                     continue
-                raise RuntimeError(
-                    f"PageSpeed API service unavailable. Status: {response.status_code}."
-                )
+                raise RuntimeError(f"PageSpeed API service unavailable. Status: {response.status_code}.")
             if response.status_code != 200:
                 raise RuntimeError(
-                    f"PageSpeed API error: {response.status_code} - "
-                    f"{client._get_error_message(response)}"
+                    f"PageSpeed API error: {response.status_code} - {client._get_error_message(response)}"
                 )
 
             data = response.json()
             if "error" in data:
-                raise RuntimeError(
-                    f"PageSpeed API error: {data['error'].get('message', 'Unknown')}"
-                )
+                raise RuntimeError(f"PageSpeed API error: {data['error'].get('message', 'Unknown')}")
             lhr = data.get("lighthouseResult")
             if not isinstance(lhr, dict):
                 raise RuntimeError("PageSpeed API response missing 'lighthouseResult'")

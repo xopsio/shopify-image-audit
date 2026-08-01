@@ -24,6 +24,7 @@ from rich import print as rprint
 # Path validation
 # ---------------------------------------------------------------------------
 
+
 def _is_windows_absolute_path(path_str: str) -> bool:
     """True if ``path_str`` looks like a Windows drive-letter absolute path (e.g. ``C:\\foo``)."""
     if os.name != "nt":
@@ -96,6 +97,7 @@ def require_exists(path: Path | str, *, label: str = "File") -> Path:
 # URL validation
 # ---------------------------------------------------------------------------
 
+
 def validate_url_scheme(url: str, *, allow_scheme_less: bool = False) -> None:
     """Validate a URL's scheme. Exits 2 on invalid input.
 
@@ -122,6 +124,7 @@ def validate_url_scheme(url: str, *, allow_scheme_less: bool = False) -> None:
 
 
 # Convenience wrappers for the two original validators (kept for clarity at call sites)
+
 
 def validate_run_url(url: str) -> None:
     """``audit run`` URL validation: explicit http/https only."""

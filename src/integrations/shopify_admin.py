@@ -57,14 +57,14 @@ _API_BASE = "https://%s/admin/api/2024-10"
 SHOPIFY_API_VERSION = "2024-10"
 
 # Network configuration (mirrors pagespeed_api.py defaults).
-DEFAULT_TIMEOUT = 30           # seconds
-DEFAULT_MAX_RETRIES = 3         # total attempts, not "initial + retries"
-DEFAULT_RETRY_DELAY = 2.0      # seconds (scaled by attempt index)
+DEFAULT_TIMEOUT = 30  # seconds
+DEFAULT_MAX_RETRIES = 3  # total attempts, not "initial + retries"
+DEFAULT_RETRY_DELAY = 2.0  # seconds (scaled by attempt index)
 
 # Rate limiting — Shopify's documented leaky-bucket budget is 40 calls per
 # 2 seconds for the REST Admin API. We sleep this many seconds between
 # calls to stay well below the limit.
-_MIN_REQUEST_INTERVAL = 0.05     # 50 ms — fast enough, leaves headroom
+_MIN_REQUEST_INTERVAL = 0.05  # 50 ms — fast enough, leaves headroom
 
 # Image file extensions we consider "audit-relevant" for theme assets.
 # Excludes .css, .js, .liquid, .json, etc.
@@ -74,6 +74,7 @@ _IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".webp", ".avif", ".gif", ".svg")
 # ---------------------------------------------------------------------------
 # Errors
 # ---------------------------------------------------------------------------
+
 
 class ShopifyAdminError(RuntimeError):
     """Raised when the Shopify Admin API returns an unexpected response.
@@ -86,6 +87,7 @@ class ShopifyAdminError(RuntimeError):
 # ---------------------------------------------------------------------------
 # Client
 # ---------------------------------------------------------------------------
+
 
 class ShopifyAdminClient:
     """Read-only client for the Shopify Admin REST API.
@@ -208,26 +210,20 @@ class ShopifyAdminClient:
                 if attempt < self.max_retries - 1:
                     time.sleep(self.retry_delay * (attempt + 1))
                     continue
-                raise RuntimeError(
-                    f"Shopify API rate limit exceeded. Status: {response.status_code}."
-                )
+                raise RuntimeError(f"Shopify API rate limit exceeded. Status: {response.status_code}.")
 
             # Transient server errors
             if response.status_code == 503:
                 if attempt < self.max_retries - 1:
                     time.sleep(self.retry_delay * (attempt + 1))
                     continue
-                raise RuntimeError(
-                    f"Shopify API service unavailable. Status: {response.status_code}."
-                )
+                raise RuntimeError(f"Shopify API service unavailable. Status: {response.status_code}.")
 
             if response.status_code != 200:
                 # Try to extract a helpful error message but never log
                 # anything that might contain the access token.
                 body = response.text[:200] if response.text else "(empty body)"
-                raise RuntimeError(
-                    f"Shopify API error {response.status_code}: {body}"
-                )
+                raise RuntimeError(f"Shopify API error {response.status_code}: {body}")
 
             data = response.json()
             # Shopify returns {"errors": "..."} on auth/permission errors
@@ -289,12 +285,14 @@ class ShopifyAdminClient:
         out: list[dict[str, Any]] = []
         for p in products:
             image = p.get("image") or {}
-            out.append({
-                "id": p.get("id"),
-                "title": str(p.get("title", "")),
-                "handle": str(p.get("handle", "")),
-                "image_url": image.get("src") if isinstance(image, dict) else None,
-            })
+            out.append(
+                {
+                    "id": p.get("id"),
+                    "title": str(p.get("title", "")),
+                    "handle": str(p.get("handle", "")),
+                    "image_url": image.get("src") if isinstance(image, dict) else None,
+                }
+            )
         return out
 
     def get_theme_assets(self) -> list[dict[str, str]]:
@@ -312,9 +310,7 @@ class ShopifyAdminClient:
         themes = themes_data.get("themes", [])
         main_themes = [t for t in themes if t.get("role") == "main"]
         if not main_themes:
-            raise RuntimeError(
-                f"No main theme found for {self.shop_domain}"
-            )
+            raise RuntimeError(f"No main theme found for {self.shop_domain}")
         # Shop returns the active theme first; be defensive regardless.
         main = main_themes[0]
         theme_id = main.get("id")
@@ -323,9 +319,7 @@ class ShopifyAdminClient:
         if not theme_id:
             raise RuntimeError(f"Main theme for {self.shop_domain} has no id")
 
-        assets_data = self._request(
-            "GET", f"/themes/{theme_id}/assets.json"
-        )
+        assets_data = self._request("GET", f"/themes/{theme_id}/assets.json")
         assets = assets_data.get("assets", [])
         out: list[dict[str, str]] = []
         for a in assets:
@@ -335,9 +329,11 @@ class ShopifyAdminClient:
                 continue
             if not key.lower().endswith(_IMAGE_EXTS):
                 continue
-            out.append({
-                "theme_name": theme_name,
-                "key": key,
-                "url": public_url,
-            })
+            out.append(
+                {
+                    "theme_name": theme_name,
+                    "key": key,
+                    "url": public_url,
+                }
+            )
         return out

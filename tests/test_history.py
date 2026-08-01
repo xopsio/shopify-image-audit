@@ -26,52 +26,78 @@ from engine.history import (
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def sample_result() -> AuditResult:
-    return AuditResult.model_validate({
-        "meta": {
-            "url": "https://mystore.myshopify.com",
-            "timestamp_utc": "2026-07-30T15:00:00Z",
-            "device": "mobile",
-            "runs": 3,
-            "tool": "lighthouse",
-        },
-        "vitals": {"lcp_ms": 2500.0, "cls": 0.05, "inp_ms": 150.0, "ttfb_ms": 600.0},
-        "images": [
-            {"src": "https://cdn.example.com/hero.jpg", "role": "hero", "score": 85,
-             "bytes": 120_000, "mime": "image/jpeg"},
-            {"src": "https://cdn.example.com/thumb.png", "role": "decorative", "score": 95,
-             "bytes": 45_000, "mime": "image/png"},
-        ],
-        "summary": {"top_issues": ["Large hero image"]},
-    })
+    return AuditResult.model_validate(
+        {
+            "meta": {
+                "url": "https://mystore.myshopify.com",
+                "timestamp_utc": "2026-07-30T15:00:00Z",
+                "device": "mobile",
+                "runs": 3,
+                "tool": "lighthouse",
+            },
+            "vitals": {"lcp_ms": 2500.0, "cls": 0.05, "inp_ms": 150.0, "ttfb_ms": 600.0},
+            "images": [
+                {
+                    "src": "https://cdn.example.com/hero.jpg",
+                    "role": "hero",
+                    "score": 85,
+                    "bytes": 120_000,
+                    "mime": "image/jpeg",
+                },
+                {
+                    "src": "https://cdn.example.com/thumb.png",
+                    "role": "decorative",
+                    "score": 95,
+                    "bytes": 45_000,
+                    "mime": "image/png",
+                },
+            ],
+            "summary": {"top_issues": ["Large hero image"]},
+        }
+    )
 
 
 @pytest.fixture
 def sample_result_v2() -> AuditResult:
     """A second audit result (later timestamp, slightly different vitals)."""
-    return AuditResult.model_validate({
-        "meta": {
-            "url": "https://mystore.myshopify.com",
-            "timestamp_utc": "2026-08-06T10:00:00Z",
-            "device": "mobile",
-            "runs": 3,
-            "tool": "lighthouse",
-        },
-        "vitals": {"lcp_ms": 1800.0, "cls": 0.03, "inp_ms": 120.0, "ttfb_ms": 400.0},
-        "images": [
-            {"src": "https://cdn.example.com/hero.webp", "role": "hero", "score": 92,
-             "bytes": 85_000, "mime": "image/webp"},
-            {"src": "https://cdn.example.com/thumb.png", "role": "decorative", "score": 97,
-             "bytes": 45_000, "mime": "image/png"},
-        ],
-        "summary": {"top_issues": []},
-    })
+    return AuditResult.model_validate(
+        {
+            "meta": {
+                "url": "https://mystore.myshopify.com",
+                "timestamp_utc": "2026-08-06T10:00:00Z",
+                "device": "mobile",
+                "runs": 3,
+                "tool": "lighthouse",
+            },
+            "vitals": {"lcp_ms": 1800.0, "cls": 0.03, "inp_ms": 120.0, "ttfb_ms": 400.0},
+            "images": [
+                {
+                    "src": "https://cdn.example.com/hero.webp",
+                    "role": "hero",
+                    "score": 92,
+                    "bytes": 85_000,
+                    "mime": "image/webp",
+                },
+                {
+                    "src": "https://cdn.example.com/thumb.png",
+                    "role": "decorative",
+                    "score": 97,
+                    "bytes": 45_000,
+                    "mime": "image/png",
+                },
+            ],
+            "summary": {"top_issues": []},
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
 # _extract_hostname
 # ---------------------------------------------------------------------------
+
 
 class TestExtractHostname:
     def test_simple_url(self) -> None:
@@ -90,6 +116,7 @@ class TestExtractHostname:
 # ---------------------------------------------------------------------------
 # HistoryEntry model
 # ---------------------------------------------------------------------------
+
 
 class TestHistoryEntryModel:
     def test_minimal_fields(self) -> None:
@@ -139,6 +166,7 @@ class TestHistoryEntryModel:
 # HistoryStore — record + list + latest
 # ---------------------------------------------------------------------------
 
+
 class TestHistoryStore:
     def test_record_creates_file(self, tmp_path: Path, sample_result: AuditResult) -> None:
         store = HistoryStore(base_dir=tmp_path)
@@ -157,10 +185,11 @@ class TestHistoryStore:
         store.record(sample_result)
         assert (tmp_path / "mystore.myshopify.com").is_dir()
 
-    def test_list_entries_returns_sorted(self, tmp_path: Path, sample_result: AuditResult,
-                                          sample_result_v2: AuditResult) -> None:
+    def test_list_entries_returns_sorted(
+        self, tmp_path: Path, sample_result: AuditResult, sample_result_v2: AuditResult
+    ) -> None:
         store = HistoryStore(base_dir=tmp_path)
-        store.record(sample_result)    # older
+        store.record(sample_result)  # older
         store.record(sample_result_v2)  # newer
         entries = store.list_entries("mystore.myshopify.com")
         assert len(entries) == 2
@@ -173,8 +202,9 @@ class TestHistoryStore:
         entries = store.list_entries("unknown.myshopify.com")
         assert entries == []
 
-    def test_latest_returns_newest(self, tmp_path: Path, sample_result: AuditResult,
-                                    sample_result_v2: AuditResult) -> None:
+    def test_latest_returns_newest(
+        self, tmp_path: Path, sample_result: AuditResult, sample_result_v2: AuditResult
+    ) -> None:
         store = HistoryStore(base_dir=tmp_path)
         store.record(sample_result)
         store.record(sample_result_v2)
@@ -229,10 +259,12 @@ class TestHistoryStore:
     def test_multiple_hostnames_isolated(self, tmp_path: Path, sample_result: AuditResult) -> None:
         store = HistoryStore(base_dir=tmp_path)
         # Record for two different hostnames
-        result2 = AuditResult.model_validate({
-            **sample_result.model_dump(),
-            "meta": {**sample_result.meta.model_dump(), "url": "https://other.example.com"},
-        })
+        result2 = AuditResult.model_validate(
+            {
+                **sample_result.model_dump(),
+                "meta": {**sample_result.meta.model_dump(), "url": "https://other.example.com"},
+            }
+        )
         store.record(sample_result)
         store.record(result2)
         assert len(store.list_entries("mystore.myshopify.com")) == 1
@@ -242,6 +274,7 @@ class TestHistoryStore:
 # ---------------------------------------------------------------------------
 # load_snapshot
 # ---------------------------------------------------------------------------
+
 
 class TestLoadSnapshot:
     def test_roundtrip_preserves_data(self, tmp_path: Path, sample_result: AuditResult) -> None:
@@ -280,6 +313,7 @@ class TestLoadSnapshot:
 # Pruning
 # ---------------------------------------------------------------------------
 
+
 class TestPruning:
     def test_oldest_pruned_when_over_limit(self, tmp_path: Path, sample_result: AuditResult) -> None:
         """When recording more than _MAX_ENTRIES, the oldest are removed."""
@@ -289,13 +323,15 @@ class TestPruning:
         for i in range(_MAX_ENTRIES + 5):
             month = (i // 31) + 1
             day = (i % 31) + 1
-            result = AuditResult.model_validate({
-                **sample_result.model_dump(),
-                "meta": {
-                    **sample_result.meta.model_dump(),
-                    "timestamp_utc": f"2026-{month:02d}-{day:02d}T00:00:00Z",
-                },
-            })
+            result = AuditResult.model_validate(
+                {
+                    **sample_result.model_dump(),
+                    "meta": {
+                        **sample_result.meta.model_dump(),
+                        "timestamp_utc": f"2026-{month:02d}-{day:02d}T00:00:00Z",
+                    },
+                }
+            )
             store.record(result)
         entries = store.list_entries("mystore.myshopify.com")
         assert len(entries) == _MAX_ENTRIES  # pruned to max
@@ -306,13 +342,15 @@ class TestPruning:
         for i in range(_MAX_ENTRIES + 5):
             month = (i // 31) + 1
             day = (i % 31) + 1
-            result = AuditResult.model_validate({
-                **sample_result.model_dump(),
-                "meta": {
-                    **sample_result.meta.model_dump(),
-                    "timestamp_utc": f"2026-{month:02d}-{day:02d}T00:00:00Z",
-                },
-            })
+            result = AuditResult.model_validate(
+                {
+                    **sample_result.model_dump(),
+                    "meta": {
+                        **sample_result.meta.model_dump(),
+                        "timestamp_utc": f"2026-{month:02d}-{day:02d}T00:00:00Z",
+                    },
+                }
+            )
             store.record(result)
         entries = store.list_entries("mystore.myshopify.com")
         # The latest should be from the last-recorded date
@@ -325,6 +363,7 @@ class TestPruning:
 # ---------------------------------------------------------------------------
 # Trend HTML generator
 # ---------------------------------------------------------------------------
+
 
 class TestGenerateTrendHtml:
     def test_empty_entries(self) -> None:
@@ -363,8 +402,8 @@ class TestGenerateTrendHtml:
             device="mobile",
             path="good/audit.json",
             lcp_ms=1800.0,  # good: <=2500
-            cls=0.05,       # good: <=0.1
-            inp_ms=100.0,   # good: <=200
+            cls=0.05,  # good: <=0.1
+            inp_ms=100.0,  # good: <=200
             ttfb_ms=400.0,  # good: <=800
             image_count=1,
             total_bytes=100_000,
@@ -383,9 +422,9 @@ class TestGenerateTrendHtml:
             device="mobile",
             path="poor/audit.json",
             lcp_ms=5000.0,  # poor: >4000
-            cls=0.30,       # poor: >0.25
-            inp_ms=600.0,   # poor: >500
-            ttfb_ms=2000.0, # poor: >1800
+            cls=0.30,  # poor: >0.25
+            inp_ms=600.0,  # poor: >500
+            ttfb_ms=2000.0,  # poor: >1800
             image_count=1,
             total_bytes=100_000,
             avg_score=50.0,
@@ -441,11 +480,14 @@ class TestGenerateTrendHtml:
 # Sprint 6 TD-1: Edge-case coverage close-out
 # ---------------------------------------------------------------------------
 
+
 class TestDefaultHistoryDir:
     """Cover the XDG_DATA_HOME and macOS branch of _default_history_dir()."""
 
     def test_xdg_data_home_used_when_set(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         from engine.history import _default_history_dir
 
@@ -456,7 +498,8 @@ class TestDefaultHistoryDir:
         assert "history" in str(result)
 
     def test_no_xdg_data_home_uses_default_path(
-        self, monkeypatch: pytest.MonkeyPatch,
+        self,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """When XDG_DATA_HOME is not set, fall back to home-based default."""
         from engine.history import _default_history_dir

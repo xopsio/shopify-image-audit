@@ -89,10 +89,7 @@ def run_parallel(
     last_completed = -1
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        future_to_idx = {
-            pool.submit(fn, item): idx
-            for idx, item in enumerate(items)
-        }
+        future_to_idx = {pool.submit(fn, item): idx for idx, item in enumerate(items)}
         for future in as_completed(future_to_idx):
             idx = future_to_idx[future]
             slots[idx] = future.result()

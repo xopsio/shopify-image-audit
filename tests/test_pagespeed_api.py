@@ -20,6 +20,7 @@ from integrations.pagespeed_api import (
 
 # --- Helper for mock responses -------------------------------------------------
 
+
 def _make_mock_response(performance_score: float = 0.75) -> dict:
     """Create a standard mock API response."""
     return {
@@ -408,6 +409,7 @@ def test_retry_exhausted():
 
 # --- Tests for fetch_lighthouse_json -----------------------------------------
 
+
 @responses.activate
 def test_fetch_lighthouse_json_returns_lhr_dict():
     """fetch_lighthouse_json must return the inner lighthouseResult dict,
@@ -497,6 +499,7 @@ def test_fetch_lighthouse_json_url_normalization():
 # ---------------------------------------------------------------------------
 # Sprint 6 TD-1: Coverage close-out (additional edge-case tests)
 # ---------------------------------------------------------------------------
+
 
 class Test429Retry:
     """429-then-200 retry path: the second attempt's sleep branch."""
@@ -604,6 +607,7 @@ class TestGetPagespeedMetricsWrapper:
             status=200,
         )
         from integrations.pagespeed_api import get_pagespeed_metrics
+
         metrics = get_pagespeed_metrics("https://demo.myshopify.com", strategy="desktop")
         assert metrics.lcp == 1.5  # seconds (1500 ms / 1000)
 
@@ -625,6 +629,7 @@ class TestValidateUrlEdgeCases:
 # ---------------------------------------------------------------------------
 # TD-3: API key must never leak into error messages
 # ---------------------------------------------------------------------------
+
 
 class TestApiKeyRedaction:
     """The key embedded in a connection-error URL must be redacted."""
@@ -662,16 +667,24 @@ class TestApiKeyRedaction:
 # TD-3: PAGESPEED_API_KEY env var as --api-key fallback
 # ---------------------------------------------------------------------------
 
+
 class TestApiKeyEnvvar:
     """`PAGESPEED_API_KEY` supplies the key when --api-key is omitted."""
 
     @staticmethod
     def _sample_metrics(url: str) -> PageSpeedMetrics:
         return PageSpeedMetrics(
-            lcp=2.5, cls=0.05, inp=0.1,
-            first_contentful_paint=1.2, first_meaningful_paint=1.5,
-            speed_index=1.8, time_to_interactive=3.5, total_blocking_time=150,
-            performance_score=90, url=url, strategy="mobile",
+            lcp=2.5,
+            cls=0.05,
+            inp=0.1,
+            first_contentful_paint=1.2,
+            first_meaningful_paint=1.5,
+            speed_index=1.8,
+            time_to_interactive=3.5,
+            total_blocking_time=150,
+            performance_score=90,
+            url=url,
+            strategy="mobile",
             fetch_time="2026-01-01T00:00:00Z",
         )
 

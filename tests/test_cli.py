@@ -2,6 +2,7 @@
 Tests for CLI input safety guards (URL scheme, --out-dir validation).
 Verifies that invalid inputs produce exit code 2.
 """
+
 from __future__ import annotations
 
 import json
@@ -258,19 +259,45 @@ class TestBaselineCommand:
         # Copy fixture into tmp_path so --save can use a relative path within cwd.
         monkeypatch.chdir(tmp_path)
         runner = CliRunner()
-        result = runner.invoke(app, [
-            "baseline", "baseline_lcp.json", "--save", "out/baseline.json",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "baseline",
+                "baseline_lcp.json",
+                "--save",
+                "out/baseline.json",
+            ],
+        )
 
         # Create the fixture in the cwd.
-        (tmp_path / "baseline_lcp.json").write_text(json.dumps({
-            "lcp_ms": 4000, "cls": 0.1, "inp_ms": 300, "ttfb_ms": 800,
-            "images": [{"url": "hero.jpg", "resourceSize": 500000,
-                        "mimeType": "image/jpeg", "displayedWidth": 800, "displayedHeight": 600}],
-        }))
-        result = runner.invoke(app, [
-            "baseline", "baseline_lcp.json", "--save", "out/baseline.json",
-        ])
+        (tmp_path / "baseline_lcp.json").write_text(
+            json.dumps(
+                {
+                    "lcp_ms": 4000,
+                    "cls": 0.1,
+                    "inp_ms": 300,
+                    "ttfb_ms": 800,
+                    "images": [
+                        {
+                            "url": "hero.jpg",
+                            "resourceSize": 500000,
+                            "mimeType": "image/jpeg",
+                            "displayedWidth": 800,
+                            "displayedHeight": 600,
+                        }
+                    ],
+                }
+            )
+        )
+        result = runner.invoke(
+            app,
+            [
+                "baseline",
+                "baseline_lcp.json",
+                "--save",
+                "out/baseline.json",
+            ],
+        )
         assert result.exit_code == 0, result.stdout
         assert (tmp_path / "out" / "baseline.json").exists()
         # Saved file must be a valid AuditResult
@@ -281,6 +308,7 @@ class TestBaselineCommand:
         from typer.testing import CliRunner
 
         from engine.cli import app
+
         monkeypatch.chdir(tmp_path)
         runner = CliRunner()
         result = runner.invoke(app, ["baseline", "nope.json", "--save", "out.json"])
@@ -290,6 +318,7 @@ class TestBaselineCommand:
         from typer.testing import CliRunner
 
         from engine.cli import app
+
         monkeypatch.chdir(tmp_path)
         runner = CliRunner()
         result = runner.invoke(app, ["baseline", "x.json", "--save", "/tmp/x.json"])
@@ -299,6 +328,7 @@ class TestBaselineCommand:
         from typer.testing import CliRunner
 
         from engine.cli import app
+
         monkeypatch.chdir(tmp_path)
         (tmp_path / "f.json").write_text(json.dumps({"images": []}))
         runner = CliRunner()
@@ -314,14 +344,34 @@ class TestCompareCommand:
         """Create before/after fixtures in cwd and return their relative paths."""
         monkeypatch.chdir(tmp_path)
         before = {
-            "lcp_ms": 4200, "cls": 0.18, "inp_ms": 320, "ttfb_ms": 900,
-            "images": [{"url": "hero.jpg", "resourceSize": 1200000, "mimeType": "image/jpeg",
-                        "displayedWidth": 1200, "displayedHeight": 600}],
+            "lcp_ms": 4200,
+            "cls": 0.18,
+            "inp_ms": 320,
+            "ttfb_ms": 900,
+            "images": [
+                {
+                    "url": "hero.jpg",
+                    "resourceSize": 1200000,
+                    "mimeType": "image/jpeg",
+                    "displayedWidth": 1200,
+                    "displayedHeight": 600,
+                }
+            ],
         }
         after = {
-            "lcp_ms": 1800, "cls": 0.04, "inp_ms": 180, "ttfb_ms": 620,
-            "images": [{"url": "hero.webp", "resourceSize": 95000, "mimeType": "image/webp",
-                        "displayedWidth": 1200, "displayedHeight": 600}],
+            "lcp_ms": 1800,
+            "cls": 0.04,
+            "inp_ms": 180,
+            "ttfb_ms": 620,
+            "images": [
+                {
+                    "url": "hero.webp",
+                    "resourceSize": 95000,
+                    "mimeType": "image/webp",
+                    "displayedWidth": 1200,
+                    "displayedHeight": 600,
+                }
+            ],
         }
         (tmp_path / "before.json").write_text(json.dumps(before))
         (tmp_path / "after.json").write_text(json.dumps(after))
@@ -331,6 +381,7 @@ class TestCompareCommand:
         from typer.testing import CliRunner
 
         from engine.cli import app
+
         before, after = before_after_files
         runner = CliRunner()
         result = runner.invoke(app, ["compare", before, after])
@@ -339,34 +390,48 @@ class TestCompareCommand:
         assert "vitals" in result.stdout
         assert "improved" in result.stdout
 
-    def test_compare_writes_html_report(self, before_after_files, tmp_path: Path,
-                                 monkeypatch: pytest.MonkeyPatch):
+    def test_compare_writes_html_report(self, before_after_files, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         from typer.testing import CliRunner
 
         from engine.cli import app
+
         before, after = before_after_files
         runner = CliRunner()
         # validate_out_path requires relative; chdir then pass basename.
         monkeypatch.chdir(tmp_path)
-        result = runner.invoke(app, [
-            "compare", before, after, "-o", "report.html",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "compare",
+                before,
+                after,
+                "-o",
+                "report.html",
+            ],
+        )
         assert result.exit_code == 0, result.stdout
         html = (tmp_path / "report.html").read_text(encoding="utf-8")
         assert "Before / After Comparison" in html
         assert "ROI estimate" in html
 
-    def test_compare_writes_json_too(self, before_after_files, tmp_path: Path,
-                                     monkeypatch: pytest.MonkeyPatch):
+    def test_compare_writes_json_too(self, before_after_files, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         from typer.testing import CliRunner
 
         from engine.cli import app
+
         before, after = before_after_files
         runner = CliRunner()
         monkeypatch.chdir(tmp_path)
-        result = runner.invoke(app, [
-            "compare", before, after, "--json", "cmp.json",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "compare",
+                before,
+                after,
+                "--json",
+                "cmp.json",
+            ],
+        )
         assert result.exit_code == 0, result.stdout
         cmp = json.loads((tmp_path / "cmp.json").read_text())
         assert cmp["vitals"]["lcp"]["status"] == "improved"
@@ -375,6 +440,7 @@ class TestCompareCommand:
         from typer.testing import CliRunner
 
         from engine.cli import app
+
         monkeypatch.chdir(tmp_path)
         runner = CliRunner()
         result = runner.invoke(app, ["compare", "nope1.json", "nope2.json"])
@@ -385,6 +451,7 @@ class TestCompareCommand:
         from typer.testing import CliRunner
 
         from engine.cli import app
+
         before, after = before_after_files
         runner = CliRunner()
         result = runner.invoke(app, ["compare", before, after, "-o", "/tmp/x.html"])
@@ -395,17 +462,38 @@ class TestCompareCommand:
         from typer.testing import CliRunner
 
         from engine.cli import app
+
         monkeypatch.chdir(tmp_path)
         raw = {
-            "lcp_ms": 4200, "cls": 0.18, "inp_ms": 320, "ttfb_ms": 900,
-            "images": [{"url": "hero.jpg", "resourceSize": 1200000, "mimeType": "image/jpeg",
-                        "displayedWidth": 1200, "displayedHeight": 600}],
+            "lcp_ms": 4200,
+            "cls": 0.18,
+            "inp_ms": 320,
+            "ttfb_ms": 900,
+            "images": [
+                {
+                    "url": "hero.jpg",
+                    "resourceSize": 1200000,
+                    "mimeType": "image/jpeg",
+                    "displayedWidth": 1200,
+                    "displayedHeight": 600,
+                }
+            ],
         }
         (tmp_path / "raw.json").write_text(json.dumps(raw))
         after = {
-            "lcp_ms": 1800, "cls": 0.04, "inp_ms": 180, "ttfb_ms": 620,
-            "images": [{"url": "hero.webp", "resourceSize": 95000, "mimeType": "image/webp",
-                        "displayedWidth": 1200, "displayedHeight": 600}],
+            "lcp_ms": 1800,
+            "cls": 0.04,
+            "inp_ms": 180,
+            "ttfb_ms": 620,
+            "images": [
+                {
+                    "url": "hero.webp",
+                    "resourceSize": 95000,
+                    "mimeType": "image/webp",
+                    "displayedWidth": 1200,
+                    "displayedHeight": 600,
+                }
+            ],
         }
         (tmp_path / "after.json").write_text(json.dumps(after))
 
@@ -482,11 +570,20 @@ class TestCompareWithLiveURL:
         # Saved baseline (good state) — build via the pipeline so it's
         # schema-compliant.
         before_json = {
-            "lcp_ms": 4200, "cls": 0.18, "inp_ms": 320, "ttfb_ms": 900,
-            "images": [{"url": "hero.jpg", "resourceSize": 1_200_000,
-                        "mimeType": "image/jpeg",
-                        "displayedWidth": 1200, "displayedHeight": 600,
-                        "is_lcp_candidate": True}],
+            "lcp_ms": 4200,
+            "cls": 0.18,
+            "inp_ms": 320,
+            "ttfb_ms": 900,
+            "images": [
+                {
+                    "url": "hero.jpg",
+                    "resourceSize": 1_200_000,
+                    "mimeType": "image/jpeg",
+                    "displayedWidth": 1200,
+                    "displayedHeight": 600,
+                    "is_lcp_candidate": True,
+                }
+            ],
         }
         (tmp_path / "before.json").write_text(json.dumps(before_json))
 
@@ -499,10 +596,17 @@ class TestCompareWithLiveURL:
         )
 
         runner = CliRunner()
-        result = runner.invoke(app, [
-            "compare", "before.json", "https://demo.myshopify.com",
-            "--strategy", "mobile", "--no-cache",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "compare",
+                "before.json",
+                "https://demo.myshopify.com",
+                "--strategy",
+                "mobile",
+                "--no-cache",
+            ],
+        )
         # Exit code 0 = success (a happy-path LCP improvement is expected).
         assert result.exit_code == 0, result.stdout
         # The "improved" word appears in the comparison table for LCP delta.
@@ -519,7 +623,10 @@ class TestCompareWithLiveURL:
 
         monkeypatch.chdir(tmp_path)
         before_json = {
-            "lcp_ms": 4200, "cls": 0.18, "inp_ms": 320, "ttfb_ms": 900,
+            "lcp_ms": 4200,
+            "cls": 0.18,
+            "inp_ms": 320,
+            "ttfb_ms": 900,
             "images": [],
         }
         (tmp_path / "before.json").write_text(json.dumps(before_json))
@@ -531,10 +638,17 @@ class TestCompareWithLiveURL:
         )
 
         runner = CliRunner()
-        result = runner.invoke(app, [
-            "compare", "before.json", "https://demo.myshopify.com",
-            "-o", "report.html", "--no-cache",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "compare",
+                "before.json",
+                "https://demo.myshopify.com",
+                "-o",
+                "report.html",
+                "--no-cache",
+            ],
+        )
         assert result.exit_code == 0, result.stdout
         html = (tmp_path / "report.html").read_text(encoding="utf-8")
         assert "Before / After Comparison" in html
@@ -548,7 +662,10 @@ class TestCompareWithLiveURL:
 
         monkeypatch.chdir(tmp_path)
         before_json = {
-            "lcp_ms": 4200, "cls": 0.18, "inp_ms": 320, "ttfb_ms": 900,
+            "lcp_ms": 4200,
+            "cls": 0.18,
+            "inp_ms": 320,
+            "ttfb_ms": 900,
             "images": [],
         }
         (tmp_path / "before.json").write_text(json.dumps(before_json))
@@ -563,10 +680,15 @@ class TestCompareWithLiveURL:
         )
 
         runner = CliRunner()
-        result = runner.invoke(app, [
-            "compare", "before.json", "https://demo.myshopify.com",
-            "--no-cache",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "compare",
+                "before.json",
+                "https://demo.myshopify.com",
+                "--no-cache",
+            ],
+        )
         assert result.exit_code == 10
         assert "PageSpeed API" in result.stdout
 
@@ -578,15 +700,24 @@ class TestCompareWithLiveURL:
 
         monkeypatch.chdir(tmp_path)
         before_json = {
-            "lcp_ms": 4200, "cls": 0.18, "inp_ms": 320, "ttfb_ms": 900,
+            "lcp_ms": 4200,
+            "cls": 0.18,
+            "inp_ms": 320,
+            "ttfb_ms": 900,
             "images": [],
         }
         (tmp_path / "before.json").write_text(json.dumps(before_json))
 
         runner = CliRunner()
-        result = runner.invoke(app, [
-            "compare", "before.json", "https://demo.myshopify.com",
-            "--strategy", "tablet", "--no-cache",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "compare",
+                "before.json",
+                "https://demo.myshopify.com",
+                "--strategy",
+                "tablet",
+                "--no-cache",
+            ],
+        )
         assert result.exit_code == 2
-

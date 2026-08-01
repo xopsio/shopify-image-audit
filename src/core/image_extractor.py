@@ -124,12 +124,7 @@ def _collect_image_items(lhr: dict[str, Any]) -> list[ImageDict]:
             continue
         seen_src.add(url_str)
 
-        bytes_ = (
-            item.get("resourceSize")
-            or item.get("transferSize")
-            or item.get("bytes")
-            or 0
-        )
+        bytes_ = item.get("resourceSize") or item.get("transferSize") or item.get("bytes") or 0
         mime = item.get("mimeType") or item.get("mime") or "image/jpeg"
         dw = item.get("displayedWidth") or item.get("displayed_width")
         dh = item.get("displayedHeight") or item.get("displayed_height")
@@ -224,4 +219,3 @@ def extract_images(lighthouse_json: dict[str, Any]) -> list[ImageDict]:
 
     _mark_lcp_candidate(images, lcp_url)
     return images
-

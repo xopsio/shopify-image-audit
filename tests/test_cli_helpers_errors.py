@@ -23,6 +23,7 @@ from engine.cli_helpers._errors import (
 # handle_json_errors
 # ---------------------------------------------------------------------------
 
+
 class TestHandleJsonErrors:
     def test_happy_path_returns_value(self, tmp_path) -> None:
         path = tmp_path / "ok.json"
@@ -73,6 +74,7 @@ class TestHandleJsonErrors:
 # handle_pipeline_errors
 # ---------------------------------------------------------------------------
 
+
 class TestHandlePipelineErrors:
     def test_happy_path(self) -> None:
         @handle_pipeline_errors(step_name="audit")
@@ -81,10 +83,13 @@ class TestHandlePipelineErrors:
 
         assert run() == "ok"
 
-    @pytest.mark.parametrize("exc_cls,msg", [
-        (FileNotFoundError, "missing"),
-        (ValueError, "bad input"),
-    ])
+    @pytest.mark.parametrize(
+        "exc_cls,msg",
+        [
+            (FileNotFoundError, "missing"),
+            (ValueError, "bad input"),
+        ],
+    )
     def test_input_errors_become_exit_2(self, exc_cls, msg) -> None:
         @handle_pipeline_errors(step_name="audit")
         def run():
@@ -137,6 +142,7 @@ class TestHandlePipelineErrors:
 # handle_compare_errors
 # ---------------------------------------------------------------------------
 
+
 class TestHandleCompareErrors:
     def test_happy_path(self) -> None:
         @handle_compare_errors()
@@ -145,11 +151,14 @@ class TestHandleCompareErrors:
 
         assert cmp() == "ok"
 
-    @pytest.mark.parametrize("exc", [
-        json.JSONDecodeError("bad json", "x.json", 5),
-        ValueError("bad input"),
-        FileNotFoundError("missing.json"),
-    ])
+    @pytest.mark.parametrize(
+        "exc",
+        [
+            json.JSONDecodeError("bad json", "x.json", 5),
+            ValueError("bad input"),
+            FileNotFoundError("missing.json"),
+        ],
+    )
     def test_input_errors_become_exit_2(self, exc) -> None:
         @handle_compare_errors()
         def cmp():

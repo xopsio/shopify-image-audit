@@ -39,10 +39,7 @@ class TestSuggestCloseMatch:
 
     def test_custom_cutoff(self) -> None:
         # Stricter cutoff rejects the match.
-        assert (
-            suggest_close_match("desktopo", ["mobile", "desktop"], cutoff=0.95)
-            is None
-        )
+        assert suggest_close_match("desktopo", ["mobile", "desktop"], cutoff=0.95) is None
 
     def test_prefers_close_over_far(self) -> None:
         # "mobilo" is closer to "mobile" than to "molecule".

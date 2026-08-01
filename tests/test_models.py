@@ -1,4 +1,4 @@
-﻿"""
+"""
 Model & pipeline integration tests.
 Tests that parser → ranker → AuditResult.model_validate works end-to-end.
 """
@@ -17,6 +17,7 @@ from tests import FIXTURES
 # ---------------------------------------------------------------------------
 # Pipeline integration (parse → rank → validate)
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.parametrize("name", ["bad_hero_lcp.json", "optimized_shopify.json"])
 def test_fixture_pipeline(name: str) -> None:
@@ -51,6 +52,7 @@ def test_fixture_pipeline(name: str) -> None:
 # Pydantic model unit tests
 # ---------------------------------------------------------------------------
 
+
 class TestImageRole:
     def test_all_roles_defined(self) -> None:
         expected = {"hero", "above_fold", "product_primary", "product_secondary", "decorative", "unknown"}
@@ -59,14 +61,21 @@ class TestImageRole:
 
 class TestMeta:
     def test_valid_meta(self) -> None:
-        m = Meta(url="https://example.com", timestamp_utc="2026-03-06T00:00:00Z",
-                 device="mobile", runs=1, tool="lighthouse")
+        m = Meta(
+            url="https://example.com", timestamp_utc="2026-03-06T00:00:00Z", device="mobile", runs=1, tool="lighthouse"
+        )
         assert m.url == "https://example.com"
 
     def test_rejects_extra_fields(self) -> None:
         with pytest.raises(ValidationError):
-            Meta(url="https://x.com", timestamp_utc="2026-03-06T00", device="mobile",
-                 runs=1, tool="lighthouse", bogus="nope")
+            Meta(
+                url="https://x.com",
+                timestamp_utc="2026-03-06T00",
+                device="mobile",
+                runs=1,
+                tool="lighthouse",
+                bogus="nope",
+            )
 
 
 class TestVitals:
@@ -81,8 +90,7 @@ class TestVitals:
 
 class TestImageItem:
     def test_valid_image(self) -> None:
-        img = ImageItem(src="https://cdn.shopify.com/img.webp", role="hero",
-                        score=85, bytes=95000, mime="image/webp")
+        img = ImageItem(src="https://cdn.shopify.com/img.webp", role="hero", score=85, bytes=95000, mime="image/webp")
         assert img.role == ImageRole.hero
 
     def test_rejects_score_over_100(self) -> None:
@@ -93,11 +101,18 @@ class TestImageItem:
 class TestAuditResult:
     def test_rejects_extra_top_level(self) -> None:
         with pytest.raises(ValidationError):
-            AuditResult.model_validate({
-                "meta": {"url": "x", "timestamp_utc": "2026-03-06T00",
-                         "device": "mobile", "runs": 1, "tool": "lighthouse"},
-                "vitals": {"lcp_ms": 0, "cls": 0, "inp_ms": 0, "ttfb_ms": 0},
-                "images": [],
-                "summary": {"top_issues": []},
-                "extra_field": "should_fail",
-            })
+            AuditResult.model_validate(
+                {
+                    "meta": {
+                        "url": "x",
+                        "timestamp_utc": "2026-03-06T00",
+                        "device": "mobile",
+                        "runs": 1,
+                        "tool": "lighthouse",
+                    },
+                    "vitals": {"lcp_ms": 0, "cls": 0, "inp_ms": 0, "ttfb_ms": 0},
+                    "images": [],
+                    "summary": {"top_issues": []},
+                    "extra_field": "should_fail",
+                }
+            )

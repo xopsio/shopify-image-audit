@@ -28,10 +28,10 @@ from tests import FIXTURES
 runner = CliRunner()
 
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _minimal_audit() -> dict:
     return {
@@ -46,7 +46,10 @@ def _minimal_audit() -> dict:
         "images": [
             {
                 "src": "https://cdn.example.com/hero.jpg",
-                "role": "hero", "score": 80, "bytes": 100_000, "mime": "image/jpeg",
+                "role": "hero",
+                "score": 80,
+                "bytes": 100_000,
+                "mime": "image/jpeg",
             },
         ],
         "summary": {"top_issues": []},
@@ -57,6 +60,7 @@ def _minimal_audit() -> dict:
 # audit version
 # ---------------------------------------------------------------------------
 
+
 class TestVersionCommand:
     def test_version_prints_package_version(self) -> None:
         result = runner.invoke(app, ["version"])
@@ -66,10 +70,12 @@ class TestVersionCommand:
         assert "shopify-image-audit" in out
         # Version is a dotted string
         import re
+
         assert re.search(r"\d+\.\d+\.\d+", out), f"No version found in: {out!r}"
 
     def test_get_version_helper_returns_string(self) -> None:
         from engine.cli import _get_version
+
         version = _get_version()
         assert isinstance(version, str)
         assert version != "unknown"  # Should read from pyproject.toml
@@ -78,6 +84,7 @@ class TestVersionCommand:
 # ---------------------------------------------------------------------------
 # audit measure
 # ---------------------------------------------------------------------------
+
 
 class TestMeasureCommand:
     """Mock PageSpeed API responses to test the CLI integration."""
@@ -109,7 +116,9 @@ class TestMeasureCommand:
 
     @responses.activate
     def test_measure_writes_output_file(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         responses.add(
             responses.GET,
@@ -151,6 +160,7 @@ class TestMeasureCommand:
 # audit extract
 # ---------------------------------------------------------------------------
 
+
 class TestExtractCommand:
     def test_extract_happy_path(self, tmp_path: Path) -> None:
         """extract should output parsed image data from a Lighthouse JSON fixture."""
@@ -174,22 +184,27 @@ class TestExtractCommand:
 # audit score
 # ---------------------------------------------------------------------------
 
+
 class TestScoreCommand:
     def test_score_heuristic_happy_path(self, tmp_path: Path) -> None:
         """score with default --ranker heuristic should succeed on a parsed-image list."""
         # Create a parsed-images JSON
         input_path = tmp_path / "extracted.json"
-        input_path.write_text(json.dumps([
-            {
-                "src": "https://cdn.example.com/hero.jpg",
-                "resourceSize": 120000,
-                "mimeType": "image/jpeg",
-                "displayedWidth": 1200,
-                "displayedHeight": 600,
-                "naturalWidth": 2400,
-                "naturalHeight": 1200,
-            },
-        ]))
+        input_path.write_text(
+            json.dumps(
+                [
+                    {
+                        "src": "https://cdn.example.com/hero.jpg",
+                        "resourceSize": 120000,
+                        "mimeType": "image/jpeg",
+                        "displayedWidth": 1200,
+                        "displayedHeight": 600,
+                        "naturalWidth": 2400,
+                        "naturalHeight": 1200,
+                    },
+                ]
+            )
+        )
         result = runner.invoke(app, ["score", str(input_path)])
         assert result.exit_code == 0
         payload = json.loads(result.stdout)
@@ -202,17 +217,21 @@ class TestScoreCommand:
     def test_score_ml_ranker_branch(self, tmp_path: Path) -> None:
         """--ranker ml should select the ML-style ensemble ranker."""
         input_path = tmp_path / "extracted.json"
-        input_path.write_text(json.dumps([
-            {
-                "src": "https://cdn.example.com/hero.jpg",
-                "resourceSize": 120000,
-                "mimeType": "image/jpeg",
-                "displayedWidth": 1200,
-                "displayedHeight": 600,
-                "naturalWidth": 2400,
-                "naturalHeight": 1200,
-            },
-        ]))
+        input_path.write_text(
+            json.dumps(
+                [
+                    {
+                        "src": "https://cdn.example.com/hero.jpg",
+                        "resourceSize": 120000,
+                        "mimeType": "image/jpeg",
+                        "displayedWidth": 1200,
+                        "displayedHeight": 600,
+                        "naturalWidth": 2400,
+                        "naturalHeight": 1200,
+                    },
+                ]
+            )
+        )
         result = runner.invoke(app, ["score", str(input_path), "--ranker", "ml"])
         assert result.exit_code == 0
         payload = json.loads(result.stdout)
@@ -233,6 +252,7 @@ class TestScoreCommand:
 # audit history
 # ---------------------------------------------------------------------------
 
+
 class TestHistoryCliDispatcher:
     """The `audit history` subcommand: list, show, diff (later), and unknown."""
 
@@ -243,18 +263,30 @@ class TestHistoryCliDispatcher:
 
     def test_history_list_empty_exits_0(self, tmp_path: Path) -> None:
         """An empty history directory is not an error — exit 0 with a friendly message."""
-        result = runner.invoke(app, [
-            "history", "list", "mystore.myshopify.com",
-            "--history-dir", str(tmp_path),
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "history",
+                "list",
+                "mystore.myshopify.com",
+                "--history-dir",
+                str(tmp_path),
+            ],
+        )
         assert result.exit_code == 0
         assert "no history" in result.stdout.lower() or "no entries" in result.stdout.lower()
 
     def test_history_show_empty_exits_0(self, tmp_path: Path) -> None:
-        result = runner.invoke(app, [
-            "history", "show", "mystore.myshopify.com",
-            "--history-dir", str(tmp_path),
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "history",
+                "show",
+                "mystore.myshopify.com",
+                "--history-dir",
+                str(tmp_path),
+            ],
+        )
         assert result.exit_code == 0
         assert "no history" in result.stdout.lower() or "no entries" in result.stdout.lower()
 
@@ -262,39 +294,66 @@ class TestHistoryCliDispatcher:
         """Record a baseline first, then list."""
         # Use a real LHR fixture and a custom history dir
         fixture = FIXTURES / "bad_hero_lcp.json"
-        result = runner.invoke(app, [
-            "baseline", str(fixture),
-            "--save", "baseline.json",
-            "--history-dir", str(tmp_path / "history"),
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "baseline",
+                str(fixture),
+                "--save",
+                "baseline.json",
+                "--history-dir",
+                str(tmp_path / "history"),
+            ],
+        )
         assert result.exit_code == 0
 
         # Now list (the bad_hero_lcp fixture has URL cdn.shopify.com — that's the hostname)
-        result = runner.invoke(app, [
-            "history", "list", "cdn.shopify.com",
-            "--history-dir", str(tmp_path / "history"),
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "history",
+                "list",
+                "cdn.shopify.com",
+                "--history-dir",
+                str(tmp_path / "history"),
+            ],
+        )
         assert result.exit_code == 0
 
     def test_history_show_with_entries(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Record a baseline first, then generate a trend HTML."""
         fixture = FIXTURES / "bad_hero_lcp.json"
-        result = runner.invoke(app, [
-            "baseline", str(fixture),
-            "--save", "baseline.json",
-            "--history-dir", str(tmp_path / "history"),
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "baseline",
+                str(fixture),
+                "--save",
+                "baseline.json",
+                "--history-dir",
+                str(tmp_path / "history"),
+            ],
+        )
         assert result.exit_code == 0
 
         # validate_out_path requires relative; chdir then pass basename.
         monkeypatch.chdir(tmp_path)
-        result = runner.invoke(app, [
-            "history", "show", "cdn.shopify.com",
-            "--history-dir", str(tmp_path / "history"),
-            "-o", "trend.html",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "history",
+                "show",
+                "cdn.shopify.com",
+                "--history-dir",
+                str(tmp_path / "history"),
+                "-o",
+                "trend.html",
+            ],
+        )
         assert result.exit_code == 0, f"Output: {result.stdout}"
         out_html = tmp_path / "trend.html"
         assert out_html.exists()
@@ -305,18 +364,26 @@ class TestHistoryCliDispatcher:
 # audit baseline records to history (extends existing coverage)
 # ---------------------------------------------------------------------------
 
+
 class TestBaselineRecordsHistory:
     """The baseline command must record a snapshot to HistoryStore."""
 
     def test_baseline_writes_to_history_dir(self, tmp_path: Path) -> None:
         fixture = FIXTURES / "bad_hero_lcp.json"
         history_dir = tmp_path / "history"
-        result = runner.invoke(app, [
-            "baseline", str(fixture),
-            "--save", "baseline.json",
-            "--history-dir", str(history_dir),
-            "--label", "Initial baseline",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "baseline",
+                str(fixture),
+                "--save",
+                "baseline.json",
+                "--history-dir",
+                str(history_dir),
+                "--label",
+                "Initial baseline",
+            ],
+        )
         assert result.exit_code == 0
         # A hostname directory must exist with at least one .json file
         host_dirs = [d for d in history_dir.iterdir() if d.is_dir()]

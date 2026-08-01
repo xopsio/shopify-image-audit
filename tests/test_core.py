@@ -27,6 +27,7 @@ EXPECTED_SCORES = FIXTURES / "expected_scores.json"
 # fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(scope="module")
 def lhr_data() -> dict[str, Any]:
     with open(EXTRACT_INPUT, encoding="utf-8") as f:
@@ -48,6 +49,7 @@ def expected_scores() -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 # image_extractor
 # ---------------------------------------------------------------------------
+
 
 class TestExtractImages:
     def test_returns_normalized_list(self, lhr_data: dict[str, Any]) -> None:
@@ -96,5 +98,3 @@ class TestExtractImages:
         images = extract_images(lhr)
         assert len(images) == 1
         assert images[0]["bytes"] == 1000  # first occurrence wins
-
-
