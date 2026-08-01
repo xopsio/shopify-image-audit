@@ -272,6 +272,11 @@ merge. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
   - `ruff format` applied across the whole repo (53 files)
   - `ruff format --check` added to CI (no future drift)
   - 4 Dependabot PRs merged (rich constraint widened, GitHub Actions bumps)
+- ✅ Sprint 13 — Strict mypy, v0.10.0 (695 tests)
+  - `mypy --strict` clean across 30 source files (zero ignore comments)
+  - `ParamSpec` + `TypeVar` preserves decorator signatures
+  - 26 mechanical annotation fixes (`dict[str, Any]`, `list[Any]`,
+    return-type annotations)
 
 ---
 
