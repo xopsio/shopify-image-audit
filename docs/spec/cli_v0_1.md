@@ -24,19 +24,24 @@ families with subcommands): `run`, `extract`, `score`, `report`, `measure`,
 
 Runs Lighthouse and writes raw results.
 
-**Prerequisites:** The `lighthouse` Node CLI must be on `PATH`. Install
-with `npm i -g lighthouse`. If the binary is missing, the command
-exits `10` with a hint. To bypass the live audit and use a pre-existing
-Lighthouse report, pass `--lhr <path>` — this also lets you re-run the
-audit pipeline on a stored report (e.g. from a CI archive).
+**Prerequisites:** The `lighthouse` Node CLI must be available. The
+binary is resolved in this order: `--lighthouse-bin PATH` →
+`$LIGHTHOUSE_BIN` → `PATH` lookup. Install with `npm i -g lighthouse`.
+If none of the paths resolves to an existing file, the command exits
+`10` with a multi-line help message. To bypass the live audit and use
+a pre-existing Lighthouse report, pass `--lhr <path>` — this also lets
+you re-run the audit pipeline on a stored report (e.g. from a CI
+archive). Full guide: `docs/integrations/LIGHTHOUSE.md`.
 
 **Flags:**
-- `--device mobile|desktop` (default `mobile`)
+- `--device mobile|desktop` (default `mobile`; falls back to `[defaults] device` in `config.toml`)
 - `--runs 3` (default 3)
 - `--out-dir <path>` (default `artifacts/`)
 - `--lhr <path>` (use an existing Lighthouse JSON instead of running live)
+- `--lighthouse-bin <path>` (default `None`; also reads `$LIGHTHOUSE_BIN`)
 
-**Exit codes:** `0` success · `2` invalid args · `10` lighthouse failure.
+**Exit codes:** `0` success · `2` invalid args · `10` lighthouse failure
+(missing binary, subprocess non-zero exit, or per-run timeout).
 
 ---
 

@@ -37,6 +37,9 @@ sudo apt-get install -y libpango-1.0-0 libpangoft2-1.0-0 libcairo2 libgdk-pixbuf
 
 The `lighthouse` Node CLI is required for `audit run <url>`. Install with
 `npm i -g lighthouse` (or pass `--lhr <file>` to use a pre-existing report).
+The binary can be overridden via `--lighthouse-bin PATH` or `$LIGHTHOUSE_BIN`;
+see [`docs/integrations/LIGHTHOUSE.md`](docs/integrations/LIGHTHOUSE.md) for
+the full install guide and CI recipes.
 
 ### Developer install (from source)
 
