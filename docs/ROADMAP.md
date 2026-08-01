@@ -1,6 +1,6 @@
 # Roadmap — Shopify Image Audit
 
-**Last updated:** 2026-08-01 (Sprint 17 complete, v0.13.0 released)
+**Last updated:** 2026-08-01 (Sprint 18 complete, v0.14.0 released)
 **Owner:** ZCode (single-agent, governance v1.3)
 
 ---
@@ -178,6 +178,7 @@ the fourth targets scalability and recurring revenue.
 | 2026-08-01 | LighthouseJson TypedDict hierarchy (Sprint 15) | Documented every PageSpeed/Lighthouse response field the runtime reads; `total=False` keeps partial mocks valid; `CachedPageSpeedResponse` wraps the success/error envelope |
 | 2026-08-01 | Lighthouse binary resolution + timeout (Sprint 16) | `--lighthouse-bin` flag + `$LIGHTHOUSE_BIN` env, 10-minute per-run timeout, multi-line help message. Closes the 0/6 testing gap in `_run_lighthouse` (now 6/6 + 4 resolver tests) |
 | 2026-08-01 | Rich Progress for batch jobs (Sprint 17) | `on_done` callback in `run_parallel` lets the CLI thread a progress bar through batch + scheduler runs without re-implementing the loop; transient bar keeps the per-store post-mortem as the canonical output |
+| 2026-08-01 | Shopify Admin API TypedDict contracts (Sprint 18) | Documents the four Admin endpoints (`/shop.json`, `/products.json`, `/themes.json`, `/themes/{id}/assets.json`) consumed by this module; slim output shapes typed separately; `total=False` keeps existing `.get(...)` reads and partial-mock tests intact |
 
 ---
 
@@ -202,5 +203,6 @@ the fourth targets scalability and recurring revenue.
 | 15 | 2026-08 | ✅ Complete | 705 | 79 |
 | 16 | 2026-08 | ✅ Complete | 715 | 80 |
 | 17 | 2026-08 | ✅ Complete | 721 | 81 |
+| 18 | 2026-08 | ✅ Complete | 726 | 82 |
 
 See [`docs/`](.) for the full documentation tree.
