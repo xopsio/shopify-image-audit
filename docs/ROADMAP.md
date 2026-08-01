@@ -1,6 +1,6 @@
 # Roadmap — Shopify Image Audit
 
-**Last updated:** 2026-08-01 (Sprint 20 complete, v0.16.0 released)
+**Last updated:** 2026-08-01 (Sprint 21 complete, v0.16.1 released)
 **Owner:** ZCode (single-agent, governance v1.3)
 
 ---
@@ -181,6 +181,7 @@ the fourth targets scalability and recurring revenue.
 | 2026-08-01 | Shopify Admin API TypedDict contracts (Sprint 18) | Documents the four Admin endpoints (`/shop.json`, `/products.json`, `/themes.json`, `/themes/{id}/assets.json`) consumed by this module; slim output shapes typed separately; `total=False` keeps existing `.get(...)` reads and partial-mock tests intact |
 | 2026-08-01 | Shopify Admin OAuth (Sprint 19) | `audit shopify login <store>` opens the browser, exchanges the code via the embedded loopback server, persists the token in `tokens.json`. CSRF via `secrets.compare_digest`. Closes a 2-year-old "out of scope" item. Token encryption and multi-store batch login are deferred |
 | 2026-08-01 | Token encryption (Sprint 20) | Fernet + AES-128-CBC + HMAC, key in system keyring (macOS Keychain / Windows Credential Manager / Linux Secret Service). `$SHOPIFY_AUDIT_TOKENS_DISABLED=1` opt-out for CI. Tokens no longer readable with `grep tokens.json`. Multi-store batch login still deferred |
+| 2026-08-01 | Batch auto-token from TokensStore (Sprint 21) | `access_token` is optional in `stores.json`; `audit shopify batch` falls back to the persisted `tokens.json` populated by `audit shopify login`. Backwards compatible (explicit token still wins) and lets a team share a credential-free `stores-file`. Chosen over per-store OAuth loops (Option A) and a `--login` batch flag (Option C): smallest change, biggest benefit. Multi-store batch login (`audit shopify login <stores-file>`) remains deferred |
 
 ---
 
@@ -208,5 +209,6 @@ the fourth targets scalability and recurring revenue.
 | 18 | 2026-08 | ✅ Complete | 726 | 82 |
 | 19 | 2026-08 | ✅ Complete | 752 | 83 |
 | 20 | 2026-08 | ✅ Complete | 780 | 84 |
+| 21 | 2026-08 | ✅ Complete | 785 | 85 |
 
 See [`docs/`](.) for the full documentation tree.

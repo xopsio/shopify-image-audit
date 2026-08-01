@@ -93,6 +93,30 @@ Limit the number of products (default 50, max 250):
 audit shopify inventory mystore.myshopify.com --limit 100
 ```
 
+### Batch auditing multiple stores
+
+```bash
+audit shopify batch --stores-file stores.json -o batch.json
+```
+
+`stores.json` is a JSON array of store entries. Each entry **must**
+have `shop_domain`; `access_token` is **optional** since v0.16.1:
+
+```json
+[
+  {"shop_domain": "store-a.myshopify.com", "access_token": "shpat_xxx"},
+  {"shop_domain": "store-b.myshopify.com"}
+]
+```
+
+When `access_token` is omitted, the token is read from `tokens.json`
+— i.e. the store must have been logged in once with
+`audit shopify login store-b.myshopify.com` (see
+[`SHOPIFY_OAUTH.md`](SHOPIFY_OAUTH.md)). This lets you share a
+credential-free `stores.json` across a team. If neither source has a
+token, that store's audit fails with an error telling you to run
+`audit shopify login` first.
+
 ## Exit codes
 
 | Code | Meaning |

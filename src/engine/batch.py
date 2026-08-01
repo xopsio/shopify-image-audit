@@ -31,20 +31,30 @@ from integrations.shopify_admin import ShopifyAdminClient
 
 @dataclass(frozen=True)
 class StoreConfig:
-    """One store to be audited in a batch run."""
+    """One store to be audited in a batch run.
+
+    ``access_token`` is optional as of Sprint 21: if it is ``None``,
+    :func:`_audit_one_store` falls back to the persisted ``TokensStore``
+    (populated by ``audit shopify login``). This lets users share
+    ``stores-file`` configs without exposing credentials — the secrets
+    stay in ``tokens.json``.
+    """
 
     shop_domain: str
-    access_token: str
+    access_token: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> StoreConfig:
         try:
-            return cls(
-                shop_domain=str(data["shop_domain"]),
-                access_token=str(data["access_token"]),
-            )
+            shop_domain = str(data["shop_domain"])
         except KeyError as exc:
             raise ValueError(f"Missing required key {exc.args[0]!r} in store config entry") from exc
+        # ``access_token`` is optional — callers can omit it and rely
+        # on ``TokensStore`` instead.
+        return cls(
+            shop_domain=shop_domain,
+            access_token=str(data["access_token"]) if "access_token" in data else None,
+        )
 
 
 @dataclass
@@ -90,8 +100,27 @@ def parse_stores_file(path: str | Path) -> list[StoreConfig]:
 
 
 def _audit_one_store(store: StoreConfig) -> StoreResult:
-    """Run the Shopify Admin inventory call for one store."""
-    client = ShopifyAdminClient(store.shop_domain, store.access_token)
+    """Run the Shopify Admin inventory call for one store.
+
+    If ``store.access_token`` is ``None``, falls back to the persisted
+    :class:`~engine.tokens.TokensStore` (populated by
+    ``audit shopify login``). If neither source yields a token, the
+    store is reported as a failure with an actionable message.
+    """
+    # Resolve the access token: explicit > TokensStore.
+    access_token = store.access_token
+    if access_token is None:
+        from engine.tokens import TokensStore
+
+        access_token = TokensStore().get(store.shop_domain)
+    if access_token is None:
+        return StoreResult(
+            shop_domain=store.shop_domain,
+            success=False,
+            error=f"No access token for {store.shop_domain}; run `audit shopify login {store.shop_domain}` first.",
+        )
+
+    client = ShopifyAdminClient(store.shop_domain, access_token)
     try:
         products = client.get_products()
         theme_assets = client.get_theme_assets()

@@ -17,13 +17,28 @@ from engine.batch import (
     BatchResult,
     StoreConfig,
     StoreResult,
+    _audit_one_store,
     merge_inventory,
     parse_stores_file,
     run_batch,
 )
 from engine.cli import app
+from engine.tokens import TokensStore
 
 runner = CliRunner()
+
+
+@pytest.fixture
+def token_store_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Redirect ``TokensStore`` to a tmp path without a keyring.
+
+    Mirrors ``tokens_dir`` in tests/test_tokens.py, but also sets
+    ``$SHOPIFY_AUDIT_TOKENS_DISABLED=1`` so the store round-trips
+    plaintext (the CI runner has no D-Bus / Secret Service).
+    """
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    monkeypatch.setenv("SHOPIFY_AUDIT_TOKENS_DISABLED", "1")
+    return tmp_path
 
 
 # ---------------------------------------------------------------------------
@@ -60,16 +75,27 @@ class TestParseStoresFile:
             parse_stores_file(path)
 
     def test_missing_required_key(self, tmp_path: Path) -> None:
+        # Only ``shop_domain`` is required (Sprint 21); a missing
+        # ``access_token`` falls back to ``TokensStore`` at audit time.
         path = tmp_path / "missing.json"
         path.write_text(
             json.dumps(
                 [
-                    {"shop_domain": "a.myshopify.com"},  # no access_token
+                    {"access_token": "shpat_a"},  # no shop_domain
                 ]
             )
         )
-        with pytest.raises(ValueError, match="Missing required key"):
+        with pytest.raises(ValueError, match="Missing required key 'shop_domain'"):
             parse_stores_file(path)
+
+    def test_valid_json_array_without_tokens(self, tmp_path: Path) -> None:
+        """Entries without ``access_token`` are valid (TokensStore fallback)."""
+        path = tmp_path / "stores.json"
+        path.write_text(json.dumps([{"shop_domain": "a.myshopify.com"}]))
+        stores = parse_stores_file(path)
+        assert len(stores) == 1
+        assert stores[0].shop_domain == "a.myshopify.com"
+        assert stores[0].access_token is None
 
     def test_missing_file_raises(self, tmp_path: Path) -> None:
         with pytest.raises(FileNotFoundError):
@@ -93,8 +119,13 @@ class TestStoreConfig:
         assert cfg.access_token == "shpat_a"
 
     def test_from_dict_missing_key_raises(self) -> None:
-        with pytest.raises(ValueError, match="Missing required key"):
-            StoreConfig.from_dict({"shop_domain": "x"})
+        with pytest.raises(ValueError, match="Missing required key 'shop_domain'"):
+            StoreConfig.from_dict({"access_token": "shpat_a"})
+
+    def test_from_dict_without_access_token(self) -> None:
+        cfg = StoreConfig.from_dict({"shop_domain": "a.myshopify.com"})
+        assert cfg.shop_domain == "a.myshopify.com"
+        assert cfg.access_token is None
 
 
 # ---------------------------------------------------------------------------
@@ -274,6 +305,99 @@ class TestRunBatchParallel:
             )
             run_batch(stores, parallel=0)
             assert mock_audit.call_count == 2
+
+
+# ---------------------------------------------------------------------------
+# _audit_one_store: TokensStore fallback (Sprint 21)
+# ---------------------------------------------------------------------------
+
+
+class TestAuditOneStoreTokensFallback:
+    @responses.activate
+    def test_falls_back_to_tokens_store(self, token_store_dir: Path) -> None:
+        """A store config without ``access_token`` reads it from TokensStore."""
+        TokensStore().set("a.myshopify.com", "shpat_from_store")
+
+        # Every request must carry the persisted token, proving the
+        # fallback value is what actually authenticates the client.
+        header = {"X-Shopify-Access-Token": "shpat_from_store"}
+        for url, payload in (
+            (
+                "https://a.myshopify.com/admin/api/2024-10/shop.json",
+                {"shop": {"name": "A", "domain": "a.myshopify.com"}},
+            ),
+            (
+                "https://a.myshopify.com/admin/api/2024-10/products.json",
+                {"products": [{"id": 1, "title": "T", "handle": "h", "image": {"src": "https://x/y.jpg"}}]},
+            ),
+            (
+                "https://a.myshopify.com/admin/api/2024-10/themes.json",
+                {"themes": [{"id": 1, "name": "main", "role": "main"}]},
+            ),
+            (
+                "https://a.myshopify.com/admin/api/2024-10/themes/1/assets.json",
+                {"assets": []},
+            ),
+        ):
+            responses.add(
+                responses.GET,
+                url,
+                json=payload,
+                status=200,
+                match=[responses.matchers.header_matcher(header)],
+            )
+
+        result = _audit_one_store(StoreConfig(shop_domain="a.myshopify.com"))
+        assert result.success, result.error
+        assert len(result.inventory) == 1
+        assert result.inventory[0]["source"] == "product"
+
+    def test_missing_token_returns_actionable_error(self, token_store_dir: Path) -> None:
+        """No token anywhere: clear failure telling the user to log in."""
+        result = _audit_one_store(StoreConfig(shop_domain="a.myshopify.com"))
+        assert not result.success
+        assert result.error is not None
+        assert "a.myshopify.com" in result.error
+        assert "audit shopify login" in result.error
+        assert result.inventory == []
+
+    @responses.activate
+    def test_explicit_token_wins_over_tokens_store(self, token_store_dir: Path) -> None:
+        """An explicit ``access_token`` still takes precedence."""
+        TokensStore().set("a.myshopify.com", "shpat_from_store")
+
+        header = {"X-Shopify-Access-Token": "shpat_explicit"}
+        responses.add(
+            responses.GET,
+            "https://a.myshopify.com/admin/api/2024-10/shop.json",
+            json={"shop": {"name": "A", "domain": "a.myshopify.com"}},
+            status=200,
+            match=[responses.matchers.header_matcher(header)],
+        )
+        responses.add(
+            responses.GET,
+            "https://a.myshopify.com/admin/api/2024-10/products.json",
+            json={"products": []},
+            status=200,
+            match=[responses.matchers.header_matcher(header)],
+        )
+        responses.add(
+            responses.GET,
+            "https://a.myshopify.com/admin/api/2024-10/themes.json",
+            json={"themes": [{"id": 1, "name": "main", "role": "main"}]},
+            status=200,
+            match=[responses.matchers.header_matcher(header)],
+        )
+        responses.add(
+            responses.GET,
+            "https://a.myshopify.com/admin/api/2024-10/themes/1/assets.json",
+            json={"assets": []},
+            status=200,
+            match=[responses.matchers.header_matcher(header)],
+        )
+
+        result = _audit_one_store(StoreConfig(shop_domain="a.myshopify.com", access_token="shpat_explicit"))
+        assert result.success, result.error
 
 
 # ---------------------------------------------------------------------------

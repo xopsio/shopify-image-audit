@@ -168,8 +168,13 @@ expose a `--redirect-uri` flag — file an issue if you need it.
 
 ## Deferred (future sprints)
 
-- Token encryption (keyring / `cryptography.fernet`).
-- Multi-store batch login (`audit shopify login <stores-file>`).
+- ~~Token encryption (keyring / `cryptography.fernet`).~~ — shipped in
+  v0.16.0; see [Token storage](#token-storage).
+- Multi-store batch login (`audit shopify login <stores-file>`). As of
+  v0.16.1 `audit shopify batch` already *consumes* tokens stored by
+  individual `audit shopify login <store>` calls when the
+  `stores-file` entry has no `access_token` — the remaining gap is
+  only the one-shot "log in N stores" convenience command.
 - HTTPS-terminated callback for production reverse proxies.
 - Public-app listing on the Shopify App Store.
 
