@@ -131,6 +131,26 @@ reset), the next `audit shopify auth` call will fail with a
 decryption error. Re-run `audit shopify login <store>` to obtain
 a fresh token — the old encrypted blob will be silently replaced.
 
+## Batch login (v0.16.2+)
+
+Authorise several stores in one run with the same `stores.json` file
+that `audit shopify batch` consumes:
+
+```bash
+audit shopify login --stores-file stores.json
+# (1/2) Opening browser to authorize store-a.myshopify.com…
+# (2/2) Opening browser to authorize store-b.myshopify.com…
+# ✓ 2 stores authorised.
+```
+
+Each store gets its own browser flow with the standard 60-second
+callback timeout, processed sequentially — N stores can take up to
+N × 60 s wall-clock. Stores that time out or are denied do not abort
+the run: they are reported in a summary line (`1 authorised, 1
+failed`) and the command exits with code 2. An `access_token` in a
+`stores-file` entry is ignored — login always performs the OAuth flow,
+so a file can be shared even if it already carries tokens.
+
 ## Headless environments
 
 The CLI prints the authorize URL before launching the browser, so
@@ -170,11 +190,8 @@ expose a `--redirect-uri` flag — file an issue if you need it.
 
 - ~~Token encryption (keyring / `cryptography.fernet`).~~ — shipped in
   v0.16.0; see [Token storage](#token-storage).
-- Multi-store batch login (`audit shopify login <stores-file>`). As of
-  v0.16.1 `audit shopify batch` already *consumes* tokens stored by
-  individual `audit shopify login <store>` calls when the
-  `stores-file` entry has no `access_token` — the remaining gap is
-  only the one-shot "log in N stores" convenience command.
+- ~~Multi-store batch login (`audit shopify login <stores-file>`).~~ —
+  shipped in v0.16.2; see [Batch login](#batch-login).
 - HTTPS-terminated callback for production reverse proxies.
 - Public-app listing on the Shopify App Store.
 

@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.16.2] - 2026-08-01
+
+### Added (Sprint 22)
+- `audit shopify login --stores-file stores.json` authorises every
+  store in the file in one run — each store gets its own browser
+  flow with the standard 60-second callback timeout — TD-1
+- Per-store failures (denied / timeout / exchange error) do not
+  abort the run: a summary line reports `N authorised, M failed`
+  and the command exits with code 2 if any store failed — TD-1
+- `_login_one_store` helper extracted from `_shopify_login`; the
+  single-store path is unchanged (exit 2 on failure, "next steps"
+  hint on success) — TD-1
+- First CLI-level test coverage for `audit shopify login`
+  (`tests/test_shopify_login_cli.py`): 12 tests with a fake
+  callback server and stubbed token exchange — TD-3
+
+### Changed (Sprint 22)
+- `--stores-file` help text now covers both `batch` and `login` —
+  TD-2
+- `docs/integrations/SHOPIFY_OAUTH.md` gains a "Batch login"
+  section; the multi-store item is struck through in the deferred
+  list; `SHOPIFY_ADMIN.md` documents the one-shot login step —
+  TD-4
+
+### Stats
+- 797 tests pass (up from 785; +12 across `test_shopify_login_cli.py`),
+  22 snapshots unchanged
+
+---
+
 ## [0.16.1] - 2026-08-01
 
 ### Added (Sprint 21)
