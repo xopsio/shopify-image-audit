@@ -9,7 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Empty — all Sprint 12 work shipped in v0.9.1.
+Empty — all Sprint 13 work shipped in v0.10.0.
+
+---
+
+## [0.10.0] - 2026-08-01
+
+### Added (Sprint 13)
+- `[tool.mypy]` promoted to `strict = true` — every function typed,
+  no implicit `Optional`, no untyped calls. CI gate strengthened —
+  TD-1..5
+- `ParamSpec` + `TypeVar` pattern in `engine/cli_helpers/_errors.py`
+  preserves the wrapped function's signature through all four
+  error-handling decorators (`handle_json_errors`,
+  `handle_pipeline_errors`, `handle_compare_errors`,
+  `handle_shopify_errors`) — TD-1
+
+### Changed (Sprint 13)
+- All `dict` / `list` / `Callable` annotations carry full generic
+  arguments (`dict[str, Any]`, `list[Any]`,
+  `Callable[[Callable[P, R]], Callable[P, R]]`) — TD-1..4
+
+### Stats
+- 695 tests pass (unchanged; pure hardening sprint)
+- `mypy src/` (now `strict`): Success, 30 files, **zero** ignore comments
+- Ruff check + format clean
+- 77 PRs merged
 
 ---
 
@@ -155,6 +180,7 @@ Empty — all Sprint 12 work shipped in v0.9.1.
 - Single concurrency primitive (`run_parallel`) replaces two copies
 - Test fixtures consolidated into one place
 
+[0.10.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/xopsio/shopify-image-audit/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.7.1...v0.8.0

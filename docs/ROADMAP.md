@@ -1,6 +1,6 @@
 # Roadmap — Shopify Image Audit
 
-**Last updated:** 2026-08-01 (Sprint 12 complete, v0.9.1 released)
+**Last updated:** 2026-08-01 (Sprint 13 complete, v0.10.0 released)
 **Owner:** ZCode (single-agent, governance v1.3)
 
 ---
@@ -129,7 +129,7 @@ the fourth targets scalability and recurring revenue.
 - ✅ Snapshot tests for HTML report (Sprint 5 TD-1, syrupy, 22 golden files)
 - ✅ SBOM generation (Sprint 10 TD-2, CycloneDX JSON in release artifacts)
 - ✅ User-side TOML config (Sprint 11 TD-1+TD-2, 13 keys / 5 sections, flag > env > config > default)
-- ✅ Mypy rollout (Sprint 10 TD-1) — CI-gate, zero ignore comments, `ImageDict` TypedDict contract; "strict" mode is a future follow-up
+- ✅ Mypy rollout (Sprint 10 TD-1) — CI-gate, zero ignore comments, `ImageDict` TypedDict contract; "strict" mode reached in Sprint 13
 
 ### Theme E — UX & DX (Sprint 8+)
 - ✅ "Did you mean: X?" suggestions on every typo site (Sprint 8 TD-1)
@@ -173,6 +173,7 @@ the fourth targets scalability and recurring revenue.
 | 2026-08-01 | Mypy as a CI gate, `ImageDict` TypedDict as the image-dict contract | Code was already ~100% annotated; the sweep surfaced 3 real type gaps (run_parallel's wrong generic, absent-vs-zero metric mapping, `_CACHE_SUBDIR` dead code) and removed all `type: ignore` comments |
 | 2026-08-01 | CycloneDX SBOM in release artifacts | Complements SLSA provenance with a dependency inventory; one step in the existing build job |
 | 2026-08-01 | User-side TOML config with flag > env > config > default precedence | The last user-visible deferred item; boolean flags (`no_cache`, `stop_on_error`, `pdf`) deliberately excluded because Typer has no reliable "unset" form |
+| 2026-08-01 | Mypy `--strict` as CI gate | 26 mechanical annotation fixes; `ParamSpec`/`TypeVar` decorators preserve wrapped-function signatures. Baseline-manager's 4 `cast(dict[str, Any], ...)` remain as a deliberate loose-dict contract for `ImageDelta.before/after` |
 
 ---
 
@@ -192,5 +193,6 @@ the fourth targets scalability and recurring revenue.
 | 10 | 2026-08 | ✅ Complete | 672 | 70 |
 | 11 | 2026-08 | ✅ Complete | 695 | 72 |
 | 12 | 2026-08 | ✅ Complete | 695 | 76 |
+| 13 | 2026-08 | ✅ Complete | 695 | 77 |
 
 See [`docs/`](.) for the full documentation tree.
