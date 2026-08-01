@@ -178,25 +178,25 @@ def _run_lighthouse(
 
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    form_factor = "desktop" if device == "desktop" else "mobile"
-    emulated = "none" if device == "desktop" else "mobile"
-
     best_path: Path | None = None
     from engine._logging import get_logger
 
     _lh_log = get_logger()
     for i in range(1, runs + 1):
         out_file = out_dir / f"lhr_run{i}.json"
+        # Lighthouse 13.x accepts --preset values "perf", "experimental",
+        # "desktop" — "mobile" is not valid. Mobile is the Lighthouse
+        # default and needs no extra flag. Desktop uses --preset=desktop.
         cmd = [
             str(lh_bin),
             url,
             "--output=json",
             f"--output-path={out_file}",
-            f"--preset={form_factor}",
-            f"--emulated-form-factor={emulated}",
             "--only-categories=performance",
             "--chrome-flags=--headless",
         ]
+        if device == "desktop":
+            cmd.append("--preset=desktop")
         rprint(f"[cyan]Lighthouse run {i}/{runs}[/cyan]")
         _lh_log.info("Lighthouse run %d/%d: %s", i, runs, url)
         try:
