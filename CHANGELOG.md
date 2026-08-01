@@ -9,7 +9,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Empty — all Sprint 15 work shipped in v0.11.0.
+Empty — all Sprint 16 work shipped in v0.12.0.
+
+---
+
+## [0.12.0] - 2026-08-01
+
+### Added (Sprint 16)
+- `--lighthouse-bin PATH` flag on `audit run` (overrides everything
+  else when the binary is not on `PATH`) — TD-1
+- `$LIGHTHOUSE_BIN` env var as second-tier override (via Typer
+  `envvar=` binding) — TD-1
+- 10-minute per-run subprocess timeout (`_LIGHTHOUSE_TIMEOUT_SECONDS`)
+  prevents Lighthouse from hanging the audit indefinitely on stuck
+  headless Chrome — TD-1
+- Multi-line error message when no Lighthouse binary is found: lists
+  every resolution path plus the `--lhr <file>` bypass — TD-1
+- New `docs/integrations/LIGHTHOUSE.md` covers requirements, install
+  options, resolution order, bypass, troubleshooting matrix, and CI
+  recipes (GitHub Actions / Docker / pinned versions) — TD-3
+
+### Fixed (Sprint 16)
+- `_run_lighthouse` was unbounded — a stuck Lighthouse process now
+  raises `typer.Exit(10)` via the new `subprocess.TimeoutExpired`
+  handler — TD-1
+
+### Stats
+- 715 tests pass (up from 705; +10 Lighthouse tests; the
+  `_run_lighthouse` 0/6 testing gap is now 6/6 covered)
+- `mypy src/` (strict): Success, 30 files, zero ignores
+- Ruff check + format clean
+- 80 PRs merged
 
 ---
 
@@ -235,6 +265,7 @@ Empty — all Sprint 15 work shipped in v0.11.0.
 - Single concurrency primitive (`run_parallel`) replaces two copies
 - Test fixtures consolidated into one place
 
+[0.12.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.10.1...v0.11.0
 [0.10.1]: https://github.com/xopsio/shopify-image-audit/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.9.1...v0.10.0

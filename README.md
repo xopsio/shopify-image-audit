@@ -289,6 +289,11 @@ merge. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
   - `LighthouseJson` + `AuditEntry` + `Categories` + `PerformanceCategory`
   - `CachedPageSpeedResponse` (envelope) + `CachedEntry` (cache)
   - `run_audit()` parses `LighthouseJson` directly
+- ✅ Sprint 16 — Lighthouse install validation, v0.12.0 (715 tests)
+  - `--lighthouse-bin PATH` flag + `$LIGHTHOUSE_BIN` env override
+  - 10-minute per-run timeout (no more infinite hangs)
+  - `docs/integrations/LIGHTHOUSE.md` (install, CI recipes, troubleshooting)
+  - 6/6 `_run_lighthouse` testing gap closed (+ 4 resolver tests)
 
 ---
 
