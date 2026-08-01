@@ -65,6 +65,15 @@ class ShopifyConfig:
     """Shopify Admin API settings."""
 
     access_token: str | None = None
+    # OAuth-flow credentials (Sprint 19). ``client_id`` / ``client_secret``
+    # come from a custom app in the Shopify Partner dashboard.
+    client_id: str | None = None
+    client_secret: str | None = None
+    # Full callback URL registered in the Partner dashboard. Defaults to
+    # the loopback URL the embedded callback server binds to.
+    redirect_uri: str | None = None
+    # Comma-separated scope list forwarded to Shopify's authorize URL.
+    scopes: str = "read_products,read_themes,read_shop"
 
 
 @dataclass(frozen=True)
