@@ -9,6 +9,9 @@ Covers:
 - Subprocess success writes a JSON report that ``run`` can consume
 - Subprocess ``CalledProcessError`` → exit 10
 - Subprocess ``TimeoutExpired`` → exit 10
+- Sprint 23: ``--preset=mobile`` regression guard — mobile builds the
+  cmd without ``--preset`` (Lighthouse default) and without
+  ``--emulated-form-factor``; desktop builds it with ``--preset=desktop``
 
 The tests never invoke a real Lighthouse binary; they mock both
 ``shutil.which`` and ``subprocess.run`` via ``monkeypatch``.
@@ -170,6 +173,101 @@ class TestRunLighthouse:
                 lighthouse_bin=fake,
             )
         assert exc.value.exit_code == EXIT_LIGHTHOUSE_FAILURE
+
+
+# ---------------------------------------------------------------------------
+# _run_lighthouse — cmd shape (Sprint 23 mobile/desktop regression guard)
+# ---------------------------------------------------------------------------
+
+
+def _capture_cmd(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    device: str,
+    runs: int,
+) -> list[list[str]]:
+    """Run ``_run_lighthouse`` with a stub that records every ``cmd``."""
+    fake = tmp_path / "lh"
+    fake.write_text("#!/bin/sh\n", encoding="utf-8")
+    out_dir = tmp_path / "artifacts"
+    captured: list[list[str]] = []
+
+    def fake_run(cmd, **kwargs):
+        captured.append(list(cmd))
+        # Write the output-path file so the success path completes.
+        out_arg = next(t for t in cmd if t.startswith("--output-path="))
+        out_path = Path(out_arg.split("=", 1)[1])
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text("{}", encoding="utf-8")
+
+    monkeypatch.setattr("engine.cli.subprocess.run", fake_run)
+    _run_lighthouse(
+        "https://example.com",
+        device=device,
+        runs=runs,
+        out_dir=out_dir,
+        lighthouse_bin=fake,
+    )
+    return captured
+
+
+class TestRunLighthouseCmdShape:
+    """Sprint 23: pin the exact ``cmd`` list that ``_run_lighthouse`` passes
+    to ``subprocess.run``. Lighthouse 13.x rejects ``--preset=mobile``,
+    so mobile must build a minimal cmd and rely on the Lighthouse default
+    for mobile emulation.
+    """
+
+    REQUIRED_FLAGS = (
+        "--output=json",
+        "--only-categories=performance",
+        "--chrome-flags=--headless",
+    )
+
+    def test_mobile_has_no_preset_or_emulated_form_factor(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        captured = _capture_cmd(tmp_path, monkeypatch, device="mobile", runs=1)
+        cmd = captured[0]
+        # The URL must come right after the binary path.
+        assert cmd[0].endswith("/lh")
+        assert cmd[1] == "https://example.com"
+        # The standard required flags are present.
+        for flag in self.REQUIRED_FLAGS:
+            assert flag in cmd, f"missing required flag {flag!r} in {cmd!r}"
+        # Mobile must NOT pass --preset at all (Lighthouse default is mobile,
+        # and the only valid --preset values are perf|experimental|desktop).
+        assert not any(t.startswith("--preset") for t in cmd), f"--preset leaked into mobile cmd: {cmd!r}"
+        # The removed --emulated-form-factor must NOT be passed either.
+        assert not any(t.startswith("--emulated-form-factor") for t in cmd), (
+            f"--emulated-form-factor leaked into mobile cmd: {cmd!r}"
+        )
+        # The output-path flag uses the file the loop just allocated.
+        out_arg = next(t for t in cmd if t.startswith("--output-path="))
+        assert out_arg.endswith("/lhr_run1.json")
+
+    def test_desktop_uses_preset_desktop(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        captured = _capture_cmd(tmp_path, monkeypatch, device="desktop", runs=1)
+        cmd = captured[0]
+        assert cmd[1] == "https://example.com"
+        for flag in self.REQUIRED_FLAGS:
+            assert flag in cmd, f"missing required flag {flag!r} in {cmd!r}"
+        assert "--preset=desktop" in cmd
+        assert not any(t.startswith("--preset=mobile") for t in cmd)
+        assert not any(t.startswith("--emulated-form-factor=none") for t in cmd), (
+            "redundant --emulated-form-factor=none leaked into desktop cmd"
+        )
+
+    def test_multi_run_produces_sequential_paths(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        captured = _capture_cmd(tmp_path, monkeypatch, device="mobile", runs=3)
+        assert len(captured) == 3
+        for i, cmd in enumerate(captured, start=1):
+            out_arg = next(t for t in cmd if t.startswith("--output-path="))
+            assert out_arg.endswith(f"/lhr_run{i}.json"), out_arg
+        # The last successful run's path is the one returned by _run_lighthouse.
+        last_out = Path(next(t for t in captured[-1] if t.startswith("--output-path=")).split("=", 1)[1])
+        assert last_out.is_file()
 
 
 # ---------------------------------------------------------------------------
