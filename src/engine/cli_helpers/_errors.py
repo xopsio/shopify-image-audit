@@ -23,21 +23,27 @@ import functools
 import json
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import ParamSpec, TypeVar
 
 from rich import print as rprint
 
+# Type-preserving decorator pattern (Sprint 13, TD-1): ParamSpec captures the
+# wrapped function's parameter signature, TypeVar its return type. Both flow
+# through the decorator so mypy --strict sees no Callable-without-type-args.
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
 
-def handle_json_errors(input_path: str | Path) -> Callable:
+
+def handle_json_errors(input_path: str | Path) -> Callable[[Callable[_P, _R]], Callable[_P, _R]]:
     """Convert ``json.JSONDecodeError`` into exit-2 with a clear message.
 
     Args:
         input_path: the file path being read (used in the error message).
     """
 
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: Callable[_P, _R]) -> Callable[_P, _R]:
         @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
+        def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _R:
             from typer import Exit
 
             try:
@@ -51,7 +57,9 @@ def handle_json_errors(input_path: str | Path) -> Callable:
     return decorator
 
 
-def handle_pipeline_errors(*, step_name: str, success_exit_code: int = 0, unknown_exit_code: int = 2) -> Callable:
+def handle_pipeline_errors(
+    *, step_name: str, success_exit_code: int = 0, unknown_exit_code: int = 2
+) -> Callable[[Callable[_P, _R]], Callable[_P, _R]]:
     """Convert known exceptions in a multi-step pipeline into clean exits.
 
     Maps:
@@ -67,9 +75,9 @@ def handle_pipeline_errors(*, step_name: str, success_exit_code: int = 0, unknow
     ``run_audit`` and expects to translate failures to a CLI exit code.
     """
 
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: Callable[_P, _R]) -> Callable[_P, _R]:
         @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
+        def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _R:
             from typer import Exit
 
             try:
@@ -93,7 +101,7 @@ def handle_pipeline_errors(*, step_name: str, success_exit_code: int = 0, unknow
     return decorator
 
 
-def handle_compare_errors(*, source_label: str = "input") -> Callable:
+def handle_compare_errors(*, source_label: str = "input") -> Callable[[Callable[_P, _R]], Callable[_P, _R]]:
     """Error handler for ``audit compare``: split backend vs input failures.
 
     Maps:
@@ -105,9 +113,9 @@ def handle_compare_errors(*, source_label: str = "input") -> Callable:
     unchanged.
     """
 
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: Callable[_P, _R]) -> Callable[_P, _R]:
         @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
+        def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _R:
             from typer import Exit
 
             try:
@@ -132,7 +140,7 @@ def handle_compare_errors(*, source_label: str = "input") -> Callable:
     return decorator
 
 
-def handle_shopify_errors() -> Callable:
+def handle_shopify_errors() -> Callable[[Callable[_P, _R]], Callable[_P, _R]]:
     """Error handler for ``audit shopify auth`` / ``audit shopify inventory``.
 
     Maps:
@@ -143,9 +151,9 @@ def handle_shopify_errors() -> Callable:
     ``typer.Exit`` raised explicitly bubbles up unchanged.
     """
 
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: Callable[_P, _R]) -> Callable[_P, _R]:
         @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
+        def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _R:
             from typer import Exit
 
             try:

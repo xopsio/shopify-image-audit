@@ -20,7 +20,7 @@ import json
 import os
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from engine._logging import get_logger
 from engine.history import _default_history_dir
@@ -105,7 +105,7 @@ class ResponseCache:
             _log.debug("Cache miss (expired): %s age=%.0fs ttl=%ds", url, age, self.ttl)
             return None
         _log.debug("Cache hit: %s age=%.0fs", url, age)
-        return entry.get("data")
+        return cast(dict[str, Any] | None, entry.get("data"))
 
     def set(self, url: str, strategy: str, data: dict[str, Any]) -> None:
         """Store a response in the cache. No-op when caching is disabled."""
