@@ -1,6 +1,6 @@
 # Roadmap — Shopify Image Audit
 
-**Last updated:** 2026-08-01 (Sprint 13 complete, v0.10.0 released)
+**Last updated:** 2026-08-01 (Sprint 14 complete, v0.10.1 released)
 **Owner:** ZCode (single-agent, governance v1.3)
 
 ---
@@ -174,6 +174,7 @@ the fourth targets scalability and recurring revenue.
 | 2026-08-01 | CycloneDX SBOM in release artifacts | Complements SLSA provenance with a dependency inventory; one step in the existing build job |
 | 2026-08-01 | User-side TOML config with flag > env > config > default precedence | The last user-visible deferred item; boolean flags (`no_cache`, `stop_on_error`, `pdf`) deliberately excluded because Typer has no reliable "unset" form |
 | 2026-08-01 | Mypy `--strict` as CI gate | 26 mechanical annotation fixes; `ParamSpec`/`TypeVar` decorators preserve wrapped-function signatures. Baseline-manager's 4 `cast(dict[str, Any], ...)` remain as a deliberate loose-dict contract for `ImageDelta.before/after` |
+| 2026-08-01 | `ImageDelta.before/after` are `ImageItem` (closes Sprint 13 follow-up) | Audit confirmed every payload key is an ImageItem field; `extra="forbid"` now protects against future drift. The 4 `cast()` sites and `typing.cast` import drop away |
 
 ---
 
@@ -194,5 +195,6 @@ the fourth targets scalability and recurring revenue.
 | 11 | 2026-08 | ✅ Complete | 695 | 72 |
 | 12 | 2026-08 | ✅ Complete | 695 | 76 |
 | 13 | 2026-08 | ✅ Complete | 695 | 77 |
+| 14 | 2026-08 | ✅ Complete | 698 | 78 |
 
 See [`docs/`](.) for the full documentation tree.
