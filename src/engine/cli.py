@@ -24,6 +24,7 @@ error-handling decorators). Keep that split.
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -115,21 +116,65 @@ _cfg = get_config
 # ---------------------------------------------------------------------------
 
 
+def _resolve_lighthouse_binary(explicit_path: str | None) -> Path:
+    """Resolve the Lighthouse CLI path with the documented precedence.
+
+    Precedence: ``--lighthouse-bin`` > ``$LIGHTHOUSE_BIN`` > ``shutil.which("lighthouse")``.
+
+    Returns the resolved Path on success. Raises ``typer.Exit(EXIT_LIGHTHOUSE_FAILURE)``
+    with a multi-line help message when nothing can be found.
+    """
+    if explicit_path:
+        candidate = Path(explicit_path)
+        if not candidate.is_file():
+            rprint(f"[red]Error:[/red] --lighthouse-bin points to a non-existent file: {candidate}")
+            raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE) from None
+        return candidate
+
+    env_bin = os.environ.get("LIGHTHOUSE_BIN")
+    if env_bin:
+        candidate = Path(env_bin)
+        if not candidate.is_file():
+            rprint(f"[red]Error:[/red] $LIGHTHOUSE_BIN points to a non-existent file: {candidate}")
+            raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE) from None
+        return candidate
+
+    on_path = shutil.which("lighthouse")
+    if on_path:
+        return Path(on_path)
+
+    rprint(
+        "[red]Error:[/red] `lighthouse` CLI not found. To fix:\n"
+        "  1. Install: npm i -g lighthouse  (Node ≥ 18)\n"
+        "  2. Set LIGHTHOUSE_BIN=/path/to/lighthouse\n"
+        "  3. Pass --lighthouse-bin /path/to/lighthouse\n"
+        "  4. Or use --lhr <file> with a pre-existing Lighthouse report\n"
+        "  Docs: docs/integrations/LIGHTHOUSE.md"
+    )
+    raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE) from None
+
+
+# 10 minute per-run timeout — long enough for slow Shopify storefronts,
+# short enough to fail fast on a stuck headless Chrome.
+_LIGHTHOUSE_TIMEOUT_SECONDS = 600
+
+
 def _run_lighthouse(
     url: str,
     *,
     device: str,
     runs: int,
     out_dir: Path,
+    lighthouse_bin: Path | None = None,
 ) -> Path:
     """Run Lighthouse CLI and return the path to the best JSON report.
 
-    Raises ``typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE)`` on failure.
+    ``lighthouse_bin`` overrides the resolution chain (``--lighthouse-bin``,
+    ``$LIGHTHOUSE_BIN``, ``shutil.which``). Raises
+    ``typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE)`` on any failure (missing
+    binary, non-zero exit, subprocess timeout).
     """
-    lh_bin = shutil.which("lighthouse")
-    if lh_bin is None:
-        rprint("[red]Error:[/red] `lighthouse` CLI not found on PATH. Install with: npm i -g lighthouse")
-        raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE) from None
+    lh_bin = lighthouse_bin or _resolve_lighthouse_binary(None)
 
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -143,7 +188,7 @@ def _run_lighthouse(
     for i in range(1, runs + 1):
         out_file = out_dir / f"lhr_run{i}.json"
         cmd = [
-            lh_bin,
+            str(lh_bin),
             url,
             "--output=json",
             f"--output-path={out_file}",
@@ -155,10 +200,14 @@ def _run_lighthouse(
         rprint(f"[cyan]Lighthouse run {i}/{runs}[/cyan]")
         _lh_log.info("Lighthouse run %d/%d: %s", i, runs, url)
         try:
-            subprocess.run(cmd, check=True, capture_output=True, text=True)
+            subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=_LIGHTHOUSE_TIMEOUT_SECONDS)
         except subprocess.CalledProcessError as exc:
             _lh_log.error("Lighthouse run %d failed: %s", i, exc.stderr[:500])
             rprint(f"[red]Lighthouse failed (run {i}):[/red] {exc.stderr[:500]}")
+            raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE) from exc
+        except subprocess.TimeoutExpired as exc:
+            _lh_log.error("Lighthouse run %d timed out after %ss", i, _LIGHTHOUSE_TIMEOUT_SECONDS)
+            rprint(f"[red]Lighthouse timed out (run {i}) after {_LIGHTHOUSE_TIMEOUT_SECONDS}s[/red]")
             raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE) from exc
         best_path = out_file  # simple: use the last successful run
 
@@ -183,6 +232,12 @@ def run(
     runs: int = typer.Option(3, "--runs", help="Number of Lighthouse runs (default 3)."),
     out_dir: Path = typer.Option("artifacts", "--out-dir", help="Directory for output artifacts."),
     lhr: Path | None = typer.Option(None, "--lhr", help="Use an existing Lighthouse JSON instead of running live."),
+    lighthouse_bin: Path | None = typer.Option(
+        None,
+        "--lighthouse-bin",
+        envvar="LIGHTHOUSE_BIN",
+        help="Path to the lighthouse CLI binary (default: $LIGHTHOUSE_BIN or PATH).",
+    ),
 ) -> None:
     """Run Lighthouse audit on <url>, analyse images, and write results."""
     # --- resolve config defaults (flag > env > config > default) ---
@@ -207,11 +262,21 @@ def run(
         rprint("[red]Error:[/red] --runs must be >= 1.")
         raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
+    # --- resolve lighthouse binary path: --lighthouse-bin > $LIGHTHOUSE_BIN > PATH ---
+    if lhr is None and lighthouse_bin is None and os.environ.get("LIGHTHOUSE_BIN"):
+        lighthouse_bin = Path(os.environ["LIGHTHOUSE_BIN"])
+
     # --- obtain LHR JSON ---
     if lhr is not None:
         json_path: Path = require_exists(lhr)
     else:
-        json_path = _run_lighthouse(url, device=device, runs=runs, out_dir=out_dir)
+        json_path = _run_lighthouse(
+            url,
+            device=device,
+            runs=runs,
+            out_dir=out_dir,
+            lighthouse_bin=lighthouse_bin,
+        )
 
     # --- run the audit pipeline (errors caught by @handle_pipeline_errors) ---
     result: AuditResult = run_audit(json_path, url=url, device=device, runs=runs)
