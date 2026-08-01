@@ -20,7 +20,7 @@ import json
 import os
 import time
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, TypedDict, cast
 
 from engine._logging import get_logger
 from engine.history import _default_history_dir
@@ -29,6 +29,23 @@ _log = get_logger()
 
 #: Default TTL in seconds. Override with PAGESPEED_CACHE_TTL env var.
 _DEFAULT_TTL = 3600
+
+
+class CachedEntry(TypedDict, total=False):
+    """On-disk cache entry — timestamp + the cached response payload.
+
+    `data` is whatever was passed to `ResponseCache.set()`; in practice
+    always a `CachedPageSpeedResponse` (the full PageSpeed API envelope).
+    Declared as `dict[str, Any]` to avoid a circular import: the cache
+    module is a primitive that the pagespeed module depends on.
+    """
+
+    timestamp: float
+    data: dict[str, Any]
+
+
+if TYPE_CHECKING:
+    from integrations.pagespeed_api import CachedPageSpeedResponse  # noqa: F401
 
 
 def _default_cache_dir() -> Path:
