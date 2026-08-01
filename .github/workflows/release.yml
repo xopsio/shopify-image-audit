@@ -99,7 +99,7 @@ jobs:
       # OIDC id-token. Non-blocking so provenance failure doesn't block
       # the PyPI publish.
       - name: Generate build provenance attestation
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         continue-on-error: true
         with:
           subject-path: dist/*
