@@ -105,9 +105,31 @@ the custom-app flow). Override via `--scopes` or
 ## Token storage
 
 Tokens land in `$XDG_DATA_HOME/.shopify-image-audit/tokens.json`
-(default `~/.local/share/.shopify-image-audit/tokens.json`). The file
-is plain JSON with **mode 0600** (POSIX). **Encryption is out of
-scope for v0.15.0** — see `docs/ROADMAP.md`.
+(default `~/.local/share/.shopify-image-audit/tokens.json`). As of
+v0.16.0 the file is **encrypted at rest** with Fernet (AES-128-CBC +
+HMAC) using a key kept in your platform's system keyring (macOS
+Keychain, Windows Credential Manager, Linux Secret Service). The file
+itself is **mode 0600**.
+
+The on-disk envelope looks like:
+
+```json
+{"v": 1, "keyring": true, "ct": "<base64 Fernet token>"}
+```
+
+### Disabling encryption
+
+Set `$SHOPIFY_AUDIT_TOKENS_DISABLED=1` to skip encryption. Useful
+for CI on Linux runners without D-Bus / Secret Service. The file is
+still written with mode `0600`; the disable flag just makes the
+plaintext form acceptable for the load heuristic.
+
+### Lost keyring entry
+
+If the system keyring entry is lost (e.g. OS reinstall, profile
+reset), the next `audit shopify auth` call will fail with a
+decryption error. Re-run `audit shopify login <store>` to obtain
+a fresh token — the old encrypted blob will be silently replaced.
 
 ## Headless environments
 

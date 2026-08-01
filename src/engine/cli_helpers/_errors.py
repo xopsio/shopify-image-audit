@@ -164,7 +164,15 @@ def handle_shopify_errors() -> Callable[[Callable[_P, _R]], Callable[_P, _R]]:
                 rprint(f"[red]Error:[/red] Invalid input: {exc}")
                 raise Exit(code=2) from exc
             except RuntimeError as exc:
-                rprint(f"[red]Error:[/red] Shopify API error: {exc}")
+                # Distinguish token-decryption failures from generic
+                # backend errors: they have different user actions.
+                if "decrypt" in str(exc).lower():
+                    rprint(
+                        f"[red]Error:[/red] Token decryption failed: {exc}\n"
+                        "  Run `audit shopify login <store>` to refresh the token."
+                    )
+                else:
+                    rprint(f"[red]Error:[/red] Shopify API error: {exc}")
                 raise Exit(code=10) from exc
             except Exception as exc:
                 rprint(f"[red]Error:[/red] Failed to reach Shopify: {exc}")
