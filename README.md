@@ -282,6 +282,10 @@ merge. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
   - Closes the Sprint 13 strict-mypy follow-up — no more `cast()` in
     `baseline_manager.py`
   - `extra="forbid"` on `ImageItem` now protects against future drift
+- ✅ Sprint 15 — TypedDict hierarchy, v0.11.0 (705 tests)
+  - `LighthouseJson` + `AuditEntry` + `Categories` + `PerformanceCategory`
+  - `CachedPageSpeedResponse` (envelope) + `CachedEntry` (cache)
+  - `run_audit()` parses `LighthouseJson` directly
 
 ---
 

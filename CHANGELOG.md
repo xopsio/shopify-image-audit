@@ -9,7 +9,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Empty — all Sprint 14 work shipped in v0.10.1.
+Empty — all Sprint 15 work shipped in v0.11.0.
+
+---
+
+## [0.11.0] - 2026-08-01
+
+### Added (Sprint 15)
+- `LighthouseJson` + `AuditEntry` + `Categories` + `PerformanceCategory`
+  TypedDict hierarchy documents the shape of every Lighthouse API
+  response the runtime reads (`total=False` so partial mocks still
+  validate) — TD-1
+- `CachedPageSpeedResponse` TypedDict wraps the outer envelope (success
+  → `lighthouseResult`; API error → `error`) — TD-1
+- `CachedEntry` TypedDict in `ResponseCache` (`timestamp` + `data`) —
+  TD-2
+
+### Changed (Sprint 15)
+- `PageSpeedAPIClient._parse_response` now takes `CachedPageSpeedResponse`
+  (was `dict[str, Any]`); `fetch_lighthouse_json` returns
+  `LighthouseJson` (was `dict[str, Any]`) — TD-1
+- `run_audit()` types the parsed LHR as `LighthouseJson` via a
+  structural cast — TD-3
+- `_cache.py` carries a `TYPE_CHECKING` import of `CachedPageSpeedResponse`
+  for documentation; the runtime `data` field stays `dict[str, Any]` to
+  avoid a circular import — TD-2
+
+### Stats
+- 705 tests pass (up from 698; +7 typeddict smoke tests)
+- `mypy src/` (strict): Success, 30 files, zero ignores
+- Ruff check + format clean
+- 79 PRs merged
 
 ---
 
@@ -205,6 +235,7 @@ Empty — all Sprint 14 work shipped in v0.10.1.
 - Single concurrency primitive (`run_parallel`) replaces two copies
 - Test fixtures consolidated into one place
 
+[0.11.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.10.1...v0.11.0
 [0.10.1]: https://github.com/xopsio/shopify-image-audit/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/xopsio/shopify-image-audit/compare/v0.9.0...v0.9.1
