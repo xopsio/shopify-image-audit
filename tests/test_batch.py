@@ -482,3 +482,32 @@ class TestShopifyBatchCli:
             ],
         )
         assert result.exit_code == 10
+
+
+# ---------------------------------------------------------------------------
+# Sprint 17 — on_done callback through run_batch
+# ---------------------------------------------------------------------------
+
+
+class TestRunBatchOnDone:
+    def test_on_done_invoked_per_completed_store(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """run_batch forwards on_done to run_parallel, which fires it per store."""
+        from engine.batch import StoreResult
+
+        seen: list[str] = []
+
+        def _fake_audit(store):
+            return StoreResult(shop_domain=store.shop_domain, inventory=[])
+
+        monkeypatch.setattr("engine.batch._audit_one_store", _fake_audit)
+        stores = [
+            StoreConfig.from_dict({"shop_domain": "a.example.com", "access_token": "x"}),
+            StoreConfig.from_dict({"shop_domain": "b.example.com", "access_token": "y"}),
+        ]
+
+        def cb(store, result):  # noqa: ARG001
+            seen.append(result.shop_domain)
+
+        batch = run_batch(stores, parallel=1, on_done=cb)
+        assert seen == ["a.example.com", "b.example.com"]
+        assert len(batch.results) == 2

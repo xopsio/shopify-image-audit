@@ -20,6 +20,7 @@ The file must contain a JSON array of objects with at least
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -141,6 +142,7 @@ def run_batch(
     *,
     parallel: int = 1,
     stop_on_error: bool = False,
+    on_done: Callable[[StoreConfig, StoreResult], None] | None = None,
 ) -> BatchResult:
     """Run the inventory audit for each store in ``stores``.
 
@@ -151,6 +153,9 @@ def run_batch(
             sequential.
         stop_on_error: If True, abort on the first failure; otherwise
             continue and report all failures.
+        on_done: Optional callback invoked once per completed store with
+            ``(store, result)``. Not called for cancelled slots. Use
+            for progress reporting (Rich ``Progress.update(advance=1)``).
 
     Returns:
         ``BatchResult`` aggregating per-store outcomes. Use
@@ -172,6 +177,7 @@ def run_batch(
         parallel=parallel,
         stop_on_error=stop_on_error,
         cancelled_factory=_cancelled if stop_on_error else None,
+        on_done=on_done,
     )
     return BatchResult(results=results)
 

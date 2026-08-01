@@ -41,6 +41,7 @@ def run_parallel(
     parallel: int = 1,
     stop_on_error: bool = False,
     cancelled_factory: Callable[[T], R] | None = None,
+    on_done: Callable[[T, R], None] | None = None,
 ) -> list[R]:
     """Execute ``fn(item)`` for each item in ``items``, optionally in parallel.
 
@@ -61,6 +62,12 @@ def run_parallel(
         cancelled_factory: Optional callable that produces a "skipped"
             result for the input. Required when ``stop_on_error=True``
             and parallel > 1 if the caller wants length-preserving output.
+        on_done: Optional callback invoked once per completed item with
+            ``(item, result)``. Not called for cancelled / skipped
+            slots. Use it for progress reporting (e.g. Rich
+            ``Progress.update(advance=1)``); the function must not raise
+            — exceptions are silently swallowed so a buggy callback
+            never breaks the parallel run.
 
     Returns:
         One result per input, in input order. The callable may raise;
@@ -70,12 +77,21 @@ def run_parallel(
     if not items:
         return []
 
+    def _fire(item: T, result: R) -> None:
+        if on_done is None:
+            return
+        try:
+            on_done(item, result)
+        except Exception:  # noqa: BLE001 — user callback, never break the run
+            pass
+
     # Sequential — worker count clamped to 1.
     if parallel <= 1:
         results: list[R] = []
         for item in items:
             result = fn(item)
             results.append(result)
+            _fire(item, result)
             if stop_on_error:
                 break
         # Sequential + stop_on_error: return only completed items.
@@ -92,7 +108,9 @@ def run_parallel(
         future_to_idx = {pool.submit(fn, item): idx for idx, item in enumerate(items)}
         for future in as_completed(future_to_idx):
             idx = future_to_idx[future]
-            slots[idx] = future.result()
+            result = future.result()
+            slots[idx] = result
+            _fire(items[idx], result)
             last_completed = max(last_completed, idx)
             if stop_on_error:
                 # Cancel pending futures; pending slots stay None.

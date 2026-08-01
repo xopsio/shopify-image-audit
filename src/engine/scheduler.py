@@ -29,6 +29,7 @@ Shopify inventory; for plain audits it can be omitted.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -235,6 +236,7 @@ def run_all_schedules(
     api_key: str | None = None,
     parallel: int = 1,
     stop_on_error: bool = False,
+    on_done: Callable[[ScheduleConfig, ScheduleRunResult], None] | None = None,
 ) -> list[ScheduleRunResult]:
     """Run every configured schedule and record results to history.
 
@@ -244,6 +246,8 @@ def run_all_schedules(
             is sequential.
         stop_on_error: If True, abort on the first failure; otherwise
             continue and report all failures.
+        on_done: Optional callback invoked once per completed schedule
+            with ``(schedule, result)``. Not called for cancelled slots.
 
     One store's failure does not abort the rest by default. Each result
     is recorded to ``history_store`` (a :class:`~engine.history.HistoryStore`)
@@ -276,4 +280,5 @@ def run_all_schedules(
         parallel=parallel,
         stop_on_error=stop_on_error,
         cancelled_factory=_cancelled if stop_on_error else None,
+        on_done=on_done,
     )
