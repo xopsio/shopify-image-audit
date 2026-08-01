@@ -18,6 +18,7 @@ from audit.ranker_heuristic import rank as rank_heuristic
 from audit.ranker_ml import rank as rank_ml
 from core.image_signals import ImageDict
 from engine._logging import get_logger
+from integrations.pagespeed_api import LighthouseJson
 
 _log = get_logger()
 
@@ -167,10 +168,12 @@ def run_audit(
 
     # 1. load raw JSON
     with open(lhr_path, encoding="utf-8") as f:
-        raw: dict[str, Any] = json.load(f)
+        raw: LighthouseJson = cast(LighthouseJson, json.load(f))
 
     # 2. parse → list[ImageDict]  (normalized images, no role/score yet)
-    parsed_images: list[ImageDict] = parse(raw)
+    # parse() accepts the broader dict[str, Any] — LighthouseJson is a strict
+    # subset, so the cast is purely structural.
+    parsed_images: list[ImageDict] = parse(cast(dict[str, Any], raw))
     _log.debug("parse stage: %d image(s) extracted", len(parsed_images))
 
     # 3. rank  → list[ImageDict]  (role, score, recommendation added)
@@ -197,7 +200,7 @@ def run_audit(
     }
 
     # 6. vitals
-    vitals = _extract_vitals(raw)
+    vitals = _extract_vitals(cast(dict[str, Any], raw))
 
     # 7. summary
     summary = _build_summary(sanitised)

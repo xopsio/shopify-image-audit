@@ -11,12 +11,61 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NotRequired, TypedDict, cast
 from urllib.parse import quote, urlparse
 
 import requests
 
 from engine._logging import get_logger
+
+# ---------------------------------------------------------------------------
+# TypedDict contracts (Sprint 15)
+#
+# Every field below is optional (`total=False`) — the runtime always reads
+# via ``.get(...)``, and tests build partial mocks that omit keys. These
+# types document the shape of the Lighthouse API responses that this module
+# actually consumes; they are not full LHR schemas.
+# ---------------------------------------------------------------------------
+
+
+class AuditEntry(TypedDict, total=False):
+    """A single Lighthouse ``audits[*]`` entry — only fields this code reads."""
+
+    numericValue: float
+    score: NotRequired[float | None]
+    displayValue: NotRequired[str]
+    title: NotRequired[str]
+
+
+class PerformanceCategory(TypedDict, total=False):
+    score: float | None
+
+
+class Categories(TypedDict, total=False):
+    performance: PerformanceCategory
+
+
+class LighthouseJson(TypedDict, total=False):
+    """The ``lighthouseResult`` block of a Lighthouse API response.
+
+    Only fields actually consumed by this module are declared.
+    """
+
+    audits: dict[str, AuditEntry]
+    categories: Categories
+    fetchTime: str
+
+
+class CachedPageSpeedResponse(TypedDict, total=False):
+    """The outer PageSpeed API response envelope.
+
+    Successful runs always include ``lighthouseResult``; error responses
+    include ``error`` instead (handled by ``_get_error_message``).
+    """
+
+    lighthouseResult: LighthouseJson
+    error: NotRequired[dict[str, Any]]
+
 
 if TYPE_CHECKING:
     from integrations._cache import ResponseCache
@@ -144,7 +193,7 @@ class PageSpeedAPIClient:
             params["key"] = self.api_key
         return params
 
-    def _parse_response(self, data: dict[str, Any], url: str, strategy: str) -> PageSpeedMetrics:
+    def _parse_response(self, data: CachedPageSpeedResponse, url: str, strategy: str) -> PageSpeedMetrics:
         """Parse API response into structured metrics."""
         lighthouse_result = data.get("lighthouseResult", {})
 
@@ -263,7 +312,7 @@ class PageSpeedAPIClient:
         if self._cache is not None:
             cached = self._cache.get(url, strategy)
             if cached is not None:
-                return self._parse_response(cached, url, strategy)
+                return self._parse_response(cast(CachedPageSpeedResponse, cached), url, strategy)
 
         # Rate limiting
         self._wait_for_rate_limit()
@@ -402,7 +451,7 @@ def fetch_lighthouse_json(
     timeout: int = DEFAULT_TIMEOUT,
     max_retries: int = DEFAULT_RETRIES,
     cache: ResponseCache | None = None,
-) -> dict[str, Any]:
+) -> LighthouseJson:
     """
     Fetch a full Lighthouse JSON report for ``url`` from the PageSpeed Insights API.
 
@@ -436,7 +485,7 @@ def fetch_lighthouse_json(
         if cached is not None:
             lhr = cached.get("lighthouseResult", cached)
             if isinstance(lhr, dict):
-                return lhr
+                return cast(LighthouseJson, lhr)
 
     client._wait_for_rate_limit()
 
@@ -472,7 +521,7 @@ def fetch_lighthouse_json(
             # Cache the raw response for future calls.
             if cache is not None:
                 cache.set(url, strategy, data)
-            return lhr
+            return cast(LighthouseJson, lhr)
         except requests.exceptions.RequestException as e:
             last_exception = e
             if attempt < client.max_retries - 1:
