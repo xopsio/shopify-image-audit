@@ -363,7 +363,7 @@ def measure(
 
 @app.command(name="shopify")
 def shopify(
-    subcommand: str = typer.Argument(..., help="Subcommand: 'auth', 'inventory', or 'batch'."),
+    subcommand: str = typer.Argument(..., help="Subcommand: 'auth', 'inventory', 'batch', or 'login'."),
     shop_domain: str = typer.Argument(
         None,
         help="Your shop domain, e.g. 'store.myshopify.com'. Omit when --stores-file is provided.",
@@ -401,22 +401,57 @@ def shopify(
         "--stop-on-error",
         help="[batch] Abort on the first store failure (default: continue past failures).",
     ),
+    client_id: str | None = typer.Option(
+        None,
+        "--client-id",
+        envvar="SHOPIFY_CLIENT_ID",
+        help="[login] OAuth client_id from your Shopify custom app.",
+    ),
+    client_secret: str | None = typer.Option(
+        None,
+        "--client-secret",
+        envvar="SHOPIFY_CLIENT_SECRET",
+        help="[login] OAuth client_secret from your Shopify custom app.",
+    ),
+    scopes: str | None = typer.Option(
+        None,
+        "--scopes",
+        envvar="SHOPIFY_OAUTH_SCOPES",
+        help="[login] Comma-separated scope list (default: config [shopify] scopes).",
+    ),
 ) -> None:
-    """Interact with a Shopify store via the Admin API (auth, inventory, batch)."""
+    """Interact with a Shopify store via the Admin API (auth, inventory, batch, login)."""
     # --- resolve config defaults (flag > env > config > default) ---
     if access_token is None:
         access_token = _cfg().shopify.access_token
     # `parallel == 0` is a valid "unlimited" value — never `or`-coalesce it.
     if parallel is None:
         parallel = _cfg().defaults.parallel
+    if client_id is None:
+        client_id = _cfg().shopify.client_id
+    if client_secret is None:
+        client_secret = _cfg().shopify.client_secret
+    if scopes is None:
+        scopes = _cfg().shopify.scopes
 
-    if subcommand not in ("auth", "inventory", "batch"):
+    if subcommand not in ("auth", "inventory", "batch", "login"):
         rprint(
             f"[red]Error:[/red] Unknown shopify subcommand: {subcommand!r} "
-            f"(use 'auth', 'inventory', or 'batch')."
-            f"{format_suggestion(subcommand, ['auth', 'inventory', 'batch'])}"
+            f"(use 'auth', 'inventory', 'batch', or 'login')."
+            f"{format_suggestion(subcommand, ['auth', 'inventory', 'batch', 'login'])}"
         )
         raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+
+    # ``login`` opens the OAuth browser flow and stores the resulting
+    # token; it does not need shop_domain / access_token flags.
+    if subcommand == "login":
+        _shopify_login(
+            shop_domain=shop_domain,
+            client_id=client_id,
+            client_secret=client_secret,
+            scopes=scopes,
+        )
+        raise typer.Exit(code=EXIT_OK) from None
 
     # batch subcommand has its own dispatch path
     if subcommand == "batch":
@@ -427,6 +462,21 @@ def shopify(
             stop_on_error=stop_on_error,
         )
         raise typer.Exit(code=EXIT_OK) from None
+
+    # auth / inventory require a single token. Fall back to the persisted
+    # ``TokensStore`` if no token was supplied on the command line or
+    # via env/config — this is how ``audit shopify auth <store>`` works
+    # after a successful ``audit shopify login <store>``.
+    if access_token is None and shop_domain is not None:
+        from engine.tokens import TokensStore
+
+        access_token = TokensStore().get(shop_domain)
+        if access_token is None:
+            rprint(
+                f"[red]Error:[/red] No access token for {shop_domain}. "
+                f"Run `audit shopify login {shop_domain}` or pass --access-token."
+            )
+            raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
     # auth / inventory require a single token
     if shop_domain is None:
@@ -538,6 +588,100 @@ def _shopify_batch(
 
     if batch_result.all_failed:
         raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE) from None
+
+
+@handle_shopify_errors()
+def _shopify_login(
+    shop_domain: str | None,
+    *,
+    client_id: str | None,
+    client_secret: str | None,
+    scopes: str | None,
+) -> None:
+    """Run the OAuth authorization-code flow against the Shopify Admin API.
+
+    Opens the user's browser to the Shopify authorize URL, waits on a
+    local HTTP server for the redirect, exchanges the temporary code for
+    a permanent access token, and stores the token in ``TokensStore``
+    (default: ``~/.local/share/.shopify-image-audit/tokens.json``).
+    """
+    import webbrowser
+
+    from engine.tokens import TokensStore
+    from integrations.oauth_callback_server import OAuthCallbackServer
+    from integrations.shopify_oauth import (
+        DEFAULT_SCOPES,
+        build_authorize_url,
+        exchange_code_for_token,
+        generate_state,
+    )
+
+    if shop_domain is None:
+        rprint(
+            "[red]Error:[/red] `audit shopify login` requires a shop_domain "
+            "(e.g. `audit shopify login mystore.myshopify.com`)."
+        )
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+
+    if not client_id or not client_secret:
+        rprint(
+            "[red]Error:[/red] OAuth credentials missing. "
+            "Pass --client-id / --client-secret, set $SHOPIFY_CLIENT_ID / "
+            "$SHOPIFY_CLIENT_SECRET, or configure [shopify] in config.toml."
+        )
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+
+    effective_scopes = scopes or DEFAULT_SCOPES
+
+    state = generate_state()
+    with OAuthCallbackServer(state, timeout=60.0) as server:
+        redirect_uri = server.callback_url
+        authorize_url = build_authorize_url(
+            shop=shop_domain,
+            client_id=client_id,
+            scopes=effective_scopes,
+            redirect_uri=redirect_uri,
+            state=state,
+        )
+
+        rprint(f"[cyan]Opening browser to authorize {shop_domain}…[/cyan]")
+        rprint(f"  Authorize URL: {authorize_url}")
+        if not webbrowser.open(authorize_url):
+            rprint(
+                "[yellow]Browser failed to open.[/yellow] Copy the URL above "
+                "into a browser, or use the headless-mode hint in "
+                "`docs/integrations/SHOPIFY_OAUTH.md`."
+            )
+
+        rprint(f"[dim]Listening on {redirect_uri} (timeout 60s)…[/dim]")
+        code = server.wait_for_code()
+
+        if code is None:
+            err = server.last_error()
+            if err:
+                rprint(f"[red]OAuth denied:[/red] {err}")
+            else:
+                rprint(
+                    "[red]OAuth timed out[/red] — no callback received "
+                    "within 60 seconds. Re-run and complete the browser step."
+                )
+            raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+
+    try:
+        token = exchange_code_for_token(
+            shop=shop_domain,
+            code=code,
+            client_id=client_id,
+            client_secret=client_secret,
+        )
+    except RuntimeError as exc:
+        rprint(f"[red]Token exchange failed:[/red] {exc}")
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from exc
+
+    path = TokensStore().set(shop_domain, token)
+    rprint(f"[green]✓ Authorised {shop_domain}[/green]")
+    rprint(f"  Token stored in {path}")
+    rprint(f"  Next: `audit shopify auth {shop_domain}` or `audit shopify inventory {shop_domain}`.")
 
 
 @handle_shopify_errors()

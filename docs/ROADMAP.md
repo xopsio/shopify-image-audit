@@ -146,7 +146,7 @@ the fourth targets scalability and recurring revenue.
 - **GPU acceleration** — not relevant (I/O-bound on PageSpeed)
 - **Automated image transformation** — different product (Shopify has built-in)
 - **Multi-store batch** — ✅ DONE in v0.5.0 (Sprint 6 TD-3): `audit shopify batch --stores-file`
-- **OAuth flow for Shopify Admin** — token-only in v1; custom-app tokens work
+- **OAuth flow for Shopify Admin** — ✅ MVP DONE in v0.15.0 (Sprint 19): `audit shopify login <store>` opens the browser, exchanges the code, persists the token. Token encryption and multi-store batch login are deferred follow-ups
 - **Real ML model training** — hand-coded weighted ensemble is deliberate
 - **Async HTTP layer** — deferred (Sprint 10+); current `ThreadPoolExecutor` + `requests` covers the use case, and the on-disk PageSpeed cache mitigates the only real pain point (rate limits)
 - **Branded CSS themes per customer** — out of scope; `--brand-color` + `--brand-logo` cover the v1 customer need

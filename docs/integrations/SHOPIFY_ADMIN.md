@@ -5,6 +5,13 @@ to verify access tokens and list image URLs (products + theme assets).
 This eliminates the need for the customer to export a Lighthouse JSON report
 by hand — the tool can fetch everything it needs directly.
 
+> **OAuth preferred.** New in v0.15.0: `audit shopify login <store>`
+> automates the custom-app flow below by opening your browser to the
+> official OAuth authorize URL and storing the resulting token in
+> `tokens.json`. See [`SHOPIFY_OAUTH.md`](SHOPIFY_OAUTH.md) for the
+> full guide. The manual flow documented below still works — the CLI
+> accepts either source.
+
 ## Token acquisition
 
 To use `audit shopify`, you need an **Admin API access token** for the
