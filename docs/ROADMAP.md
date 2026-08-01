@@ -1,6 +1,6 @@
 # Roadmap — Shopify Image Audit
 
-**Last updated:** 2026-08-01 (Sprint 16 complete, v0.12.0 released)
+**Last updated:** 2026-08-01 (Sprint 17 complete, v0.13.0 released)
 **Owner:** ZCode (single-agent, governance v1.3)
 
 ---
@@ -177,6 +177,7 @@ the fourth targets scalability and recurring revenue.
 | 2026-08-01 | `ImageDelta.before/after` are `ImageItem` (closes Sprint 13 follow-up) | Audit confirmed every payload key is an ImageItem field; `extra="forbid"` now protects against future drift. The 4 `cast()` sites and `typing.cast` import drop away |
 | 2026-08-01 | LighthouseJson TypedDict hierarchy (Sprint 15) | Documented every PageSpeed/Lighthouse response field the runtime reads; `total=False` keeps partial mocks valid; `CachedPageSpeedResponse` wraps the success/error envelope |
 | 2026-08-01 | Lighthouse binary resolution + timeout (Sprint 16) | `--lighthouse-bin` flag + `$LIGHTHOUSE_BIN` env, 10-minute per-run timeout, multi-line help message. Closes the 0/6 testing gap in `_run_lighthouse` (now 6/6 + 4 resolver tests) |
+| 2026-08-01 | Rich Progress for batch jobs (Sprint 17) | `on_done` callback in `run_parallel` lets the CLI thread a progress bar through batch + scheduler runs without re-implementing the loop; transient bar keeps the per-store post-mortem as the canonical output |
 
 ---
 
@@ -200,5 +201,6 @@ the fourth targets scalability and recurring revenue.
 | 14 | 2026-08 | ✅ Complete | 698 | 78 |
 | 15 | 2026-08 | ✅ Complete | 705 | 79 |
 | 16 | 2026-08 | ✅ Complete | 715 | 80 |
+| 17 | 2026-08 | ✅ Complete | 721 | 81 |
 
 See [`docs/`](.) for the full documentation tree.

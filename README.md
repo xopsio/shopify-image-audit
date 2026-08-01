@@ -294,6 +294,11 @@ merge. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
   - 10-minute per-run timeout (no more infinite hangs)
   - `docs/integrations/LIGHTHOUSE.md` (install, CI recipes, troubleshooting)
   - 6/6 `_run_lighthouse` testing gap closed (+ 4 resolver tests)
+- ✅ Sprint 17 — Rich Progress bar, v0.13.0 (721 tests)
+  - Live progress bar for `audit shopify batch` and `audit schedule run-all`
+  - `on_done` callback in `run_parallel` (per-item observer hook)
+  - Transient bar erases on completion; per-store post-mortem lines
+    remain the canonical output
 
 ---
 
