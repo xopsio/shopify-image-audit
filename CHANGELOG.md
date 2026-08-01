@@ -9,7 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Empty — all Sprint 17 work shipped in v0.13.0.
+Empty — all Sprint 18 work shipped in v0.14.0.
+
+---
+
+## [0.14.0] - 2026-08-01
+
+### Added (Sprint 18)
+- TypedDict contracts for every Shopify Admin API response this module
+  consumes — `ShopInfo` / `ShopEnvelope` (`/shop.json`),
+  `ProductSummary` / `ProductListEnvelope` (`/products.json`),
+  `ThemeSummary` / `ThemeListEnvelope` (`/themes.json`),
+  `ThemeAssetSummary` / `ThemeAssetListEnvelope`
+  (`/themes/{id}/assets.json`). Slim client-side output shapes
+  (`ShopSummary`, `ProductEntry`, `ThemeAssetEntry`) are typed
+  separately. All `total=False` so the existing `.get(...)`-based
+  reads and partial-mock tests keep working.
+
+### Changed (Sprint 18)
+- `get_shop_info() -> ShopSummary` (was `dict[str, str]`)
+- `get_products() -> list[ProductEntry]` (was `list[dict[str, Any]]`)
+- `get_theme_assets() -> list[ThemeAssetEntry]` (was
+  `list[dict[str, str]]`)
+- `docs/integrations/SHOPIFY_ADMIN.md` documents the new contracts
+  section so contributors see which fields are consumed.
+
+### Stats
+- 726 tests pass (up from 721; +5 `TestShopifyTypedDicts` cases)
+- `mypy src/` (strict): Success, 30 files, zero ignores
+- Ruff check + format clean
+- 82 PRs merged
 
 ---
 
@@ -286,6 +315,7 @@ Empty — all Sprint 17 work shipped in v0.13.0.
 - Single concurrency primitive (`run_parallel`) replaces two copies
 - Test fixtures consolidated into one place
 
+[0.14.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.10.1...v0.11.0

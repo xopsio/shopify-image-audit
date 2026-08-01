@@ -299,6 +299,10 @@ merge. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
   - `on_done` callback in `run_parallel` (per-item observer hook)
   - Transient bar erases on completion; per-store post-mortem lines
     remain the canonical output
+- ✅ Sprint 18 — Shopify Admin API TypedDicts, v0.14.0 (726 tests)
+  - Typed contracts for `shop`/`products`/`themes`/`theme_assets`
+  - Slim client-side output shapes typed separately
+  - All `total=False` — `.get(...)`-based reads and partial mocks work
 
 ---
 
