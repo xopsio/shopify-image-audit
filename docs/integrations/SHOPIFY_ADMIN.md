@@ -116,3 +116,21 @@ client respects this by sleeping 50 ms between calls.
 - If a token is compromised, revoke it in the Shopify admin and create
   a new app. There is no auto-rotation.
 - For team use, create one app per developer; do not share tokens.
+
+## Internal API contracts (typed)
+
+The Admin API response shapes consumed by this module are documented
+via `TypedDict, total=False` classes at the top of `shopify_admin.py`:
+
+- `ShopInfo` / `ShopEnvelope` — `GET /shop.json`
+- `ProductImage` / `ProductSummary` / `ProductListEnvelope` — `GET /products.json`
+- `ThemeSummary` / `ThemeListEnvelope` — `GET /themes.json`
+- `ThemeAssetSummary` / `ThemeAssetListEnvelope` — `GET /themes/{id}/assets.json`
+- `ShopSummary` / `ProductEntry` / `ThemeAssetEntry` — slimmed-down output
+  shapes returned by the client methods
+
+All fields are optional (`total=False`) because the runtime always
+reads via `.get(...)` and tests build partial mocks. Switching to
+`total=True` would break every existing mock — see
+`tests/test_shopify_admin.py::TestShopifyTypedDicts` for the guard
+rails.
