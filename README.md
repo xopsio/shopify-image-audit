@@ -3,7 +3,7 @@
 [![CI](https://github.com/xopsio/shopify-image-audit/actions/workflows/ci.yml/badge.svg)](https://github.com/xopsio/shopify-image-audit/actions)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
 [![ruff](https://img.shields.io/badge/lint-ruff-green)](https://docs.astral.sh/ruff/)
-[![tests](https://img.shields.io/badge/tests-695_passing-brightgreen)](#testing)
+[![tests](https://img.shields.io/badge/tests-797_passing-brightgreen)](#testing)
 
 A Lighthouse-based image audit tool for Shopify stores. Produces per-image
 scores, role assignments, optimisation recommendations, and a **before/after
@@ -51,7 +51,22 @@ pip install -e ".[dev]"
 
 # Verify the install
 audit version
-pytest -q                                              # 695 tests
+pytest -q                                              # 797 tests
+```
+
+### Shopify stores (OAuth, preferred)
+
+Log in once per store — the token is stored **encrypted** in `tokens.json`
+(system keyring), so no manual `--access-token` is needed afterwards:
+
+```bash
+audit shopify login mystore.myshopify.com
+audit shopify inventory mystore.myshopify.com -o inventory.json
+
+# Many stores in one go (v0.16.2+): log in via the same stores.json
+# that batch consumes, then audit them all
+audit shopify login --stores-file stores.json
+audit shopify batch --stores-file stores.json -o batch.json
 ```
 
 ---
@@ -104,17 +119,22 @@ audit measure https://demo.myshopify.com --strategy mobile
 # -> JSON metrics to stdout (or --output metrics.json)
 ```
 
-### `audit shopify <auth|inventory> <store>` — Shopify Admin API
+### `audit shopify <login|auth|inventory|batch>` — Shopify Admin API
 ```bash
-# Verify a token
-audit shopify auth mystore.myshopify.com --access-token shpat_xxx
-# -> Token valid, prints shop info
+# Preferred (v0.15+): OAuth login, token persisted encrypted in
+# tokens.json — no manual tokens needed
+audit shopify login mystore.myshopify.com
+audit shopify auth mystore.myshopify.com           # verify the stored token
+audit shopify inventory mystore.myshopify.com -o inventory.json
 
-# List all image URLs (products + theme assets)
-audit shopify inventory mystore.myshopify.com --access-token shpat_xxx -o inventory.json
+# One-shot login for many stores, then batch-audit them (v0.16.2+)
+audit shopify login --stores-file stores.json
+audit shopify batch --stores-file stores.json -o batch.json
 ```
 Read-only scopes required (`read_products`, `read_themes`, `read_shop`).
-See `docs/integrations/SHOPIFY_ADMIN.md` for token-acquisition steps.
+Manual tokens still work via `--access-token` / `$SHOPIFY_ACCESS_TOKEN`.
+See `docs/integrations/SHOPIFY_ADMIN.md` for token acquisition and
+`docs/integrations/SHOPIFY_OAUTH.md` for the OAuth flow.
 
 ### `audit score <audit_input.json> --ranker {heuristic|ml}`
 ```bash
@@ -191,7 +211,7 @@ src/
     └── shopify_admin.py      # Shopify Admin API (auth, products, theme_assets)
 
 src/audit/schemas/audit_result.schema.json  # JSON Schema contract (validated by tests)
-tests/                              # 695 tests, single-writer (ZCode)
+tests/                              # 797 tests, single-writer (ZCode)
 docs/examples/                       # live demo report + comparison JSON
 docs/integrations/                   # Shopify Admin API token guide
 ```
@@ -204,7 +224,7 @@ The codebase is governed by **a single ZCode agent** (see
 ## Testing
 
 ```bash
-pytest -q                                # 695 tests, single-writer discipline
+pytest -q                                # 797 tests, single-writer discipline
 pytest --cov=src --cov-report=term       # ~91% coverage
 ruff check src/ tests/                   # 0 violations
 ```
