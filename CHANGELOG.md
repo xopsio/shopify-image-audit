@@ -9,7 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Empty — all Sprint 16 work shipped in v0.12.0.
+Empty — all Sprint 17 work shipped in v0.13.0.
+
+---
+
+## [0.13.0] - 2026-08-01
+
+### Added (Sprint 17)
+- `audit shopify batch` and `audit schedule run-all` now show a live
+  Rich Progress bar (`SpinnerColumn` + `TextColumn` + `BarColumn` +
+  `MofNCompleteColumn` + `TimeElapsedColumn`) while the run is
+  in flight — TD-3
+- New `on_done` keyword callback parameter on `run_parallel` (and
+  forwarded by `run_batch` and `run_all_schedules`) lets callers
+  observe each completed item without re-implementing the loop —
+  callback exceptions are silently swallowed so a buggy handler
+  never breaks the run — TD-1, TD-2
+
+### Stats
+- 721 tests pass (up from 715; +6 callback tests)
+- `mypy src/` (strict): Success, 30 files, zero ignores
+- Ruff check + format clean
+- 81 PRs merged
 
 ---
 
@@ -265,6 +286,7 @@ Empty — all Sprint 16 work shipped in v0.12.0.
 - Single concurrency primitive (`run_parallel`) replaces two copies
 - Test fixtures consolidated into one place
 
+[0.13.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.10.1...v0.11.0
 [0.10.1]: https://github.com/xopsio/shopify-image-audit/compare/v0.10.0...v0.10.1
