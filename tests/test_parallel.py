@@ -15,12 +15,14 @@ from engine._parallel import run_parallel
 @dataclass
 class Item:
     """Test input that simulates a callable result."""
+
     value: int
 
 
 @dataclass
 class Result:
     """Test output that mirrors ScheduleRunResult / StoreResult shape."""
+
     value: int
     cancelled: bool = False
 
@@ -65,7 +67,10 @@ class TestRunParallel:
         # Sequential + stop_on_error → returns only the first item.
         # The loop breaks before the second call.
         results = run_parallel(
-            items, maybe_fail, parallel=1, stop_on_error=True,
+            items,
+            maybe_fail,
+            parallel=1,
+            stop_on_error=True,
         )
         assert len(results) == 1
         assert results[0].value == 2
@@ -109,21 +114,25 @@ class TestRunParallel:
 # Integration: batch.py and scheduler.py both delegate to run_parallel
 # ---------------------------------------------------------------------------
 
+
 class TestRunParallelIntegration:
     def test_batch_uses_run_parallel(self) -> None:
         """run_batch delegates to run_parallel (same observable behaviour)."""
         # Indirect: just verify existing batch tests still work; covered
         # by the full test_run_batchSequential tests in tests/test_batch.py.
         from engine.batch import StoreConfig, run_batch
-        stores = [
-            StoreConfig(f"a{i}.myshopify.com", "shpat_a{i}") for i in range(3)
-        ]
+
+        stores = [StoreConfig(f"a{i}.myshopify.com", "shpat_a{i}") for i in range(3)]
         from unittest.mock import patch
 
-        with patch("engine.batch._audit_one_store",
-                   side_effect=lambda s: __import__("engine.batch", fromlist=["StoreResult"]).StoreResult(
-                       shop_domain=s.shop_domain, success=True, inventory=[],
-                   )):
+        with patch(
+            "engine.batch._audit_one_store",
+            side_effect=lambda s: __import__("engine.batch", fromlist=["StoreResult"]).StoreResult(
+                shop_domain=s.shop_domain,
+                success=True,
+                inventory=[],
+            ),
+        ):
             result = run_batch(stores, parallel=1)
         assert len(result.results) == 3
         assert all(r.success for r in result.results)
@@ -144,16 +153,20 @@ class TestRunParallelIntegration:
             store.add(ScheduleConfig("a.myshopify.com", "https://a"))
             store.add(ScheduleConfig("b.myshopify.com", "https://b"))
 
-            audit = AuditResult.model_validate({
-                "meta": {
-                    "url": "https://a.myshopify.com",
-                    "timestamp_utc": "2026-07-30T15:00:00Z",
-                    "device": "mobile", "runs": 1, "tool": "lighthouse",
-                },
-                "vitals": {"lcp_ms": 1800.0, "cls": 0.05, "inp_ms": 120.0, "ttfb_ms": 400.0},
-                "images": [],
-                "summary": {"top_issues": []},
-            })
+            audit = AuditResult.model_validate(
+                {
+                    "meta": {
+                        "url": "https://a.myshopify.com",
+                        "timestamp_utc": "2026-07-30T15:00:00Z",
+                        "device": "mobile",
+                        "runs": 1,
+                        "tool": "lighthouse",
+                    },
+                    "vitals": {"lcp_ms": 1800.0, "cls": 0.05, "inp_ms": 120.0, "ttfb_ms": 400.0},
+                    "images": [],
+                    "summary": {"top_issues": []},
+                }
+            )
 
             class StubHistory:
                 def record(self, *a, **kw):
@@ -162,15 +175,19 @@ class TestRunParallelIntegration:
                 def list_entries(self, *a, **kw):
                     class E:
                         id = "stub-entry-id"
+
                     return [E()]
 
             from unittest.mock import patch
+
             with patch(
                 "engine.cli_helpers._dispatchers.fetch_url_as_audit",
                 return_value=audit,
             ):
                 results = run_all_schedules(
-                    store, history_store=StubHistory(), parallel=1,
+                    store,
+                    history_store=StubHistory(),
+                    parallel=1,
                 )
             assert len(results) == 2
             assert all(r.success for r in results)

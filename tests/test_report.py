@@ -33,6 +33,7 @@ from tests import FIXTURES
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 def _minimal_result(**overrides) -> dict:
     """Return a minimal, schema-shaped audit_result dict for tests."""
     base = {
@@ -65,6 +66,7 @@ def _minimal_result(**overrides) -> dict:
 # _vitals_status
 # ---------------------------------------------------------------------------
 
+
 class TestVitalsStatus:
     def test_good_below_threshold(self) -> None:
         assert _vitals_status("lcp_ms", 2000) == "good"
@@ -92,6 +94,7 @@ class TestVitalsStatus:
 # ---------------------------------------------------------------------------
 # _aggregate_stats
 # ---------------------------------------------------------------------------
+
 
 class TestAggregateStats:
     def test_basic_aggregation(self) -> None:
@@ -121,6 +124,7 @@ class TestAggregateStats:
 # ---------------------------------------------------------------------------
 # _render_meta
 # ---------------------------------------------------------------------------
+
 
 class TestRenderMeta:
     def test_basic_fields_rendered(self) -> None:
@@ -153,6 +157,7 @@ class TestRenderMeta:
 # _render_vitals
 # ---------------------------------------------------------------------------
 
+
 class TestRenderVitals:
     def test_all_four_vitals_present(self) -> None:
         out = _render_vitals(_minimal_result()["vitals"])
@@ -178,6 +183,7 @@ class TestRenderVitals:
 # _render_issues
 # ---------------------------------------------------------------------------
 
+
 class TestRenderIssues:
     def test_empty_returns_empty_string(self) -> None:
         assert _render_issues({"top_issues": []}) == ""
@@ -197,6 +203,7 @@ class TestRenderIssues:
 # ---------------------------------------------------------------------------
 # _render_image_row
 # ---------------------------------------------------------------------------
+
 
 class TestRenderImageRow:
     def test_lcp_badge_shown(self) -> None:
@@ -231,7 +238,7 @@ class TestRenderImageRow:
         tail = long_src[-50:]
         assert f">{tail}</td>" in out
         # And the long run of 'a' must not appear in the visible cell
-        visible_cell = out.split('">', 1)[1].split('</td>', 1)[0]
+        visible_cell = out.split('">', 1)[1].split("</td>", 1)[0]
         assert "a" * 51 not in visible_cell
 
     def test_dimensions_show_natural_when_missing(self) -> None:
@@ -243,6 +250,7 @@ class TestRenderImageRow:
 # ---------------------------------------------------------------------------
 # _render_role_distribution
 # ---------------------------------------------------------------------------
+
 
 class TestRenderRoleDistribution:
     def test_sorted_roles(self) -> None:
@@ -261,6 +269,7 @@ class TestRenderRoleDistribution:
 # _render_comparison_section (before/after — #18/#20)
 # ---------------------------------------------------------------------------
 
+
 def _sample_comparison():
     """A minimal ComparisonResult-shaped dict for section tests."""
     return {
@@ -273,10 +282,18 @@ def _sample_comparison():
             "ttfb": {"before": 900.0, "after": 620.0, "delta": -280.0, "delta_pct": -31.11, "status": "improved"},
         },
         "images": {
-            "before_count": 3, "after_count": 3, "count_delta": 0,
-            "before_total_bytes": 1625000, "after_total_bytes": 139100, "total_bytes_delta": -1485900,
-            "before_total_waste": 1570400, "after_total_waste": 84500, "total_waste_delta": -1485900,
-            "before_avg_score": 10.0, "after_avg_score": 57.0, "avg_score_delta": 47.0,
+            "before_count": 3,
+            "after_count": 3,
+            "count_delta": 0,
+            "before_total_bytes": 1625000,
+            "after_total_bytes": 139100,
+            "total_bytes_delta": -1485900,
+            "before_total_waste": 1570400,
+            "after_total_waste": 84500,
+            "total_waste_delta": -1485900,
+            "before_avg_score": 10.0,
+            "after_avg_score": 57.0,
+            "avg_score_delta": 47.0,
         },
         "summary": {
             "top_improvements": ["LCP 4200ms → 1800ms (-57%)"],
@@ -311,8 +328,11 @@ class TestComparisonSection:
         comp = _sample_comparison()
         # Flip LCP to a regression
         comp["vitals"]["lcp"] = {
-            "before": 1000.0, "after": 2500.0, "delta": 1500.0,
-            "delta_pct": 150.0, "status": "regressed",
+            "before": 1000.0,
+            "after": 2500.0,
+            "delta": 1500.0,
+            "delta_pct": 150.0,
+            "status": "regressed",
         }
         out = _render_comparison_section(comp)
         assert 'class="delta regressed"' in out
@@ -325,6 +345,7 @@ class TestComparisonSection:
     def test_accepts_comparisonresult_model(self) -> None:
         """The renderer should accept a Pydantic ComparisonResult, not just a dict."""
         from audit.models import ComparisonResult
+
         comp = ComparisonResult.model_validate(_sample_comparison())
         out = _render_comparison_section(comp)
         assert "Before / After Comparison" in out
@@ -333,6 +354,7 @@ class TestComparisonSection:
 # ---------------------------------------------------------------------------
 # generate_html_report (integration of renderers)
 # ---------------------------------------------------------------------------
+
 
 class TestGenerateHtmlReport:
     def test_full_structure(self) -> None:
@@ -378,7 +400,6 @@ class TestGenerateHtmlReport:
 # ---------------------------------------------------------------------------
 
 
-
 class TestRefactorEquivalence:
     """Regression guard for the report refactor + comparison feature.
 
@@ -411,72 +432,116 @@ class TestRefactorEquivalence:
 # ---------------------------------------------------------------------------
 
 
-
 class TestRenderImageRowDirect:
     def test_high_score_class(self) -> None:
-        out = _render_image_row({
-            "src": "x.jpg", "role": "hero", "score": 90,
-            "bytes": 1000, "mime": "image/jpeg",
-        })
+        out = _render_image_row(
+            {
+                "src": "x.jpg",
+                "role": "hero",
+                "score": 90,
+                "bytes": 1000,
+                "mime": "image/jpeg",
+            }
+        )
         assert 'class="score high"' in out
 
     def test_medium_score_class(self) -> None:
-        out = _render_image_row({
-            "src": "x.jpg", "role": "hero", "score": 60,
-            "bytes": 1000, "mime": "image/jpeg",
-        })
+        out = _render_image_row(
+            {
+                "src": "x.jpg",
+                "role": "hero",
+                "score": 60,
+                "bytes": 1000,
+                "mime": "image/jpeg",
+            }
+        )
         assert 'class="score medium"' in out
 
     def test_low_score_class(self) -> None:
-        out = _render_image_row({
-            "src": "x.jpg", "role": "hero", "score": 30,
-            "bytes": 1000, "mime": "image/jpeg",
-        })
+        out = _render_image_row(
+            {
+                "src": "x.jpg",
+                "role": "hero",
+                "score": 30,
+                "bytes": 1000,
+                "mime": "image/jpeg",
+            }
+        )
         assert 'class="score low"' in out
 
     def test_role_classes(self) -> None:
         """Each known role renders its specific CSS class."""
         for role in (
-            "hero", "above_fold", "product_primary",
-            "product_secondary", "decorative", "unknown",
+            "hero",
+            "above_fold",
+            "product_primary",
+            "product_secondary",
+            "decorative",
+            "unknown",
         ):
-            out = _render_image_row({
-                "src": "x.jpg", "role": role, "score": 80,
-                "bytes": 1000, "mime": "image/jpeg",
-            })
+            out = _render_image_row(
+                {
+                    "src": "x.jpg",
+                    "role": role,
+                    "score": 80,
+                    "bytes": 1000,
+                    "mime": "image/jpeg",
+                }
+            )
             assert f'class="role {role}"' in out, f"Role {role!r} did not render its class"
 
     def test_recommendation_class_rendered(self) -> None:
-        out = _render_image_row({
-            "src": "x.jpg", "role": "hero", "score": 80,
-            "bytes": 1000, "mime": "image/jpeg",
-            "recommendation": "Convert to WebP",
-        })
+        out = _render_image_row(
+            {
+                "src": "x.jpg",
+                "role": "hero",
+                "score": 80,
+                "bytes": 1000,
+                "mime": "image/jpeg",
+                "recommendation": "Convert to WebP",
+            }
+        )
         assert 'class="recommendation"' in out
 
     def test_lcp_candidate_badge(self) -> None:
-        out = _render_image_row({
-            "src": "x.jpg", "role": "hero", "score": 80,
-            "bytes": 1000, "mime": "image/jpeg",
-            "is_lcp_candidate": True,
-        })
+        out = _render_image_row(
+            {
+                "src": "x.jpg",
+                "role": "hero",
+                "score": 80,
+                "bytes": 1000,
+                "mime": "image/jpeg",
+                "is_lcp_candidate": True,
+            }
+        )
         assert "lcp-badge" in out
 
     def test_no_lcp_badge_when_not_candidate(self) -> None:
-        out = _render_image_row({
-            "src": "x.jpg", "role": "decorative", "score": 80,
-            "bytes": 1000, "mime": "image/jpeg",
-            "is_lcp_candidate": False,
-        })
+        out = _render_image_row(
+            {
+                "src": "x.jpg",
+                "role": "decorative",
+                "score": 80,
+                "bytes": 1000,
+                "mime": "image/jpeg",
+                "is_lcp_candidate": False,
+            }
+        )
         assert "lcp-badge" not in out
 
     def test_long_src_truncated(self) -> None:
         import re
+
         long_src = "https://example.com/" + ("UNIQUE_" * 50) + ".jpg"
-        out = _render_image_row({
-            "src": long_src, "role": "hero", "score": 80,
-            "bytes": 1000, "mime": "image/jpeg",
-        })
+        out = _render_image_row(
+            {
+                "src": long_src,
+                "role": "hero",
+                "score": 80,
+                "bytes": 1000,
+                "mime": "image/jpeg",
+            }
+        )
         # The visible cell contains only the last 50 chars
         m = re.search(r'<td class="bytes" title="[^"]*">([^<]*)<', out)
         assert m is not None, "Could not find <td> cell"
@@ -487,19 +552,31 @@ class TestRenderImageRowDirect:
         assert long_src not in visible
 
     def test_missing_dimensions_rendered_as_na(self) -> None:
-        out = _render_image_row({
-            "src": "x.jpg", "role": "hero", "score": 80,
-            "bytes": 1000, "mime": "image/jpeg",
-        })
+        out = _render_image_row(
+            {
+                "src": "x.jpg",
+                "role": "hero",
+                "score": 80,
+                "bytes": 1000,
+                "mime": "image/jpeg",
+            }
+        )
         assert "N/A×N/A" in out
 
     def test_dimensions_present(self) -> None:
-        out = _render_image_row({
-            "src": "x.jpg", "role": "hero", "score": 80,
-            "bytes": 1000, "mime": "image/jpeg",
-            "displayed_width": 800, "displayed_height": 600,
-            "natural_width": 1600, "natural_height": 1200,
-        })
+        out = _render_image_row(
+            {
+                "src": "x.jpg",
+                "role": "hero",
+                "score": 80,
+                "bytes": 1000,
+                "mime": "image/jpeg",
+                "displayed_width": 800,
+                "displayed_height": 600,
+                "natural_width": 1600,
+                "natural_height": 1200,
+            }
+        )
         assert "800×600" in out
         assert "1600×1200" in out
 

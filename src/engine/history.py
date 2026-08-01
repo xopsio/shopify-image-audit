@@ -57,6 +57,7 @@ _HISTORY_RELATIVE = Path(".shopify-image-audit") / "history"
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _extract_hostname(url: str) -> str:
     """Extract the hostname from a store URL.
 
@@ -95,6 +96,7 @@ def _default_history_dir() -> Path:
 # Entry model
 # ---------------------------------------------------------------------------
 
+
 class HistoryEntry(BaseModel):
     """Lightweight index entry for a single historical snapshot.
 
@@ -127,6 +129,7 @@ class HistoryEntry(BaseModel):
 # ---------------------------------------------------------------------------
 # Store
 # ---------------------------------------------------------------------------
+
 
 class HistoryStore:
     """Filesystem-backed history store for ``AuditResult`` snapshots.
@@ -197,8 +200,8 @@ class HistoryStore:
         pruned = self._prune(host)
         if pruned:
             from engine._logging import get_logger
-            get_logger().debug("History pruned: %d old entries for host=%s",
-                               pruned, host)
+
+            get_logger().debug("History pruned: %d old entries for host=%s", pruned, host)
 
         return path
 
@@ -343,10 +346,7 @@ class HistoryStore:
         images = raw.get("images", [])
 
         label = raw.get("_history_label")
-        avg_score = (
-            sum(img.get("score", 0) for img in images) / len(images)
-            if images else 0.0
-        )
+        avg_score = sum(img.get("score", 0) for img in images) / len(images) if images else 0.0
         total_bytes = sum(img.get("bytes", 0) for img in images)
 
         return HistoryEntry(
@@ -580,8 +580,9 @@ def generate_diff_html(
     img_stats = comp.get("images", {})
     summary = comp.get("summary", {})
 
-    def _row(label: str, before: float, after: float, delta: float,
-             pct: float | None, fmt: str, lower_better: bool = True) -> str:
+    def _row(
+        label: str, before: float, after: float, delta: float, pct: float | None, fmt: str, lower_better: bool = True
+    ) -> str:
         if pct is not None:
             pct_str = f" ({pct:+.0f}%)"
         else:
@@ -610,8 +611,12 @@ def generate_diff_html(
     ):
         d = vitals.get(key, {})
         vital_rows += _row(
-            label, d.get("before", 0), d.get("after", 0),
-            d.get("delta", 0), d.get("delta_pct"), fmt,
+            label,
+            d.get("before", 0),
+            d.get("after", 0),
+            d.get("delta", 0),
+            d.get("delta_pct"),
+            fmt,
         )
 
     img_rows = _row(
@@ -619,21 +624,24 @@ def generate_diff_html(
         img_stats.get("before_total_bytes", 0),
         img_stats.get("after_total_bytes", 0),
         img_stats.get("total_bytes_delta", 0),
-        None, "{:.0f}",
+        None,
+        "{:.0f}",
     )
     img_rows += _row(
         "Estimated waste",
         img_stats.get("before_total_waste", 0),
         img_stats.get("after_total_waste", 0),
         img_stats.get("total_waste_delta", 0),
-        None, "{:.0f}",
+        None,
+        "{:.0f}",
     )
     img_rows += _row(
         "Avg image score",
         img_stats.get("before_avg_score", 0),
         img_stats.get("after_avg_score", 0),
         img_stats.get("avg_score_delta", 0),
-        None, "{:.1f}",
+        None,
+        "{:.1f}",
     )
 
     improvements = summary.get("top_improvements", [])

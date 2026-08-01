@@ -38,21 +38,25 @@ BEFORE_AFTER = Path(__file__).resolve().parents[1] / "fixtures" / "before_after"
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(scope="module")
 def before_result() -> AuditResult:
     from engine.audit_orchestrator import run_audit
+
     return run_audit(BEFORE_AFTER / "before_lcp.json", url="https://demo.myshopify.com")
 
 
 @pytest.fixture(scope="module")
 def after_result() -> AuditResult:
     from engine.audit_orchestrator import run_audit
+
     return run_audit(BEFORE_AFTER / "after_lcp.json", url="https://demo.myshopify.com")
 
 
 # ---------------------------------------------------------------------------
 # _delta helper
 # ---------------------------------------------------------------------------
+
 
 class TestDelta:
     def test_improvement_lower_is_better(self) -> None:
@@ -89,6 +93,7 @@ class TestDelta:
 # ---------------------------------------------------------------------------
 # save_baseline / load_baseline
 # ---------------------------------------------------------------------------
+
 
 class TestSaveLoadBaseline:
     def test_roundtrip_preserves_data(self, tmp_path: Path, before_result: AuditResult) -> None:
@@ -131,6 +136,7 @@ class TestSaveLoadBaseline:
 # ---------------------------------------------------------------------------
 # compare()
 # ---------------------------------------------------------------------------
+
 
 class TestCompare:
     def test_returns_comparison_result(self, before_result, after_result) -> None:
@@ -189,8 +195,13 @@ class TestCompare:
     def test_empty_images(self) -> None:
         """compare() must not divide by zero when images lists are empty."""
         empty = {
-            "meta": {"url": "x", "timestamp_utc": "2026-01-01T00:00:00Z",
-                     "device": "mobile", "runs": 1, "tool": "lighthouse"},
+            "meta": {
+                "url": "x",
+                "timestamp_utc": "2026-01-01T00:00:00Z",
+                "device": "mobile",
+                "runs": 1,
+                "tool": "lighthouse",
+            },
             "vitals": {"lcp_ms": 1000.0, "cls": 0.0, "inp_ms": 100.0, "ttfb_ms": 200.0},
             "images": [],
             "summary": {"top_issues": []},
@@ -204,6 +215,7 @@ class TestCompare:
 # ROI heuristic
 # ---------------------------------------------------------------------------
 
+
 class TestRoiEstimate:
     def test_large_lcp_improvement_gives_uplift(self, before_result, after_result) -> None:
         comp = compare(before_result, after_result)
@@ -213,6 +225,7 @@ class TestRoiEstimate:
 
     def test_no_lcp_change_gives_neutral_message(self) -> None:
         from audit.models import ImageStatsDelta, MetricDelta, VitalsDelta
+
         vd = VitalsDelta(
             lcp=MetricDelta(before=1000, after=1000, delta=0, delta_pct=0, status="unchanged"),
             cls=MetricDelta(before=0, after=0, delta=0, status="unchanged"),
@@ -220,10 +233,18 @@ class TestRoiEstimate:
             ttfb=MetricDelta(before=0, after=0, delta=0, status="unchanged"),
         )
         isd = ImageStatsDelta(
-            before_count=0, after_count=0, count_delta=0,
-            before_total_bytes=0, after_total_bytes=0, total_bytes_delta=0,
-            before_total_waste=0, after_total_waste=0, total_waste_delta=0,
-            before_avg_score=0, after_avg_score=0, avg_score_delta=0,
+            before_count=0,
+            after_count=0,
+            count_delta=0,
+            before_total_bytes=0,
+            after_total_bytes=0,
+            total_bytes_delta=0,
+            before_total_waste=0,
+            after_total_waste=0,
+            total_waste_delta=0,
+            before_avg_score=0,
+            after_avg_score=0,
+            avg_score_delta=0,
         )
         msg = _roi_estimate(vd, isd)
         assert "No significant LCP change" in msg
@@ -232,6 +253,7 @@ class TestRoiEstimate:
 # ---------------------------------------------------------------------------
 # ROI sort key (Sprint 4, TD-3)
 # ---------------------------------------------------------------------------
+
 
 class TestRoiSortKey:
     def test_lcp_improvement_positive(self) -> None:
@@ -369,10 +391,14 @@ class TestRecommendationsInSummary:
         """When after is worse than before, regressions come first."""
         from engine.audit_orchestrator import run_audit
 
-        before = run_audit(Path(__file__).resolve().parents[1] / "fixtures" / "before_after" / "after_lcp.json",
-                           url="https://demo.myshopify.com")
-        after = run_audit(Path(__file__).resolve().parents[1] / "fixtures" / "before_after" / "before_lcp.json",
-                          url="https://demo.myshopify.com")
+        before = run_audit(
+            Path(__file__).resolve().parents[1] / "fixtures" / "before_after" / "after_lcp.json",
+            url="https://demo.myshopify.com",
+        )
+        after = run_audit(
+            Path(__file__).resolve().parents[1] / "fixtures" / "before_after" / "before_lcp.json",
+            url="https://demo.myshopify.com",
+        )
         comp = compare(before, after)
         regressions = [r for r in comp.summary.recommendations if r.sort_key < 0]
         assert len(regressions) >= 1
@@ -394,8 +420,10 @@ class TestRecommendationsInSummary:
         """Comparing identical results yields no recommendations but stable fields."""
         from engine.audit_orchestrator import run_audit
 
-        result = run_audit(Path(__file__).resolve().parents[1] / "fixtures" / "before_after" / "before_lcp.json",
-                           url="https://demo.myshopify.com")
+        result = run_audit(
+            Path(__file__).resolve().parents[1] / "fixtures" / "before_after" / "before_lcp.json",
+            url="https://demo.myshopify.com",
+        )
         comp = compare(result, result)
         assert comp.summary.recommendations == []
         assert "No measurable changes" in comp.summary.top_improvements[0]
@@ -424,20 +452,19 @@ class TestRecommendationsInSummary:
 # Per-image deltas (Sprint 3, TD-2)
 # ---------------------------------------------------------------------------
 
+
 class TestStripQueryParams:
     def test_no_query(self) -> None:
-        assert _strip_query_params("https://cdn.example.com/hero.webp") == \
-            "https://cdn.example.com/hero.webp"
+        assert _strip_query_params("https://cdn.example.com/hero.webp") == "https://cdn.example.com/hero.webp"
 
     def test_with_v_query(self) -> None:
-        assert _strip_query_params(
-            "https://cdn.example.com/hero.webp?v=2"
-        ) == "https://cdn.example.com/hero.webp"
+        assert _strip_query_params("https://cdn.example.com/hero.webp?v=2") == "https://cdn.example.com/hero.webp"
 
     def test_with_multiple_params(self) -> None:
-        assert _strip_query_params(
-            "https://cdn.example.com/hero.webp?v=2&token=abc"
-        ) == "https://cdn.example.com/hero.webp"
+        assert (
+            _strip_query_params("https://cdn.example.com/hero.webp?v=2&token=abc")
+            == "https://cdn.example.com/hero.webp"
+        )
 
     def test_relative_path(self) -> None:
         assert _strip_query_params("/path/img.jpg?x=1") == "/path/img.jpg"
@@ -466,14 +493,17 @@ class TestImageKey:
 
 
 class TestPerImageStatus:
-    @pytest.mark.parametrize("before,after,expected", [
-        (1000, 500, "improved"),     # -50% >= 10% threshold
-        (1000, 700, "improved"),     # -30% >= 10% threshold
-        (1000, 950, "unchanged"),    # -5% within tolerance
-        (1000, 1050, "unchanged"),   # +5% within tolerance
-        (1000, 2000, "regressed"),   # +100% >= 10% threshold
-        (0, 1000, "unchanged"),      # zero before_bytes -> unchanged (can't compute ratio)
-    ])
+    @pytest.mark.parametrize(
+        "before,after,expected",
+        [
+            (1000, 500, "improved"),  # -50% >= 10% threshold
+            (1000, 700, "improved"),  # -30% >= 10% threshold
+            (1000, 950, "unchanged"),  # -5% within tolerance
+            (1000, 1050, "unchanged"),  # +5% within tolerance
+            (1000, 2000, "regressed"),  # +100% >= 10% threshold
+            (0, 1000, "unchanged"),  # zero before_bytes -> unchanged (can't compute ratio)
+        ],
+    )
     def test_status_thresholds(self, before, after, expected) -> None:
         assert _per_image_status(before, after) == expected
 
@@ -492,7 +522,10 @@ class TestPerImageRecommendation:
 
     def test_format_conversion_mentions_both(self) -> None:
         rec = _per_image_recommendation(
-            "improved", "image/jpeg", "image/webp", 5,
+            "improved",
+            "image/jpeg",
+            "image/webp",
+            5,
         )
         assert "jpeg" in rec.lower() and "webp" in rec.lower()
 
@@ -543,61 +576,86 @@ class TestMatchImages:
         assert deltas[0].after is None
 
     def test_mixed_add_remove_keep(self) -> None:
-            """3 before, 3 after: 1 kept, 1 removed (no match), 1 added, 1 regressed (5x growth)."""
-            before = [
-                {"src": "https://x/keep.jpg", "bytes": 1000, "mime": "image/jpeg"},
-                {"src": "https://x/removed.jpg", "bytes": 2000, "mime": "image/jpeg"},
-                {"src": "https://x/grew.jpg", "bytes": 100, "mime": "image/jpeg"},
-            ]
-            after = [
-                {"src": "https://x/keep.jpg", "bytes": 1000, "mime": "image/jpeg"},
-                {"src": "https://x/grew.jpg", "bytes": 500, "mime": "image/jpeg"},
-                {"src": "https://x/added.jpg", "bytes": 300, "mime": "image/webp"},
-            ]
-            deltas = _match_images(before, after)
-            statuses = {d.status for d in deltas}
-            # keep: unchanged (same bytes); removed: removed (no after-match);
-            # grew: regressed (bytes 100 -> 500 = +400%); added: added
-            assert statuses == {"added", "removed", "regressed", "unchanged"}
+        """3 before, 3 after: 1 kept, 1 removed (no match), 1 added, 1 regressed (5x growth)."""
+        before = [
+            {"src": "https://x/keep.jpg", "bytes": 1000, "mime": "image/jpeg"},
+            {"src": "https://x/removed.jpg", "bytes": 2000, "mime": "image/jpeg"},
+            {"src": "https://x/grew.jpg", "bytes": 100, "mime": "image/jpeg"},
+        ]
+        after = [
+            {"src": "https://x/keep.jpg", "bytes": 1000, "mime": "image/jpeg"},
+            {"src": "https://x/grew.jpg", "bytes": 500, "mime": "image/jpeg"},
+            {"src": "https://x/added.jpg", "bytes": 300, "mime": "image/webp"},
+        ]
+        deltas = _match_images(before, after)
+        statuses = {d.status for d in deltas}
+        # keep: unchanged (same bytes); removed: removed (no after-match);
+        # grew: regressed (bytes 100 -> 500 = +400%); added: added
+        assert statuses == {"added", "removed", "regressed", "unchanged"}
 
 
 class TestComparePerImage:
     """The compare() function must populate the new per_image field."""
 
     def test_compare_populates_per_image(self) -> None:
-        before = AuditResult.model_validate({
-            "meta": {"url": "x", "timestamp_utc": "2026-01-01T00:00:00Z",
-                     "device": "mobile", "runs": 1, "tool": "lighthouse"},
-            "vitals": {"lcp_ms": 1000.0, "cls": 0.0, "inp_ms": 100.0, "ttfb_ms": 200.0},
-            "images": [
-                {"src": "https://x/hero.jpg", "role": "hero", "score": 50,
-                 "bytes": 500_000, "mime": "image/jpeg"},
-            ],
-            "summary": {"top_issues": []},
-        })
-        after = AuditResult.model_validate({
-            "meta": {"url": "y", "timestamp_utc": "2026-01-02T00:00:00Z",
-                     "device": "mobile", "runs": 1, "tool": "lighthouse"},
-            "vitals": {"lcp_ms": 1000.0, "cls": 0.0, "inp_ms": 100.0, "ttfb_ms": 200.0},
-            "images": [
-                {"src": "https://x/hero.jpg?v=2", "role": "hero", "score": 90,
-                 "bytes": 500_000, "mime": "image/jpeg"},
-            ],
-            "summary": {"top_issues": []},
-        })
+        before = AuditResult.model_validate(
+            {
+                "meta": {
+                    "url": "x",
+                    "timestamp_utc": "2026-01-01T00:00:00Z",
+                    "device": "mobile",
+                    "runs": 1,
+                    "tool": "lighthouse",
+                },
+                "vitals": {"lcp_ms": 1000.0, "cls": 0.0, "inp_ms": 100.0, "ttfb_ms": 200.0},
+                "images": [
+                    {"src": "https://x/hero.jpg", "role": "hero", "score": 50, "bytes": 500_000, "mime": "image/jpeg"},
+                ],
+                "summary": {"top_issues": []},
+            }
+        )
+        after = AuditResult.model_validate(
+            {
+                "meta": {
+                    "url": "y",
+                    "timestamp_utc": "2026-01-02T00:00:00Z",
+                    "device": "mobile",
+                    "runs": 1,
+                    "tool": "lighthouse",
+                },
+                "vitals": {"lcp_ms": 1000.0, "cls": 0.0, "inp_ms": 100.0, "ttfb_ms": 200.0},
+                "images": [
+                    {
+                        "src": "https://x/hero.jpg?v=2",
+                        "role": "hero",
+                        "score": 90,
+                        "bytes": 500_000,
+                        "mime": "image/jpeg",
+                    },
+                ],
+                "summary": {"top_issues": []},
+            }
+        )
         comp = compare(before, after)
         assert len(comp.per_image) == 1
         assert comp.per_image[0].status == "unchanged"
         assert comp.per_image[0].score_delta == 40
 
     def test_compare_empty_images_yields_empty_per_image(self) -> None:
-        before = AuditResult.model_validate({
-            "meta": {"url": "x", "timestamp_utc": "2026-01-01T00:00:00Z",
-                     "device": "mobile", "runs": 1, "tool": "lighthouse"},
-            "vitals": {"lcp_ms": 1000.0, "cls": 0.0, "inp_ms": 100.0, "ttfb_ms": 200.0},
-            "images": [],
-            "summary": {"top_issues": []},
-        })
+        before = AuditResult.model_validate(
+            {
+                "meta": {
+                    "url": "x",
+                    "timestamp_utc": "2026-01-01T00:00:00Z",
+                    "device": "mobile",
+                    "runs": 1,
+                    "tool": "lighthouse",
+                },
+                "vitals": {"lcp_ms": 1000.0, "cls": 0.0, "inp_ms": 100.0, "ttfb_ms": 200.0},
+                "images": [],
+                "summary": {"top_issues": []},
+            }
+        )
         after = before.model_copy(deep=True)
         after.meta.url = "y"
         after.meta.timestamp_utc = "2026-01-02T00:00:00Z"
@@ -606,24 +664,38 @@ class TestComparePerImage:
 
     def test_compare_preserves_cohort_aggregates(self) -> None:
         """Adding per_image must not remove the existing cohort-level fields."""
-        before = AuditResult.model_validate({
-            "meta": {"url": "x", "timestamp_utc": "2026-01-01T00:00:00Z",
-                     "device": "mobile", "runs": 1, "tool": "lighthouse"},
-            "vitals": {"lcp_ms": 1000.0, "cls": 0.0, "inp_ms": 100.0, "ttfb_ms": 200.0},
-            "images": [
-                {"src": "a.jpg", "role": "hero", "score": 80, "bytes": 1000, "mime": "image/jpeg"},
-            ],
-            "summary": {"top_issues": []},
-        })
-        after = AuditResult.model_validate({
-            "meta": {"url": "y", "timestamp_utc": "2026-01-02T00:00:00Z",
-                     "device": "mobile", "runs": 1, "tool": "lighthouse"},
-            "vitals": {"lcp_ms": 1000.0, "cls": 0.0, "inp_ms": 100.0, "ttfb_ms": 200.0},
-            "images": [
-                {"src": "a.jpg", "role": "hero", "score": 90, "bytes": 800, "mime": "image/jpeg"},
-            ],
-            "summary": {"top_issues": []},
-        })
+        before = AuditResult.model_validate(
+            {
+                "meta": {
+                    "url": "x",
+                    "timestamp_utc": "2026-01-01T00:00:00Z",
+                    "device": "mobile",
+                    "runs": 1,
+                    "tool": "lighthouse",
+                },
+                "vitals": {"lcp_ms": 1000.0, "cls": 0.0, "inp_ms": 100.0, "ttfb_ms": 200.0},
+                "images": [
+                    {"src": "a.jpg", "role": "hero", "score": 80, "bytes": 1000, "mime": "image/jpeg"},
+                ],
+                "summary": {"top_issues": []},
+            }
+        )
+        after = AuditResult.model_validate(
+            {
+                "meta": {
+                    "url": "y",
+                    "timestamp_utc": "2026-01-02T00:00:00Z",
+                    "device": "mobile",
+                    "runs": 1,
+                    "tool": "lighthouse",
+                },
+                "vitals": {"lcp_ms": 1000.0, "cls": 0.0, "inp_ms": 100.0, "ttfb_ms": 200.0},
+                "images": [
+                    {"src": "a.jpg", "role": "hero", "score": 90, "bytes": 800, "mime": "image/jpeg"},
+                ],
+                "summary": {"top_issues": []},
+            }
+        )
         comp = compare(before, after)
         # Cohort fields still populated (backward compat)
         assert comp.images.before_total_bytes == 1000

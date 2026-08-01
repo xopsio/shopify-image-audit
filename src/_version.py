@@ -39,6 +39,7 @@ def get_version() -> str:
     pyproject = Path(__file__).resolve().parent.parent / "pyproject.toml"
     try:
         import tomllib
+
         with open(pyproject, "rb") as f:
             return tomllib.load(f)["project"]["version"]
     except (FileNotFoundError, KeyError, ModuleNotFoundError):

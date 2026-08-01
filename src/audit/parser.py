@@ -115,9 +115,7 @@ def parse(data: dict[str, Any]) -> list[ImageDict]:
     if "images" in data or "lcp_candidate" in data or "lcpCandidate" in data:
         images, lcp_url = _parse_fixture_format(data)
         if lcp_url and not any(img.get("is_lcp_candidate") for img in images):
-            images.append(
-                _normalize_image(url=lcp_url, bytes_=0, mime="image/jpeg", is_lcp_candidate=True)
-            )
+            images.append(_normalize_image(url=lcp_url, bytes_=0, mime="image/jpeg", is_lcp_candidate=True))
         if images:
             return images
 

@@ -58,25 +58,21 @@ def _clean_config_cache() -> None:
 # Path resolution
 # ---------------------------------------------------------------------------
 
+
 class TestDefaultConfigPath:
     def test_uses_xdg_config_home(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("XDG_CONFIG_HOME", "/tmp/xdg-config")
-        assert default_config_path() == (
-            Path("/tmp/xdg-config") / "shopify-image-audit" / "config.toml"
-        )
+        assert default_config_path() == (Path("/tmp/xdg-config") / "shopify-image-audit" / "config.toml")
 
-    def test_falls_back_to_home_dot_config(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_falls_back_to_home_dot_config(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
-        assert default_config_path() == (
-            Path.home() / ".config" / "shopify-image-audit" / "config.toml"
-        )
+        assert default_config_path() == (Path.home() / ".config" / "shopify-image-audit" / "config.toml")
 
 
 # ---------------------------------------------------------------------------
 # Loading
 # ---------------------------------------------------------------------------
+
 
 class TestLoadConfig:
     def test_missing_file_returns_defaults(self, tmp_path: Path) -> None:
@@ -98,9 +94,7 @@ class TestLoadConfig:
         assert cfg.report.brand_color == "#ff6b35"
         assert cfg.report.brand_logo == "/etc/audit/logo.png"
 
-    def test_invalid_toml_degrades_to_defaults(
-        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_invalid_toml_degrades_to_defaults(self, tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
         path = tmp_path / "config.toml"
         path.write_text("[defaults\ndevice = ", encoding="utf-8")  # malformed
         with caplog.at_level("WARNING"):
@@ -108,9 +102,7 @@ class TestLoadConfig:
         assert cfg == Config()
         assert "cannot read" in caplog.text
 
-    def test_unknown_section_warns_but_keeps_known(
-        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_unknown_section_warns_but_keeps_known(self, tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
         path = tmp_path / "config.toml"
         path.write_text('[typo_section]\nx = 1\n\n[defaults]\ndevice = "desktop"\n', encoding="utf-8")
         with caplog.at_level("WARNING"):
@@ -118,9 +110,7 @@ class TestLoadConfig:
         assert cfg.defaults.device == "desktop"
         assert "unknown section" in caplog.text
 
-    def test_invalid_device_falls_back_to_mobile(
-        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_invalid_device_falls_back_to_mobile(self, tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
         path = tmp_path / "config.toml"
         path.write_text('[defaults]\ndevice = "tablet"\n', encoding="utf-8")
         with caplog.at_level("WARNING"):
@@ -143,9 +133,7 @@ class TestLoadConfig:
         path.write_text('[defaults]\nparallel = "many"\n', encoding="utf-8")
         assert load_config(path).defaults.parallel == 1
 
-    def test_env_var_override_path(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_env_var_override_path(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         path = tmp_path / "elsewhere.toml"
         path.write_text('[defaults]\ndevice = "desktop"\n', encoding="utf-8")
         monkeypatch.setenv("SHOPIFY_IMAGE_AUDIT_CONFIG", str(path))

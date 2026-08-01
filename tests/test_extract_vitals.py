@@ -2,6 +2,7 @@
 Tests for the null-safe _extract_vitals function in audit_orchestrator.
 Verifies that None values do not raise TypeError (bug #2 fix).
 """
+
 from __future__ import annotations
 
 from engine.audit_orchestrator import _extract_vitals
@@ -28,12 +29,14 @@ class TestExtractVitals:
             "audits": {
                 "metrics": {
                     "details": {
-                        "items": [{
-                            "largestContentfulPaint": 1800,
-                            "cumulativeLayoutShift": 0.05,
-                            "interactive": 150,
-                            "serverResponseTime": 300,
-                        }]
+                        "items": [
+                            {
+                                "largestContentfulPaint": 1800,
+                                "cumulativeLayoutShift": 0.05,
+                                "interactive": 150,
+                                "serverResponseTime": 300,
+                            }
+                        ]
                     }
                 }
             },
@@ -42,10 +45,7 @@ class TestExtractVitals:
         assert result["lcp_ms"] == 1800.0
 
     def test_lhr_none_metric_items_falls_back(self) -> None:
-        data = {
-            "lcp_ms": 1234.0,
-            "audits": {"metrics": {"details": {"items": []}}}
-        }
+        data = {"lcp_ms": 1234.0, "audits": {"metrics": {"details": {"items": []}}}}
         result = _extract_vitals(data)
         assert result["lcp_ms"] == 1234.0
 
@@ -88,4 +88,3 @@ class TestExtractVitals:
         data = {"audits": {"metrics": {"details": {"items": ["not-a-dict"]}}}, "lcp_ms": 500.0}
         result = _extract_vitals(data)
         assert result["lcp_ms"] == 500.0
-

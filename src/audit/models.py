@@ -34,6 +34,7 @@ class _ExcludeNoneModel(BaseModel):
 
 # ---------- enums ----------
 
+
 class Device(StrEnum):
     mobile = "mobile"
     desktop = "desktop"
@@ -54,8 +55,10 @@ class ImageRole(StrEnum):
 
 # ---------- nested models ----------
 
+
 class Meta(_ExcludeNoneModel):
     """meta object – additionalProperties: false"""
+
     model_config = {"extra": "forbid"}
 
     url: str = Field(..., min_length=1)
@@ -68,6 +71,7 @@ class Meta(_ExcludeNoneModel):
 
 class Vitals(_ExcludeNoneModel):
     """vitals object – additionalProperties: false"""
+
     model_config = {"extra": "forbid"}
 
     lcp_ms: float = Field(..., ge=0)
@@ -86,6 +90,7 @@ class ImageItem(_ExcludeNoneModel):
     the contract. Round-trip via ``model_validate`` is unaffected: missing keys
     are optional and default to None.
     """
+
     model_config = {"extra": "forbid"}
 
     src: str = Field(..., min_length=1)
@@ -104,6 +109,7 @@ class ImageItem(_ExcludeNoneModel):
 
 class Summary(_ExcludeNoneModel):
     """summary object – additionalProperties: false"""
+
     model_config = {"extra": "forbid"}
 
     top_issues: list[str]
@@ -111,11 +117,13 @@ class Summary(_ExcludeNoneModel):
 
 # ---------- top-level ----------
 
+
 class AuditResult(_ExcludeNoneModel):
     """
     Top-level audit result – maps 1-to-1 to audit_result.schema.json.
     additionalProperties: false
     """
+
     model_config = {"extra": "forbid"}
 
     meta: Meta
@@ -141,6 +149,7 @@ class MetricDelta(_ExcludeNoneModel):
     for LCP/INP/TTFB/CLS (lower is better). ``delta_pct`` is relative to the
     before value (None when before is 0). ``status`` is the derived verdict.
     """
+
     model_config = {"extra": "forbid"}
 
     before: float
@@ -152,6 +161,7 @@ class MetricDelta(_ExcludeNoneModel):
 
 class VitalsDelta(_ExcludeNoneModel):
     """Deltas for the Core Web Vitals suite."""
+
     model_config = {"extra": "forbid"}
 
     lcp: MetricDelta
@@ -162,6 +172,7 @@ class VitalsDelta(_ExcludeNoneModel):
 
 class ImageStatsDelta(_ExcludeNoneModel):
     """Aggregate image-level changes (cohort level, not per-image)."""
+
     model_config = {"extra": "forbid"}
 
     before_count: int = Field(..., ge=0)
@@ -188,6 +199,7 @@ class ComparisonSummary(_ExcludeNoneModel):
     changes. ``top_improvements`` and ``top_regressions`` are kept for backward
     compatibility and are derived from ``recommendations`` by the caller.
     """
+
     model_config = {"extra": "forbid"}
 
     top_improvements: list[str]
@@ -207,6 +219,7 @@ class ComparisonRecommendation(_ExcludeNoneModel):
     ``estimated_lcp_impact_ms`` is a rough heuristic of how many ms of LCP
     improvement this change likely contributed. It is *not* a measured value.
     """
+
     model_config = {"extra": "forbid"}
 
     text: str = Field(..., min_length=1)
@@ -222,6 +235,7 @@ class ImageDelta(_ExcludeNoneModel):
     ``match_key`` identifies which before-image pairs with which after-image
     (see ``core.baseline_manager._image_key`` for the hashing scheme).
     """
+
     model_config = {"extra": "forbid"}
 
     match_key: str
@@ -237,9 +251,7 @@ class ImageDelta(_ExcludeNoneModel):
     mime_before: str | None = None
     mime_after: str | None = None
 
-    status: str = Field(
-        ..., pattern="^(improved|regressed|unchanged|added|removed)$"
-    )
+    status: str = Field(..., pattern="^(improved|regressed|unchanged|added|removed)$")
 
     recommendation: str | None = None
 
@@ -251,6 +263,7 @@ class ComparisonResult(_ExcludeNoneModel):
     timestamp) so the report can label the two sides without carrying full
     AuditResults around.
     """
+
     model_config = {"extra": "forbid"}
 
     before: dict[str, str]
@@ -259,4 +272,3 @@ class ComparisonResult(_ExcludeNoneModel):
     images: ImageStatsDelta
     summary: ComparisonSummary
     per_image: list[ImageDelta] = Field(default_factory=list)
-

@@ -104,7 +104,9 @@ def default_config_path() -> Path:
 def _warn_bad_value(key: str, value: object, expected: str) -> None:
     _log.warning(
         "Config: ignoring invalid %r (%r) — expected %s",
-        key, value, expected,
+        key,
+        value,
+        expected,
     )
 
 

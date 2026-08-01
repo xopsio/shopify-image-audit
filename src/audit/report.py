@@ -77,6 +77,7 @@ def _parse_brand_color(hex_str: str | None) -> str | None:
     s = hex_str.strip()
     if not s.startswith("#"):
         from engine._logging import get_logger
+
         get_logger().debug("Invalid --brand-color %r: missing '#' prefix", hex_str)
         return None
     body = s[1:]
@@ -107,13 +108,14 @@ def _read_brand_logo(path: str | Path) -> tuple[str, str] | None:
         return None
     if size > _BRAND_LOGO_MAX_BYTES:
         from engine._logging import get_logger
-        get_logger().debug("Brand logo too large: %d > %d bytes (path=%s)",
-                           size, _BRAND_LOGO_MAX_BYTES, path)
+
+        get_logger().debug("Brand logo too large: %d > %d bytes (path=%s)", size, _BRAND_LOGO_MAX_BYTES, path)
         return None
     ext = p.suffix.lower()
     mime = _BRAND_LOGO_MIME.get(ext)
     if mime is None:
         from engine._logging import get_logger
+
         get_logger().debug("Unsupported brand logo extension: %s (path=%s)", ext, path)
         return None
     try:
@@ -125,6 +127,7 @@ def _read_brand_logo(path: str | Path) -> tuple[str, str] | None:
     # tripwire that catches the common "external SVG with embedded JS" case.
     if mime == "image/svg+xml" and b"<script" in data.lower():
         from engine._logging import get_logger
+
         get_logger().debug("Brand logo rejected: SVG contains <script> tag (path=%s)", path)
         return None
     return mime, base64.b64encode(data).decode("ascii")
@@ -133,6 +136,7 @@ def _read_brand_logo(path: str | Path) -> tuple[str, str] | None:
 # ---------------------------------------------------------------------------
 # Aggregate stats
 # ---------------------------------------------------------------------------
+
 
 def _aggregate_stats(images: list[ImageDict]) -> dict[str, Any]:
     """Compute summary statistics for the stats grid."""
@@ -389,10 +393,7 @@ def _render_head(
 
     if brand_logo is not None:
         logo_mime, logo_b64 = brand_logo
-        logo_tag = (
-            f'    <img class="brand-logo" alt="Brand logo" '
-            f'src="data:{logo_mime};base64,{logo_b64}">\n'
-        )
+        logo_tag = f'    <img class="brand-logo" alt="Brand logo" src="data:{logo_mime};base64,{logo_b64}">\n'
     else:
         logo_tag = ""
 
@@ -414,16 +415,13 @@ def _render_head(
 
 
 def _render_meta(meta: dict[str, Any]) -> str:
-    notes_line = (
-        f"<p><strong>Notes:</strong> {escape(meta.get('notes', 'N/A'))}</p>"
-        if meta.get("notes") else ""
-    )
+    notes_line = f"<p><strong>Notes:</strong> {escape(meta.get('notes', 'N/A'))}</p>" if meta.get("notes") else ""
     return f"""        <div class="meta">
-            <p><strong>URL:</strong> {escape(meta['url'])}</p>
-            <p><strong>Timestamp:</strong> {escape(meta['timestamp_utc'])}</p>
-            <p><strong>Device:</strong> {escape(meta['device']).capitalize()}</p>
-            <p><strong>Runs:</strong> {meta['runs']}</p>
-            <p><strong>Tool:</strong> {escape(meta['tool']).capitalize()}</p>
+            <p><strong>URL:</strong> {escape(meta["url"])}</p>
+            <p><strong>Timestamp:</strong> {escape(meta["timestamp_utc"])}</p>
+            <p><strong>Device:</strong> {escape(meta["device"]).capitalize()}</p>
+            <p><strong>Runs:</strong> {meta["runs"]}</p>
+            <p><strong>Tool:</strong> {escape(meta["tool"]).capitalize()}</p>
             {notes_line}
         </div>
 
@@ -462,19 +460,19 @@ def _render_stats(stats: dict[str, Any]) -> str:
     return f"""        <h2>📈 Image Summary</h2>
         <div class="stats-grid">
             <div class="stat-box">
-                <div class="stat-value">{stats['total_images']}</div>
+                <div class="stat-value">{stats["total_images"]}</div>
                 <div class="stat-label">Total Images</div>
             </div>
             <div class="stat-box" style="background: #9b59b6;">
-                <div class="stat-value">{stats['total_bytes'] / 1024 / 1024:.2f} MB</div>
+                <div class="stat-value">{stats["total_bytes"] / 1024 / 1024:.2f} MB</div>
                 <div class="stat-label">Total Size</div>
             </div>
             <div class="stat-box" style="background: #e74c3c;">
-                <div class="stat-value">{stats['total_waste'] / 1024:.0f} KB</div>
+                <div class="stat-value">{stats["total_waste"] / 1024:.0f} KB</div>
                 <div class="stat-label">Est. Waste</div>
             </div>
             <div class="stat-box" style="background: #27ae60;">
-                <div class="stat-value">{stats['avg_score']:.0f}</div>
+                <div class="stat-value">{stats["avg_score"]:.0f}</div>
                 <div class="stat-label">Avg Score</div>
             </div>
         </div>
@@ -496,8 +494,7 @@ def _render_issues(summary: dict[str, Any]) -> str:
 """
 
 
-def _render_comparison_delta_row(label: str, before: float, after: float, delta: float,
-                                 delta_pct, fmt: str) -> str:
+def _render_comparison_delta_row(label: str, before: float, after: float, delta: float, delta_pct, fmt: str) -> str:
     """Render one before/after metric row in the comparison table."""
     if delta_pct is not None:
         pct_str = f" ({delta_pct:+.0f}%)"
@@ -557,16 +554,28 @@ def _render_comparison_section(comparison) -> str:
     # Image-level aggregate rows
     img_rows = ""
     img_rows += _render_comparison_delta_row(
-        "Total image bytes", img_stats["before_total_bytes"], img_stats["after_total_bytes"],
-        img_stats["total_bytes_delta"], None, "{:.0f}"
+        "Total image bytes",
+        img_stats["before_total_bytes"],
+        img_stats["after_total_bytes"],
+        img_stats["total_bytes_delta"],
+        None,
+        "{:.0f}",
     )
     img_rows += _render_comparison_delta_row(
-        "Estimated waste", img_stats["before_total_waste"], img_stats["after_total_waste"],
-        img_stats["total_waste_delta"], None, "{:.0f}"
+        "Estimated waste",
+        img_stats["before_total_waste"],
+        img_stats["after_total_waste"],
+        img_stats["total_waste_delta"],
+        None,
+        "{:.0f}",
     )
     img_rows += _render_comparison_delta_row(
-        "Avg image score", img_stats["before_avg_score"], img_stats["after_avg_score"],
-        img_stats["avg_score_delta"], None, "{:.1f}"
+        "Avg image score",
+        img_stats["before_avg_score"],
+        img_stats["after_avg_score"],
+        img_stats["avg_score_delta"],
+        None,
+        "{:.1f}",
     )
 
     improvements = summary.get("top_improvements", [])
@@ -579,8 +588,7 @@ def _render_comparison_section(comparison) -> str:
     improvement_items = "".join(f"<li>{escape(i)}</li>" for i in improvements)
     regression_items = "".join(f"<li>{escape(i)}</li>" for i in regressions)
     regressions_block = (
-        f'<h3 style="color:#c0392b;">⚠️ Regressions</h3><ul>{regression_items}</ul>'
-        if regressions else ""
+        f'<h3 style="color:#c0392b;">⚠️ Regressions</h3><ul>{regression_items}</ul>' if regressions else ""
     )
 
     return f"""        <div class="comparison">
@@ -635,11 +643,11 @@ def _render_per_image_deltas(per_image: list[dict[str, Any]]) -> str:
         return ""
 
     status_colours = {
-        "improved": "#27ae60",   # green
-        "regressed": "#c0392b",   # red
-        "unchanged": "#7f8c8d",   # grey
-        "added": "#2980b9",      # blue
-        "removed": "#95a5a6",    # light grey
+        "improved": "#27ae60",  # green
+        "regressed": "#c0392b",  # red
+        "unchanged": "#7f8c8d",  # grey
+        "added": "#2980b9",  # blue
+        "removed": "#95a5a6",  # light grey
     }
 
     rows = []
@@ -709,13 +717,13 @@ def _render_image_row(img: ImageDict) -> str:
     lcp_badge = '<span class="lcp-badge">LCP</span> ' if img.get("is_lcp_candidate") else ""
 
     return f"""                <tr>
-                    <td class="bytes" title="{escape(img['src'])}">{lcp_badge}{escape(src_display)}</td>
-                    <td><span class="role {escape(img['role'])}">{escape(img['role'].replace('_', ' '))}</span></td>
-                    <td><span class="score {score_class}">{img['score']}</span></td>
-                    <td class="bytes">{img['bytes'] / 1024:.1f} KB</td>
+                    <td class="bytes" title="{escape(img["src"])}">{lcp_badge}{escape(src_display)}</td>
+                    <td><span class="role {escape(img["role"])}">{escape(img["role"].replace("_", " "))}</span></td>
+                    <td><span class="score {score_class}">{img["score"]}</span></td>
+                    <td class="bytes">{img["bytes"] / 1024:.1f} KB</td>
                     <td>{dimensions}</td>
-                    <td class="bytes">{img.get('waste_bytes_est', 0) / 1024:.1f} KB</td>
-                    <td class="recommendation">{escape(img.get('recommendation') or '—')}</td>
+                    <td class="bytes">{img.get("waste_bytes_est", 0) / 1024:.1f} KB</td>
+                    <td class="recommendation">{escape(img.get("recommendation") or "—")}</td>
                 </tr>
 """
 
@@ -759,6 +767,7 @@ def _render_role_distribution(role_counts: dict[str, int]) -> str:
 def _render_footer(audit_result: dict[str, Any]) -> str:
     source_name = Path(audit_result.get("_source_file", "audit_result.json")).name
     from _version import get_version
+
     version = get_version()
     return f"""
         <footer>
@@ -774,6 +783,7 @@ def _render_footer(audit_result: dict[str, Any]) -> str:
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def generate_html_report(
     audit_result: dict[str, Any],

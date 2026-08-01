@@ -3,12 +3,14 @@
 
 from pathlib import Path
 
+
 def count_lines(filepath):
     try:
-        with open(filepath, 'r', encoding='utf-8') as f:
+        with open(filepath, "r", encoding="utf-8") as f:
             return sum(1 for _ in f)
     except:
         return 0
+
 
 def main():
     root = Path.cwd()
@@ -20,8 +22,7 @@ def main():
 
     for py_file in root.rglob("*.py"):
         # Skip venv and hidden folders
-        if any(part.startswith('.') or part == 'venv' or part == '__pycache__'
-               for part in py_file.parts):
+        if any(part.startswith(".") or part == "venv" or part == "__pycache__" for part in py_file.parts):
             continue
 
         lines = count_lines(py_file)
@@ -34,7 +35,7 @@ def main():
     # Group by top-level folder
     by_folder = {}
     for filepath, lines in all_files:
-        parts = filepath.split('\\') if '\\' in filepath else filepath.split('/')
+        parts = filepath.split("\\") if "\\" in filepath else filepath.split("/")
         top_folder = parts[0] if len(parts) > 1 else "root"
 
         if top_folder not in by_folder:
@@ -59,6 +60,6 @@ def main():
     print(f"GRAND TOTAL: {grand_total:,} lines in {len(all_files)} Python files")
     print("=" * 80)
 
+
 if __name__ == "__main__":
     main()
-

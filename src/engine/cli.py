@@ -81,6 +81,7 @@ def _get_version() -> str:
     and the HTML report footer read from one place.
     """
     from _version import get_version
+
     return get_version()
 
 
@@ -112,6 +113,7 @@ _cfg = get_config
 # Lighthouse helper (kept inline — requires subprocess + external CLI)
 # ---------------------------------------------------------------------------
 
+
 def _run_lighthouse(
     url: str,
     *,
@@ -135,6 +137,7 @@ def _run_lighthouse(
 
     best_path: Path | None = None
     from engine._logging import get_logger
+
     _lh_log = get_logger()
     for i in range(1, runs + 1):
         out_file = out_dir / f"lhr_run{i}.json"
@@ -166,12 +169,14 @@ def _run_lighthouse(
 # run
 # ---------------------------------------------------------------------------
 
+
 @app.command()
 @handle_pipeline_errors(step_name="run")
 def run(
     url: str = typer.Argument(..., help="Shopify store URL to audit."),
     device: str | None = typer.Option(
-        None, "--device",
+        None,
+        "--device",
         help="Device type: mobile or desktop (default: config or mobile).",
     ),
     runs: int = typer.Option(3, "--runs", help="Number of Lighthouse runs (default 3)."),
@@ -227,18 +232,22 @@ def run(
 # measure
 # ---------------------------------------------------------------------------
 
+
 @app.command()
 def measure(
     url: str = typer.Argument(..., help="URL to measure with PageSpeed Insights."),
     strategy: str | None = typer.Option(
-        None, "--strategy",
+        None,
+        "--strategy",
         help="Strategy: mobile or desktop (default: config or mobile).",
     ),
-    api_key: str | None = typer.Option(None, "--api-key", envvar="PAGESPEED_API_KEY",
-                                       help="Google Cloud API key (optional, or set PAGESPEED_API_KEY)."),
+    api_key: str | None = typer.Option(
+        None, "--api-key", envvar="PAGESPEED_API_KEY", help="Google Cloud API key (optional, or set PAGESPEED_API_KEY)."
+    ),
     output: Path | None = typer.Option(None, "-o", "--output", help="Output JSON file (default: print to stdout)."),
     no_cache: bool = typer.Option(
-        False, "--no-cache",
+        False,
+        "--no-cache",
         help="Bypass the on-disk PageSpeed response cache (always fetch fresh).",
     ),
 ) -> None:
@@ -285,35 +294,45 @@ def measure(
 # shopify
 # ---------------------------------------------------------------------------
 
+
 @app.command(name="shopify")
 def shopify(
     subcommand: str = typer.Argument(..., help="Subcommand: 'auth', 'inventory', or 'batch'."),
     shop_domain: str = typer.Argument(
         None,
-        help="Your shop domain, e.g. 'store.myshopify.com'. "
-        "Omit when --stores-file is provided.",
+        help="Your shop domain, e.g. 'store.myshopify.com'. Omit when --stores-file is provided.",
     ),
     access_token: str | None = typer.Option(
-        None, "--access-token", help="Admin API access token. Required for 'auth' and single-store 'inventory'.",
+        None,
+        "--access-token",
+        help="Admin API access token. Required for 'auth' and single-store 'inventory'.",
         envvar="SHOPIFY_ACCESS_TOKEN",
     ),
     output: Path = typer.Option(
-        None, "-o", "--output", help="[inventory/batch] Write the inventory JSON to this file.",
+        None,
+        "-o",
+        "--output",
+        help="[inventory/batch] Write the inventory JSON to this file.",
     ),
     limit: int = typer.Option(
-        50, "--limit", help="[inventory] Maximum products to fetch (1-250, default 50).",
+        50,
+        "--limit",
+        help="[inventory] Maximum products to fetch (1-250, default 50).",
     ),
     stores_file: Path | None = typer.Option(
-        None, "--stores-file",
+        None,
+        "--stores-file",
         help="[batch] Path to a JSON file listing stores to audit. "
         "Each entry must have 'shop_domain' and 'access_token'.",
     ),
     parallel: int | None = typer.Option(
-        None, "--parallel",
+        None,
+        "--parallel",
         help="[batch] Number of concurrent store audits. 0 = unlimited (default: config or 1).",
     ),
     stop_on_error: bool = typer.Option(
-        False, "--stop-on-error",
+        False,
+        "--stop-on-error",
         help="[batch] Abort on the first store failure (default: continue past failures).",
     ),
 ) -> None:
@@ -391,9 +410,11 @@ def _shopify_batch(
         rprint(f"[yellow]No stores found in {stores_file}.[/yellow]")
         raise typer.Exit(code=EXIT_OK) from None
 
-    rprint(f"[cyan]Running batch for {len(stores)} store(s) "
-          f"(parallel={parallel if parallel > 0 else len(stores)}, "
-          f"stop_on_error={stop_on_error})...[/cyan]")
+    rprint(
+        f"[cyan]Running batch for {len(stores)} store(s) "
+        f"(parallel={parallel if parallel > 0 else len(stores)}, "
+        f"stop_on_error={stop_on_error})...[/cyan]"
+    )
     batch_result = run_batch(stores, parallel=parallel, stop_on_error=stop_on_error)
 
     for r in batch_result.results:
@@ -408,10 +429,12 @@ def _shopify_batch(
         validate_out_path(output)
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(
-            json.dumps(inventory, indent=2), encoding="utf-8",
+            json.dumps(inventory, indent=2),
+            encoding="utf-8",
         )
-        rprint(f"[green]Batch inventory written to {output}[/green] "
-              f"({len(inventory)} images from {len(stores)} store(s))")
+        rprint(
+            f"[green]Batch inventory written to {output}[/green] ({len(inventory)} images from {len(stores)} store(s))"
+        )
     else:
         # Print combined inventory to stdout
         rprint(json.dumps(inventory, indent=2))
@@ -435,8 +458,10 @@ def _shopify_auth(shop_domain: str, access_token: str) -> None:
 
 @handle_shopify_errors()
 def _shopify_inventory(
-    shop_domain: str, access_token: str,
-    output: Path | None, limit: int,
+    shop_domain: str,
+    access_token: str,
+    output: Path | None,
+    limit: int,
 ) -> None:
     """List image URLs in a Shopify store: products + theme assets."""
     client = ShopifyAdminClient(shop_domain, access_token)
@@ -447,29 +472,32 @@ def _shopify_inventory(
     inventory: list[dict[str, Any]] = []
     for p in products:
         if p.get("image_url"):
-            inventory.append({
-                "source": "product",
-                "title": p["title"],
-                "url": p["image_url"],
-            })
+            inventory.append(
+                {
+                    "source": "product",
+                    "title": p["title"],
+                    "url": p["image_url"],
+                }
+            )
     for a in theme_assets:
-        inventory.append({
-            "source": "theme_asset",
-            "theme": a["theme_name"],
-            "key": a["key"],
-            "url": a["url"],
-        })
+        inventory.append(
+            {
+                "source": "theme_asset",
+                "theme": a["theme_name"],
+                "key": a["key"],
+                "url": a["url"],
+            }
+        )
 
     if output is not None:
         Path(output).parent.mkdir(parents=True, exist_ok=True)
         Path(output).write_text(
-            json.dumps(inventory, indent=2), encoding="utf-8",
+            json.dumps(inventory, indent=2),
+            encoding="utf-8",
         )
-        rprint(f"[green]Inventory written to {output}[/green] "
-              f"({len(inventory)} images)")
+        rprint(f"[green]Inventory written to {output}[/green] ({len(inventory)} images)")
     else:
-        rprint(f"[green]✓ Inventory fetched[/green] "
-              f"({len(products)} products, {len(theme_assets)} theme assets)")
+        rprint(f"[green]✓ Inventory fetched[/green] ({len(products)} products, {len(theme_assets)} theme assets)")
         for item in inventory:
             rprint(f"  [{item['source']:11}] {item['url']}")
 
@@ -478,24 +506,30 @@ def _shopify_inventory(
 # history
 # ---------------------------------------------------------------------------
 
+
 @app.command()
 def history(
     subcommand: str = typer.Argument(..., help="Subcommand: 'list', 'show', or 'diff'."),
     hostname: str = typer.Argument(..., help="Store hostname, e.g. 'mystore.myshopify.com'."),
     history_dir: Path | None = typer.Option(
-        None, "--history-dir",
+        None,
+        "--history-dir",
         help="Override the audit-history directory (default: $XDG_DATA_HOME/.shopify-image-audit/history/).",
     ),
     output: Path | None = typer.Option(
-        None, "-o", "--output",
+        None,
+        "-o",
+        "--output",
         help="[show/diff] Output HTML file path.",
     ),
     id_a: str | None = typer.Option(
-        None, "--from",
+        None,
+        "--from",
         help="[diff] Source entry id (the older 'before' snapshot).",
     ),
     id_b: str | None = typer.Option(
-        None, "--to",
+        None,
+        "--to",
         help="[diff] Target entry id (the newer 'after' snapshot).",
     ),
 ) -> None:
@@ -565,8 +599,12 @@ def _history_list(hostname: str, entries: list) -> None:
         inp_display = f"{entry.inp_ms:.0f}ms"
         ts = entry.timestamp_utc.replace("T", " ")[:19]
         table.add_row(
-            str(idx), ts, label,
-            lcp_display, cls_display, inp_display,
+            str(idx),
+            ts,
+            label,
+            lcp_display,
+            cls_display,
+            inp_display,
             str(entry.image_count),
             f"{entry.total_bytes / 1024:.0f} KB",
             f"{entry.avg_score:.0f}",
@@ -637,6 +675,7 @@ def _history_diff(
 # extract
 # ---------------------------------------------------------------------------
 
+
 @app.command()
 @handle_json_errors("lighthouse_json")
 def extract(
@@ -662,12 +701,12 @@ def extract(
 # score
 # ---------------------------------------------------------------------------
 
+
 @app.command()
 @handle_json_errors("audit_input_json")
 def score(
     audit_input_json: Path = typer.Argument(..., help="Path to intermediate audit input JSON."),
-    ranker: str = typer.Option("heuristic", "--ranker",
-                                help="Scoring algorithm: 'heuristic' (default) or 'ml'."),
+    ranker: str = typer.Option("heuristic", "--ranker", help="Scoring algorithm: 'heuristic' (default) or 'ml'."),
 ) -> None:
     """Assign role, score (0-100), and recommendations to each image."""
     if not audit_input_json.exists():
@@ -699,20 +738,25 @@ def score(
 # report
 # ---------------------------------------------------------------------------
 
+
 @app.command()
 def report(
     audit_result_json: Path = typer.Argument(..., help="Path to audit_result.json."),
     output: Path | None = typer.Option(
-        None, "-o", "--output",
+        None,
+        "-o",
+        "--output",
         help="Output file (HTML or PDF based on --pdf; default: config or report.html).",
     ),
     pdf: bool = typer.Option(False, "--pdf", help="Render the report as PDF instead of HTML."),
     brand_logo: Path | None = typer.Option(
-        None, "--brand-logo",
+        None,
+        "--brand-logo",
         help="Path to a brand logo (PNG, JPG, GIF, WebP, SVG). Embedded in the report header as a data URI.",
     ),
     brand_color: str | None = typer.Option(
-        None, "--brand-color",
+        None,
+        "--brand-color",
         help="Brand primary colour as a hex string (e.g. '#ff6b35'). Invalid values are ignored.",
     ),
 ) -> None:
@@ -754,15 +798,20 @@ def report(
             with open(audit_result_json, encoding="utf-8") as fh:
                 raw = json.load(fh)
             from audit.report import generate_html_report, render_pdf_report
+
             html = generate_html_report(
-                raw, brand_logo=validated_logo, brand_color=validated_color,
+                raw,
+                brand_logo=validated_logo,
+                brand_color=validated_color,
             )
             render_pdf_report(html, output)
             rprint(f"[green]OK[/green] PDF report written to: {output}")
         else:
             write_html_report(
-                audit_result_json, output,
-                brand_logo=brand_logo, brand_color=brand_color,
+                audit_result_json,
+                output,
+                brand_logo=brand_logo,
+                brand_color=brand_color,
             )
             rprint(f"[green]OK[/green] HTML report written to: {output}")
     except json.JSONDecodeError as e:
@@ -786,6 +835,7 @@ def report(
 # baseline
 # ---------------------------------------------------------------------------
 
+
 @app.command()
 @handle_pipeline_errors(step_name="baseline")
 def baseline(
@@ -793,15 +843,18 @@ def baseline(
     save: Path = typer.Option(..., "--save", help="Where to write the baseline audit_result.json."),
     url: str | None = typer.Option(None, "--url", help="Override the store URL in the baseline meta."),
     device: str | None = typer.Option(
-        None, "--device",
+        None,
+        "--device",
         help="Device type: mobile or desktop (default: config or mobile).",
     ),
     history_dir: Path | None = typer.Option(
-        None, "--history-dir",
+        None,
+        "--history-dir",
         help="Override the audit-history directory (default: $XDG_DATA_HOME/.shopify-image-audit/history/).",
     ),
     label: str | None = typer.Option(
-        None, "--label",
+        None,
+        "--label",
         help="Optional label for the history entry (e.g. 'Pre-optimisation baseline').",
     ),
 ) -> None:
@@ -832,8 +885,10 @@ def baseline(
 
     save_baseline(result, save)
     rprint(f"[green]Baseline saved to {save}[/green]")
-    rprint(f"  URL: {result.meta.url} | LCP: {result.vitals.lcp_ms:.0f}ms | "
-          f"images: {len(result.images)} | {sum(i.bytes for i in result.images) / 1024:.0f} KB")
+    rprint(
+        f"  URL: {result.meta.url} | LCP: {result.vitals.lcp_ms:.0f}ms | "
+        f"images: {len(result.images)} | {sum(i.bytes for i in result.images) / 1024:.0f} KB"
+    )
 
     # --- record to audit history (never blocks the baseline) ---
     try:
@@ -850,32 +905,41 @@ def baseline(
 # compare
 # ---------------------------------------------------------------------------
 
+
 @app.command()
 @handle_compare_errors()
 def compare(
     baseline_json: Path = typer.Argument(..., help="Path to a baseline audit_result.json (from `audit baseline`)."),
     current: str = typer.Argument(..., help="Path to the current audit_result.json OR a live URL (https://...)."),
-    output: Path | None = typer.Option(None, "-o", "--output",
-                                          help="Write an HTML before/after report here (default: stdout JSON)."),
+    output: Path | None = typer.Option(
+        None, "-o", "--output", help="Write an HTML before/after report here (default: stdout JSON)."
+    ),
     pdf: bool = typer.Option(False, "--pdf", help="When --output is set, render a PDF instead of HTML."),
-    json_out: Path | None = typer.Option(None, "--json",
-                                            help="Also write the comparison result JSON to this file."),
+    json_out: Path | None = typer.Option(None, "--json", help="Also write the comparison result JSON to this file."),
     strategy: str | None = typer.Option(
-        None, "--strategy",
+        None,
+        "--strategy",
         help="PageSpeed strategy when <current> is a URL (default: config or mobile).",
     ),
-    api_key: str | None = typer.Option(None, "--api-key", envvar="PAGESPEED_API_KEY",
-                                       help="Google Cloud API key for PageSpeed (optional, or set PAGESPEED_API_KEY)."),
+    api_key: str | None = typer.Option(
+        None,
+        "--api-key",
+        envvar="PAGESPEED_API_KEY",
+        help="Google Cloud API key for PageSpeed (optional, or set PAGESPEED_API_KEY).",
+    ),
     brand_logo: Path | None = typer.Option(
-        None, "--brand-logo",
+        None,
+        "--brand-logo",
         help="Path to a brand logo (PNG, JPG, GIF, WebP, SVG). Used when -o/--pdf writes a report.",
     ),
     brand_color: str | None = typer.Option(
-        None, "--brand-color",
+        None,
+        "--brand-color",
         help="Brand primary colour as hex (e.g. '#ff6b35'). Invalid values are ignored.",
     ),
     no_cache: bool = typer.Option(
-        False, "--no-cache",
+        False,
+        "--no-cache",
         help="Bypass the on-disk PageSpeed response cache (always fetch fresh).",
     ),
 ) -> None:
@@ -939,6 +1003,7 @@ def compare(
         else:
             current_payload["_source_file"] = current
         from audit.report import _parse_brand_color, _read_brand_logo
+
         validated_color = _parse_brand_color(brand_color) if brand_color else None
         validated_logo = _read_brand_logo(brand_logo) if brand_logo else None
         if brand_color and validated_color is None:
@@ -946,8 +1011,10 @@ def compare(
         if brand_logo and validated_logo is None:
             rprint(f"[yellow]Warning:[/yellow] Could not read --brand-logo {brand_logo!r}.")
         html = generate_html_report(
-            current_payload, comparison=comparison,
-            brand_logo=validated_logo, brand_color=validated_color,
+            current_payload,
+            comparison=comparison,
+            brand_logo=validated_logo,
+            brand_color=validated_color,
         )
         Path(output).parent.mkdir(parents=True, exist_ok=True)
         if pdf:
@@ -955,6 +1022,7 @@ def compare(
             # toggles between the two output formats; the output file
             # extension is the user's choice (no auto-rename here).
             from audit.report import render_pdf_report
+
             render_pdf_report(html, output)
             rprint(f"\n[green]PDF report written to {output}[/green]")
         else:
@@ -975,6 +1043,7 @@ def compare(
 # version (convenience, not in spec but harmless)
 # ---------------------------------------------------------------------------
 
+
 @app.command()
 def version() -> None:
     """Print tool version."""
@@ -984,6 +1053,7 @@ def version() -> None:
 # ---------------------------------------------------------------------------
 # schedule
 # ---------------------------------------------------------------------------
+
 
 @app.command()
 def schedule(
@@ -997,32 +1067,39 @@ def schedule(
         help="[add] Store URL to audit (https://...).",
     ),
     schedule_dir: Path | None = typer.Option(
-        None, "--schedule-dir",
-        help="Override the schedule config directory "
-        "(default: $XDG_DATA_HOME/.shopify-image-audit/).",
+        None,
+        "--schedule-dir",
+        help="Override the schedule config directory (default: $XDG_DATA_HOME/.shopify-image-audit/).",
     ),
     history_dir: Path | None = typer.Option(
-        None, "--history-dir",
+        None,
+        "--history-dir",
         help="[run-all] Override the audit-history directory.",
     ),
     device: str | None = typer.Option(
-        None, "--device",
+        None,
+        "--device",
         help="[add] Device: mobile or desktop (default: config or mobile).",
     ),
     label: str | None = typer.Option(
-        None, "--label",
+        None,
+        "--label",
         help="[add] Optional label for the schedule (e.g. 'Daily 09:00').",
     ),
     api_key: str | None = typer.Option(
-        None, "--api-key", envvar="PAGESPEED_API_KEY",
+        None,
+        "--api-key",
+        envvar="PAGESPEED_API_KEY",
         help="[run-all] Google Cloud API key for PageSpeed (optional, or set PAGESPEED_API_KEY).",
     ),
     parallel: int | None = typer.Option(
-        None, "--parallel",
+        None,
+        "--parallel",
         help="[run-all] Number of concurrent store audits. 0 = unlimited (default: config or 1).",
     ),
     stop_on_error: bool = typer.Option(
-        False, "--stop-on-error",
+        False,
+        "--stop-on-error",
         help="[run-all] Abort on the first store failure (default: continue past failures).",
     ),
 ) -> None:
@@ -1077,7 +1154,10 @@ def schedule(
             rprint("[red]Error:[/red] `audit schedule add` requires <shop_domain> and <url>.")
             raise typer.Exit(code=EXIT_INVALID_ARGS) from None
         config = ScheduleConfig(
-            shop_domain=shop_domain, url=url, device=device, label=label,
+            shop_domain=shop_domain,
+            url=url,
+            device=device,
+            label=label,
         )
         store.add(config)
         rprint(f"[green]Schedule added:[/green] {shop_domain} -> {url}")
@@ -1093,9 +1173,7 @@ def schedule(
     else:  # run-all
         if parallel < 0:
             rprint(f"[red]Error:[/red] --parallel must be >= 0, got {parallel}.")
-            rprint(
-                f"{format_suggestion(str(parallel), ['0', '1', '2'])}"
-            )
+            rprint(f"{format_suggestion(str(parallel), ['0', '1', '2'])}")
             raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
         history_store = HistoryStore(base_dir=history_dir)
@@ -1123,6 +1201,7 @@ def schedule(
 def _default_schedule_dir() -> Path:
     """Default schedule config dir (sibling of the history dir)."""
     from engine.history import _default_history_dir
+
     return _default_history_dir().parent
 
 
@@ -1132,6 +1211,7 @@ def _build_pagespeed_cache():
     Returns ``None`` when caching is disabled (``PAGESPEED_CACHE_TTL=0``).
     """
     from integrations._cache import ResponseCache
+
     cache = ResponseCache()
     return cache if cache.ttl > 0 else None
 
@@ -1155,8 +1235,10 @@ def _schedule_list(schedules: list) -> None:
 # entry-point
 # ---------------------------------------------------------------------------
 
+
 def main() -> None:
     from engine._logging import configure
+
     configure()
     app()
 

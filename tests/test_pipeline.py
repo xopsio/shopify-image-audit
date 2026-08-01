@@ -25,6 +25,7 @@ from tests import FIXTURES
 # parametrised fixture paths
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(params=["bad_hero_lcp.json", "optimized_shopify.json"])
 def fixture_path(request: pytest.FixtureRequest) -> Path:
     p = FIXTURES / request.param
@@ -35,6 +36,7 @@ def fixture_path(request: pytest.FixtureRequest) -> Path:
 # ---------------------------------------------------------------------------
 # parser tests
 # ---------------------------------------------------------------------------
+
 
 class TestParser:
     def test_parse_returns_list(self, fixture_path: Path) -> None:
@@ -63,6 +65,7 @@ class TestParser:
 # ranker tests
 # ---------------------------------------------------------------------------
 
+
 class TestRanker:
     def test_rank_adds_fields(self, fixture_path: Path) -> None:
         with open(fixture_path, encoding="utf-8") as f:
@@ -84,6 +87,7 @@ class TestRanker:
 # ---------------------------------------------------------------------------
 # orchestrator / AuditResult validation
 # ---------------------------------------------------------------------------
+
 
 class TestOrchestrator:
     def test_run_audit_returns_audit_result(self, fixture_path: Path) -> None:
@@ -135,6 +139,7 @@ class TestOrchestrator:
 # bad_hero_lcp specific
 # ---------------------------------------------------------------------------
 
+
 class TestBadHeroFixture:
     @pytest.fixture()
     def result(self) -> AuditResult:
@@ -158,6 +163,7 @@ class TestBadHeroFixture:
 # optimized_shopify specific
 # ---------------------------------------------------------------------------
 
+
 class TestOptimizedFixture:
     @pytest.fixture()
     def result(self) -> AuditResult:
@@ -176,6 +182,7 @@ class TestOptimizedFixture:
 # ---------------------------------------------------------------------------
 # ML ranker end-to-end (Sprint 3, #27)
 # ---------------------------------------------------------------------------
+
 
 class TestMLRankerEndToEnd:
     """run_audit(ranker="ml") must produce a schema-valid AuditResult that
@@ -207,4 +214,3 @@ class TestMLRankerEndToEnd:
         # At least one image must score differently.
         deltas = [abs(a - b) for a, b in zip(h_scores, m_scores, strict=True)]
         assert max(deltas) > 0, f"ML and heuristic produced identical scores: {h_scores}"
-

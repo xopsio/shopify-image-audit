@@ -62,8 +62,8 @@ _W_DIM_MATCH = 0.10
 _MODERN_MIME_HINTS = ("image/webp", "image/avif", "image/jxl", "image/svg+xml")
 
 # Size scoring calibration: 50 KB -> 1.0, 2.5 MB -> 0.0 (log scale).
-_SIZE_FLOOR = 50_000          # bytes at which f_size = 1.0
-_SIZE_CEIL = 2_500_000        # bytes at which f_size = 0.0
+_SIZE_FLOOR = 50_000  # bytes at which f_size = 1.0
+_SIZE_CEIL = 2_500_000  # bytes at which f_size = 0.0
 
 # Density scoring calibration: bytes per 1k displayed pixels at which f_density = 0.
 _DENSITY_CEIL = 300.0
@@ -152,6 +152,7 @@ def _features(img: ImageDict) -> dict[str, float]:
 # Scoring
 # ---------------------------------------------------------------------------
 
+
 def _score_from_features(f: dict[str, float], *, is_lcp: bool, bytes_: int) -> int:
     """Combine features into a 0-100 score."""
     base = (
@@ -174,6 +175,7 @@ def _score_from_features(f: dict[str, float], *, is_lcp: bool, bytes_: int) -> i
 # Role assignment (mirrors heuristic thresholds for cross-ranker consistency)
 # ---------------------------------------------------------------------------
 
+
 def _role_from_features(img: ImageDict, features: dict[str, float], index: int) -> str:
     """Assign a role using the shared heuristic from ``core.image_signals``.
 
@@ -188,8 +190,8 @@ def _role_from_features(img: ImageDict, features: dict[str, float], index: int) 
 # Recommendation text
 # ---------------------------------------------------------------------------
 
-def _recommendation(score: int, is_lcp: bool, features: dict[str, float],
-                    bytes_: int) -> str:
+
+def _recommendation(score: int, is_lcp: bool, features: dict[str, float], bytes_: int) -> str:
     """Human-readable recommendation string, tailored to the ML signals."""
     if score >= 85:
         return "OK"
@@ -219,6 +221,7 @@ def _recommendation(score: int, is_lcp: bool, features: dict[str, float],
 # ---------------------------------------------------------------------------
 # Public API (drop-in for audit.ranker_heuristic.rank)
 # ---------------------------------------------------------------------------
+
 
 def rank(images: list[ImageDict]) -> list[ImageDict]:
     """

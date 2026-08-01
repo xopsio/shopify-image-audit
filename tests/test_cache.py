@@ -67,21 +67,26 @@ class TestResponseCacheEnvVar:
         assert cache.ttl == 3600
 
     def test_env_ttl_override(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
     ) -> None:
         monkeypatch.setenv("PAGESPEED_CACHE_TTL", "120")
         cache = ResponseCache(tmp_path)
         assert cache.ttl == 120
 
     def test_env_ttl_zero_disables(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
     ) -> None:
         monkeypatch.setenv("PAGESPEED_CACHE_TTL", "0")
         cache = ResponseCache(tmp_path)
         assert cache.ttl == 0
 
     def test_env_ttl_invalid_falls_back(
-        self, monkeypatch: pytest.MonkeyPatch,
+        self,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         monkeypatch.setenv("PAGESPEED_CACHE_TTL", "not-a-number")
         cache = ResponseCache("/tmp/unused")
@@ -101,7 +106,8 @@ class TestPageSpeedClientCacheIntegration:
     """Verify PageSpeedAPIClient consults the cache."""
 
     def test_cache_hit_avoids_network(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         import responses
 

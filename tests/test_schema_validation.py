@@ -50,6 +50,7 @@ def audit_result(request: pytest.FixtureRequest):
 # tests
 # ---------------------------------------------------------------------------
 
+
 class TestSchemaValidation:
     def test_schema_file_exists(self) -> None:
         assert SCHEMA_PATH.exists(), f"schema missing at {SCHEMA_PATH}"
@@ -60,9 +61,8 @@ class TestSchemaValidation:
 
     def test_audit_result_matches_schema(self, validator, audit_result) -> None:
         errors = sorted(validator.iter_errors(audit_result.model_dump()), key=lambda e: e.path)
-        assert not errors, (
-            "AuditResult failed schema validation:\n"
-            + "\n".join(f"  - {'/'.join(map(str, e.path)) or '<root>'}: {e.message}" for e in errors)
+        assert not errors, "AuditResult failed schema validation:\n" + "\n".join(
+            f"  - {'/'.join(map(str, e.path)) or '<root>'}: {e.message}" for e in errors
         )
 
     def test_no_additional_properties_at_root(self, validator) -> None:

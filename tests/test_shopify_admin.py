@@ -20,6 +20,7 @@ from integrations.shopify_admin import ShopifyAdminClient
 # _normalize_domain
 # ---------------------------------------------------------------------------
 
+
 class TestNormalizeDomain:
     def test_bare_domain(self) -> None:
         assert ShopifyAdminClient._normalize_domain("mystore.myshopify.com") == "mystore.myshopify.com"
@@ -50,11 +51,15 @@ class TestNormalizeDomain:
 # Constructor
 # ---------------------------------------------------------------------------
 
+
 class TestConstructor:
     def test_stores_all_args(self) -> None:
         c = ShopifyAdminClient(
-            "mystore.myshopify.com", "shpat_abc",
-            timeout=10, max_retries=2, retry_delay=1.0,
+            "mystore.myshopify.com",
+            "shpat_abc",
+            timeout=10,
+            max_retries=2,
+            retry_delay=1.0,
         )
         assert c.shop_domain == "mystore.myshopify.com"
         assert c.access_token == "shpat_abc"
@@ -74,17 +79,20 @@ class TestConstructor:
 # get_shop_info
 # ---------------------------------------------------------------------------
 
+
 @responses.activate
 def test_get_shop_info_success():
     responses.add(
         responses.GET,
         "https://mystore.myshopify.com/admin/api/2024-10/shop.json",
-        json={"shop": {
-            "name": "My Store",
-            "domain": "mystore.myshopify.com",
-            "plan_display_name": "Basic",
-            "currency": "EUR",
-        }},
+        json={
+            "shop": {
+                "name": "My Store",
+                "domain": "mystore.myshopify.com",
+                "plan_display_name": "Basic",
+                "currency": "EUR",
+            }
+        },
         status=200,
     )
     client = ShopifyAdminClient("mystore.myshopify.com", "shpat_abc")
@@ -172,27 +180,28 @@ def test_get_shop_info_404_raises():
 # get_products
 # ---------------------------------------------------------------------------
 
+
 @responses.activate
 def test_get_products_normalizes_response():
     responses.add(
         responses.GET,
         "https://mystore.myshopify.com/admin/api/2024-10/products.json",
         match_querystring=False,  # we'll assert separately
-        json={"products": [
-            {"id": 1, "title": "Shirt", "handle": "shirt",
-             "image": {"src": "https://cdn.example.com/shirt.jpg"}},
-            {"id": 2, "title": "No-Image", "handle": "no-image", "image": None},
-            # Defensive: image is a string (shouldn't happen, but the
-            # client should not crash).
-            {"id": 3, "title": "Bad-Image", "handle": "bad-image", "image": "oops"},
-        ]},
+        json={
+            "products": [
+                {"id": 1, "title": "Shirt", "handle": "shirt", "image": {"src": "https://cdn.example.com/shirt.jpg"}},
+                {"id": 2, "title": "No-Image", "handle": "no-image", "image": None},
+                # Defensive: image is a string (shouldn't happen, but the
+                # client should not crash).
+                {"id": 3, "title": "Bad-Image", "handle": "bad-image", "image": "oops"},
+            ]
+        },
         status=200,
     )
     client = ShopifyAdminClient("mystore.myshopify.com", "shpat_abc")
     products = client.get_products(limit=50)
     assert products == [
-        {"id": 1, "title": "Shirt", "handle": "shirt",
-         "image_url": "https://cdn.example.com/shirt.jpg"},
+        {"id": 1, "title": "Shirt", "handle": "shirt", "image_url": "https://cdn.example.com/shirt.jpg"},
         {"id": 2, "title": "No-Image", "handle": "no-image", "image_url": None},
         {"id": 3, "title": "Bad-Image", "handle": "bad-image", "image_url": None},
     ]
@@ -213,32 +222,37 @@ def test_get_products_limit_validation():
 # get_theme_assets
 # ---------------------------------------------------------------------------
 
+
 @responses.activate
 def test_get_theme_assets_filters_to_images():
     responses.add(
         responses.GET,
         "https://mystore.myshopify.com/admin/api/2024-10/themes.json",
-        json={"themes": [
-            {"id": 1, "name": "Debut", "role": "main"},
-            {"id": 2, "name": "Old", "role": "unpublished"},
-        ]},
+        json={
+            "themes": [
+                {"id": 1, "name": "Debut", "role": "main"},
+                {"id": 2, "name": "Old", "role": "unpublished"},
+            ]
+        },
         status=200,
     )
     responses.add(
         responses.GET,
         "https://mystore.myshopify.com/admin/api/2024-10/themes/1/assets.json",
-        json={"assets": [
-            {"key": "assets/hero.jpg", "public_url": "https://cdn.example.com/hero.jpg"},
-            {"key": "assets/banner.png", "public_url": "https://cdn.example.com/banner.png"},
-            {"key": "assets/style.css", "public_url": "https://cdn.example.com/style.css"},
-            {"key": "assets/theme.js", "public_url": "https://cdn.example.com/theme.js"},
-            {"key": "assets/logo.svg", "public_url": "https://cdn.example.com/logo.svg"},
-            {"key": "assets/pic.avif", "public_url": "https://cdn.example.com/pic.avif"},
-            # Edge case: no public_url, should be skipped
-            {"key": "assets/orphan.jpg", "public_url": None},
-            # Edge case: no key, should be skipped
-            {"public_url": "https://cdn.example.com/no-key.jpg"},
-        ]},
+        json={
+            "assets": [
+                {"key": "assets/hero.jpg", "public_url": "https://cdn.example.com/hero.jpg"},
+                {"key": "assets/banner.png", "public_url": "https://cdn.example.com/banner.png"},
+                {"key": "assets/style.css", "public_url": "https://cdn.example.com/style.css"},
+                {"key": "assets/theme.js", "public_url": "https://cdn.example.com/theme.js"},
+                {"key": "assets/logo.svg", "public_url": "https://cdn.example.com/logo.svg"},
+                {"key": "assets/pic.avif", "public_url": "https://cdn.example.com/pic.avif"},
+                # Edge case: no public_url, should be skipped
+                {"key": "assets/orphan.jpg", "public_url": None},
+                # Edge case: no key, should be skipped
+                {"public_url": "https://cdn.example.com/no-key.jpg"},
+            ]
+        },
         status=200,
     )
     client = ShopifyAdminClient("mystore.myshopify.com", "shpat_abc")
@@ -280,15 +294,26 @@ def test_cli_shopify_auth_success():
     responses.add(
         responses.GET,
         "https://mystore.myshopify.com/admin/api/2024-10/shop.json",
-        json={"shop": {
-            "name": "Test Store", "domain": "mystore.myshopify.com",
-            "plan_display_name": "Pro", "currency": "USD",
-        }},
+        json={
+            "shop": {
+                "name": "Test Store",
+                "domain": "mystore.myshopify.com",
+                "plan_display_name": "Pro",
+                "currency": "USD",
+            }
+        },
         status=200,
     )
-    result = runner.invoke(app, [
-        "shopify", "auth", "mystore.myshopify.com", "--access-token", "shpat_test_token",
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "shopify",
+            "auth",
+            "mystore.myshopify.com",
+            "--access-token",
+            "shpat_test_token",
+        ],
+    )
     assert result.exit_code == 0, result.stdout
     assert "Token valid" in result.stdout
     assert "Test Store" in result.stdout
@@ -305,18 +330,33 @@ def test_cli_shopify_auth_401_exits_10():
         json={"errors": "Invalid API key or access token"},
         status=401,
     )
-    result = runner.invoke(app, [
-        "shopify", "auth", "mystore.myshopify.com", "--access-token", "shpat_bad",
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "shopify",
+            "auth",
+            "mystore.myshopify.com",
+            "--access-token",
+            "shpat_bad",
+        ],
+    )
     assert result.exit_code == 10
     assert "Shopify API error" in result.stdout
 
 
 def test_cli_shopify_auth_invalid_domain_exits_2():
     from engine.cli import app
-    result = runner.invoke(app, [
-        "shopify", "auth", "not a domain", "--access-token", "shpat_abc",
-    ])
+
+    result = runner.invoke(
+        app,
+        [
+            "shopify",
+            "auth",
+            "not a domain",
+            "--access-token",
+            "shpat_abc",
+        ],
+    )
     assert result.exit_code == 2
 
 
@@ -328,11 +368,12 @@ def test_cli_shopify_inventory_lists_images():
     responses.add(
         responses.GET,
         "https://mystore.myshopify.com/admin/api/2024-10/products.json",
-        json={"products": [
-            {"id": 1, "title": "Shirt", "handle": "shirt",
-             "image": {"src": "https://cdn.example.com/shirt.jpg"}},
-            {"id": 2, "title": "NoImg", "handle": "noimg", "image": None},
-        ]},
+        json={
+            "products": [
+                {"id": 1, "title": "Shirt", "handle": "shirt", "image": {"src": "https://cdn.example.com/shirt.jpg"}},
+                {"id": 2, "title": "NoImg", "handle": "noimg", "image": None},
+            ]
+        },
         status=200,
     )
     # Mock themes endpoint
@@ -346,15 +387,24 @@ def test_cli_shopify_inventory_lists_images():
     responses.add(
         responses.GET,
         "https://mystore.myshopify.com/admin/api/2024-10/themes/1/assets.json",
-        json={"assets": [
-            {"key": "assets/hero.jpg", "public_url": "https://cdn.example.com/hero.jpg"},
-        ]},
+        json={
+            "assets": [
+                {"key": "assets/hero.jpg", "public_url": "https://cdn.example.com/hero.jpg"},
+            ]
+        },
         status=200,
     )
 
-    result = runner.invoke(app, [
-        "shopify", "inventory", "mystore.myshopify.com", "--access-token", "shpat_abc",
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "shopify",
+            "inventory",
+            "mystore.myshopify.com",
+            "--access-token",
+            "shpat_abc",
+        ],
+    )
     assert result.exit_code == 0, result.stdout
     assert "Inventory fetched" in result.stdout
     assert "shirt.jpg" in result.stdout
@@ -370,10 +420,11 @@ def test_cli_shopify_inventory_writes_output_file(tmp_path, monkeypatch):
     responses.add(
         responses.GET,
         "https://mystore.myshopify.com/admin/api/2024-10/products.json",
-        json={"products": [
-            {"id": 1, "title": "X", "handle": "x",
-             "image": {"src": "https://cdn.example.com/x.jpg"}},
-        ]},
+        json={
+            "products": [
+                {"id": 1, "title": "X", "handle": "x", "image": {"src": "https://cdn.example.com/x.jpg"}},
+            ]
+        },
         status=200,
     )
     # Mock themes endpoint with a main theme
@@ -392,10 +443,18 @@ def test_cli_shopify_inventory_writes_output_file(tmp_path, monkeypatch):
     )
     monkeypatch.chdir(tmp_path)
     out = tmp_path / "inventory.json"
-    result = runner.invoke(app, [
-        "shopify", "inventory", "mystore.myshopify.com",
-        "--access-token", "shpat_abc", "-o", "inventory.json",
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "shopify",
+            "inventory",
+            "mystore.myshopify.com",
+            "--access-token",
+            "shpat_abc",
+            "-o",
+            "inventory.json",
+        ],
+    )
     assert result.exit_code == 0, result.stdout
     assert out.exists()
     data = json.loads(out.read_text())
@@ -406,23 +465,38 @@ def test_cli_shopify_inventory_writes_output_file(tmp_path, monkeypatch):
 
 def test_cli_shopify_inventory_missing_token_exits_2():
     from engine.cli import app
-    result = runner.invoke(app, [
-        "shopify", "inventory", "mystore.myshopify.com",
-    ])
+
+    result = runner.invoke(
+        app,
+        [
+            "shopify",
+            "inventory",
+            "mystore.myshopify.com",
+        ],
+    )
     assert result.exit_code == 2
 
 
 def test_cli_shopify_unknown_subcommand_exits_2():
     from engine.cli import app
-    result = runner.invoke(app, [
-        "shopify", "frobnicate", "mystore.myshopify.com", "--access-token", "shpat_abc",
-    ])
+
+    result = runner.invoke(
+        app,
+        [
+            "shopify",
+            "frobnicate",
+            "mystore.myshopify.com",
+            "--access-token",
+            "shpat_abc",
+        ],
+    )
     assert result.exit_code == 2
 
 
 # ---------------------------------------------------------------------------
 # Token not logged
 # ---------------------------------------------------------------------------
+
 
 @responses.activate
 def test_token_not_in_normal_error_messages():

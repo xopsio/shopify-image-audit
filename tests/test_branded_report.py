@@ -27,29 +27,36 @@ from audit.report import (
 # _parse_brand_color
 # ---------------------------------------------------------------------------
 
+
 class TestParseBrandColor:
-    @pytest.mark.parametrize("raw,expected", [
-        ("#fff", "#ffffff"),
-        ("#FFF", "#ffffff"),
-        ("#ff6b35", "#ff6b35"),
-        ("#FF6B35", "#ff6b35"),
-        ("#1234AB", "#1234ab"),
-        ("  #ff6b35  ", "#ff6b35"),
-    ])
+    @pytest.mark.parametrize(
+        "raw,expected",
+        [
+            ("#fff", "#ffffff"),
+            ("#FFF", "#ffffff"),
+            ("#ff6b35", "#ff6b35"),
+            ("#FF6B35", "#ff6b35"),
+            ("#1234AB", "#1234ab"),
+            ("  #ff6b35  ", "#ff6b35"),
+        ],
+    )
     def test_accepts_valid(self, raw: str, expected: str) -> None:
         assert _parse_brand_color(raw) == expected
 
-    @pytest.mark.parametrize("raw", [
-        None,
-        "",
-        "   ",
-        "ff6b35",         # missing #
-        "#ff",            # wrong length
-        "#fffff",         # wrong length
-        "#ff6b3z",        # non-hex char
-        "red",            # named colour
-        "#ff6b3555",      # 8-char hex (RGBA, not supported)
-    ])
+    @pytest.mark.parametrize(
+        "raw",
+        [
+            None,
+            "",
+            "   ",
+            "ff6b35",  # missing #
+            "#ff",  # wrong length
+            "#fffff",  # wrong length
+            "#ff6b3z",  # non-hex char
+            "red",  # named colour
+            "#ff6b3555",  # 8-char hex (RGBA, not supported)
+        ],
+    )
     def test_rejects_invalid(self, raw: str | None) -> None:
         assert _parse_brand_color(raw) is None
 
@@ -57,6 +64,7 @@ class TestParseBrandColor:
 # ---------------------------------------------------------------------------
 # _read_brand_logo
 # ---------------------------------------------------------------------------
+
 
 class TestReadBrandLogo:
     def test_reads_png(self, tmp_path: Path) -> None:
@@ -129,6 +137,7 @@ class TestReadBrandLogo:
 # generate_html_report — brand integration
 # ---------------------------------------------------------------------------
 
+
 def _minimal_audit_result() -> dict:
     return {
         "meta": {
@@ -140,8 +149,7 @@ def _minimal_audit_result() -> dict:
         },
         "vitals": {"lcp_ms": 1000.0, "cls": 0.05, "inp_ms": 100.0, "ttfb_ms": 200.0},
         "images": [
-            {"src": "https://x/a.jpg", "role": "hero", "score": 85,
-             "bytes": 50000, "mime": "image/jpeg"},
+            {"src": "https://x/a.jpg", "role": "hero", "score": 85, "bytes": 50000, "mime": "image/jpeg"},
         ],
         "summary": {"top_issues": []},
     }
@@ -163,15 +171,17 @@ class TestGenerateHtmlReportBranding:
         logo = tmp_path / "logo.png"
         logo.write_bytes(b"\x89PNG" + b"data")
         html = generate_html_report(
-            _minimal_audit_result(), brand_logo=_read_brand_logo(logo),
+            _minimal_audit_result(),
+            brand_logo=_read_brand_logo(logo),
         )
         expected_b64 = base64.b64encode(logo.read_bytes()).decode("ascii")
-        assert f'data:image/png;base64,{expected_b64}' in html
+        assert f"data:image/png;base64,{expected_b64}" in html
         assert 'class="brand-logo"' in html
 
     def test_brand_color_creates_css_variable(self) -> None:
         html = generate_html_report(
-            _minimal_audit_result(), brand_color="#ff6b35",
+            _minimal_audit_result(),
+            brand_color="#ff6b35",
         )
         assert ":root { --brand-color: #ff6b35; }" in html
         # The actual rule uses the variable.
@@ -188,7 +198,8 @@ class TestGenerateHtmlReportBranding:
         validated = _parse_brand_color(raw)
         assert validated is None  # confirm the validator rejects it
         html = generate_html_report(
-            _minimal_audit_result(), brand_color=validated,
+            _minimal_audit_result(),
+            brand_color=validated,
         )
         # The CSS variable line is omitted; the fallback value in the
         # var(--brand-color, #3498db) is still used.
@@ -197,15 +208,17 @@ class TestGenerateHtmlReportBranding:
 
     def test_no_logo_means_no_img_tag(self) -> None:
         html = generate_html_report(
-            _minimal_audit_result(), brand_color="#ff6b35",
+            _minimal_audit_result(),
+            brand_color="#ff6b35",
         )
         assert "<img" not in html
-        assert "class=\"brand-logo\"" not in html
+        assert 'class="brand-logo"' not in html
 
 
 # ---------------------------------------------------------------------------
 # write_html_report — brand integration
 # ---------------------------------------------------------------------------
+
 
 class TestWriteHtmlReportBranding:
     def test_brand_persists_through_io(self, tmp_path: Path) -> None:
@@ -217,11 +230,14 @@ class TestWriteHtmlReportBranding:
 
         out_path = tmp_path / "report.html"
         write_html_report(
-            json_path, out_path, brand_logo=logo, brand_color="#ff6b35",
+            json_path,
+            out_path,
+            brand_logo=logo,
+            brand_color="#ff6b35",
         )
 
         html = out_path.read_text(encoding="utf-8")
-        assert f'data:image/png;base64,{base64.b64encode(logo.read_bytes()).decode()}' in html
+        assert f"data:image/png;base64,{base64.b64encode(logo.read_bytes()).decode()}" in html
         assert ":root { --brand-color: #ff6b35; }" in html
 
     def test_missing_logo_file_silently_skipped(self, tmp_path: Path) -> None:

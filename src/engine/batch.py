@@ -43,9 +43,7 @@ class StoreConfig:
                 access_token=str(data["access_token"]),
             )
         except KeyError as exc:
-            raise ValueError(
-                f"Missing required key {exc.args[0]!r} in store config entry"
-            ) from exc
+            raise ValueError(f"Missing required key {exc.args[0]!r} in store config entry") from exc
 
 
 @dataclass
@@ -85,9 +83,7 @@ def parse_stores_file(path: str | Path) -> list[StoreConfig]:
         raise ValueError(f"Invalid JSON in stores file {p}: {exc}") from exc
 
     if not isinstance(raw, list):
-        raise ValueError(
-            f"Stores file must be a JSON array, got {type(raw).__name__}"
-        )
+        raise ValueError(f"Stores file must be a JSON array, got {type(raw).__name__}")
 
     return [StoreConfig.from_dict(entry) for entry in raw]
 
@@ -100,34 +96,43 @@ def _audit_one_store(store: StoreConfig) -> StoreResult:
         theme_assets = client.get_theme_assets()
     except (ValueError, RuntimeError) as exc:
         return StoreResult(
-            shop_domain=store.shop_domain, success=False, error=str(exc),
+            shop_domain=store.shop_domain,
+            success=False,
+            error=str(exc),
         )
     except Exception as exc:  # noqa: BLE001 — surface any unexpected error
         return StoreResult(
-            shop_domain=store.shop_domain, success=False,
+            shop_domain=store.shop_domain,
+            success=False,
             error=f"Unexpected error: {exc}",
         )
 
     inventory: list[dict[str, Any]] = []
     for p in products:
         if p.get("image_url"):
-            inventory.append({
-                "source": "product",
-                "shop_domain": store.shop_domain,
-                "title": p["title"],
-                "url": p["image_url"],
-            })
+            inventory.append(
+                {
+                    "source": "product",
+                    "shop_domain": store.shop_domain,
+                    "title": p["title"],
+                    "url": p["image_url"],
+                }
+            )
     for a in theme_assets:
-        inventory.append({
-            "source": "theme_asset",
-            "shop_domain": store.shop_domain,
-            "theme": a["theme_name"],
-            "key": a["key"],
-            "url": a["url"],
-        })
+        inventory.append(
+            {
+                "source": "theme_asset",
+                "shop_domain": store.shop_domain,
+                "theme": a["theme_name"],
+                "key": a["key"],
+                "url": a["url"],
+            }
+        )
 
     return StoreResult(
-        shop_domain=store.shop_domain, inventory=inventory, success=True,
+        shop_domain=store.shop_domain,
+        inventory=inventory,
+        success=True,
     )
 
 

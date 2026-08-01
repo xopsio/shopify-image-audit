@@ -37,6 +37,7 @@ from core.image_signals import ImageDict
 # Persistence
 # ---------------------------------------------------------------------------
 
+
 def save_baseline(audit_result: AuditResult, path: str | Path) -> Path:
     """Write an ``AuditResult`` to ``path`` as schema-compliant JSON.
 
@@ -86,25 +87,25 @@ _UNCHANGED_TOLERANCE = 1e-6
 #: Weight applied to each metric's absolute delta when computing the ROI
 #: sort key. Higher weight = higher estimated conversion impact.
 _ROI_WEIGHTS: dict[str, float] = {
-    "lcp": 10.0,         # Direct LCP impact (highest conversion correlation)
-    "ttfb": 5.0,         # TTFB correlates with LCP ~50%
-    "cls": 1000.0,       # 0.1 CLS change → 100 sort key units
-    "inp": 2.0,          # INP responsiveness, weaker conversion link
-    "image_payload": 0.5,   # Per-KB payload change
-    "image_waste": 1.0,     # Per-KB waste reduction (higher signal)
-    "image_score": 3.0,     # Per-point average score change
+    "lcp": 10.0,  # Direct LCP impact (highest conversion correlation)
+    "ttfb": 5.0,  # TTFB correlates with LCP ~50%
+    "cls": 1000.0,  # 0.1 CLS change → 100 sort key units
+    "inp": 2.0,  # INP responsiveness, weaker conversion link
+    "image_payload": 0.5,  # Per-KB payload change
+    "image_waste": 1.0,  # Per-KB waste reduction (higher signal)
+    "image_score": 3.0,  # Per-point average score change
 }
 
 #: Estimated LCP impact (ms) per unit of metric change. Used to populate
 #: ``ComparisonRecommendation.estimated_lcp_impact_ms``.
 _LCP_MULTIPLIERS: dict[str, float] = {
-    "lcp": 1.0,          # Direct — 1ms LCP = 1ms estimated impact
-    "ttfb": 0.6,         # ~60% of TTFB change reflects in LCP
-    "cls": 200.0,        # 0.1 CLS ≈ 20ms perceived LCP impact
-    "inp": 0.5,          # Weak LCP correlation
-    "image_payload": 0.8,    # Per-KB: reducing bytes helps LCP
-    "image_waste": 2.0,      # Per-KB: waste is "easy fix" bytes
-    "image_score": 5.0,      # Per-point: weak but existing signal
+    "lcp": 1.0,  # Direct — 1ms LCP = 1ms estimated impact
+    "ttfb": 0.6,  # ~60% of TTFB change reflects in LCP
+    "cls": 200.0,  # 0.1 CLS ≈ 20ms perceived LCP impact
+    "inp": 0.5,  # Weak LCP correlation
+    "image_payload": 0.8,  # Per-KB: reducing bytes helps LCP
+    "image_waste": 2.0,  # Per-KB: waste is "easy fix" bytes
+    "image_score": 5.0,  # Per-point: weak but existing signal
 }
 
 
@@ -141,9 +142,16 @@ def _lcp_impact_estimate(category: str, raw_delta: float) -> float:
 
 
 #: Categories that use "lower is better" semantics (negative delta = improvement).
-_LOWER_IS_BETTER_CATEGORIES = frozenset({
-    "lcp", "cls", "inp", "ttfb", "image_payload", "image_waste",
-})
+_LOWER_IS_BETTER_CATEGORIES = frozenset(
+    {
+        "lcp",
+        "cls",
+        "inp",
+        "ttfb",
+        "image_payload",
+        "image_waste",
+    }
+)
 
 #: Categories that use "higher is better" (positive delta = improvement).
 _HIGHER_IS_BETTER_CATEGORIES = frozenset({"image_score"})
@@ -190,6 +198,7 @@ def _total_waste(images: list[ImageDict]) -> int:
 # ROI heuristic
 # ---------------------------------------------------------------------------
 
+
 def _roi_estimate(vitals: VitalsDelta, images: ImageStatsDelta) -> str:
     """Simple, clearly-labelled ROI heuristic.
 
@@ -215,6 +224,7 @@ def _roi_estimate(vitals: VitalsDelta, images: ImageStatsDelta) -> str:
 # ---------------------------------------------------------------------------
 # Per-image matching and delta computation
 # ---------------------------------------------------------------------------
+
 
 def _strip_query_params(src: str) -> str:
     """Remove ``?key=value`` query params from a URL/path.
@@ -260,8 +270,7 @@ def _per_image_status(before_bytes: int, after_bytes: int) -> str:
     return "unchanged"
 
 
-def _per_image_recommendation(status: str, mime_before: str | None,
-                              mime_after: str | None, score_delta: int) -> str:
+def _per_image_recommendation(status: str, mime_before: str | None, mime_after: str | None, score_delta: int) -> str:
     """A short per-image recommendation string for the report table."""
     if status == "added":
         if mime_after and mime_after not in ("image/webp", "image/avif", "image/jxl"):
@@ -329,18 +338,23 @@ def _match_images(
 
         if a_img is None:
             # No match — image removed.
-            deltas.append(ImageDelta(
-                match_key=b_key,
-                src=str(b_img.get("src", "")),
-                role_before=b_img.get("role"),
-                # ImageDelta.before is the schema's loose dict contract.
-                before=cast(dict[str, Any], b_img),
-                status="removed",
-                mime_before=b_img.get("mime"),
-                recommendation=_per_image_recommendation(
-                    "removed", b_img.get("mime"), None, 0,
-                ),
-            ))
+            deltas.append(
+                ImageDelta(
+                    match_key=b_key,
+                    src=str(b_img.get("src", "")),
+                    role_before=b_img.get("role"),
+                    # ImageDelta.before is the schema's loose dict contract.
+                    before=cast(dict[str, Any], b_img),
+                    status="removed",
+                    mime_before=b_img.get("mime"),
+                    recommendation=_per_image_recommendation(
+                        "removed",
+                        b_img.get("mime"),
+                        None,
+                        0,
+                    ),
+                )
+            )
             continue
 
         # Mark the matched after-image as consumed.
@@ -355,25 +369,30 @@ def _match_images(
         # the recommendation should reflect that this is a "same URL,
         # different bytes" case.
         rec = _per_image_recommendation(
-            status, b_img.get("mime"), a_img.get("mime"), a_score - b_score,
+            status,
+            b_img.get("mime"),
+            a_img.get("mime"),
+            a_score - b_score,
         )
         if match_kind == "src" and status == "unchanged" and not rec:
             rec = "Image re-encoded (same URL, bytes changed)."
 
-        deltas.append(ImageDelta(
-            match_key=b_key,
-            src=str(a_img.get("src") or b_img.get("src", "")),
-            role_before=b_img.get("role"),
-            role_after=a_img.get("role"),
-            before=cast(dict[str, Any], b_img),
-            after=cast(dict[str, Any], a_img),
-            bytes_delta=a_bytes - b_bytes,
-            score_delta=a_score - b_score,
-            mime_before=b_img.get("mime"),
-            mime_after=a_img.get("mime"),
-            status=status,
-            recommendation=rec,
-        ))
+        deltas.append(
+            ImageDelta(
+                match_key=b_key,
+                src=str(a_img.get("src") or b_img.get("src", "")),
+                role_before=b_img.get("role"),
+                role_after=a_img.get("role"),
+                before=cast(dict[str, Any], b_img),
+                after=cast(dict[str, Any], a_img),
+                bytes_delta=a_bytes - b_bytes,
+                score_delta=a_score - b_score,
+                mime_before=b_img.get("mime"),
+                mime_after=a_img.get("mime"),
+                status=status,
+                recommendation=rec,
+            )
+        )
 
     # Any after-image not consumed is "added".
     for a_img in after_imgs:
@@ -381,18 +400,23 @@ def _match_images(
             continue
         a_key = _image_key(a_img)
         a_bytes = int(a_img.get("bytes") or 0)
-        deltas.append(ImageDelta(
-            match_key=a_key,
-            src=str(a_img.get("src", "")),
-            role_after=a_img.get("role"),
-            after=cast(dict[str, Any], a_img),
-            bytes_delta=a_bytes,
-            mime_after=a_img.get("mime"),
-            status="added",
-            recommendation=_per_image_recommendation(
-                "added", None, a_img.get("mime"), 0,
-            ),
-        ))
+        deltas.append(
+            ImageDelta(
+                match_key=a_key,
+                src=str(a_img.get("src", "")),
+                role_after=a_img.get("role"),
+                after=cast(dict[str, Any], a_img),
+                bytes_delta=a_bytes,
+                mime_after=a_img.get("mime"),
+                status="added",
+                recommendation=_per_image_recommendation(
+                    "added",
+                    None,
+                    a_img.get("mime"),
+                    0,
+                ),
+            )
+        )
 
     return deltas
 
@@ -400,6 +424,7 @@ def _match_images(
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def compare(before: AuditResult, after: AuditResult) -> ComparisonResult:
     """Compare two ``AuditResult`` measurements and return a ``ComparisonResult``.
@@ -479,47 +504,52 @@ def _build_summary(vitals: VitalsDelta, images: ImageStatsDelta) -> ComparisonSu
         pct = f" ({delta_obj.delta_pct:+.0f}%)" if delta_obj.delta_pct is not None else ""
         text = f"{label} {fmt.format(delta_obj.before)} → {fmt.format(delta_obj.after)}{pct}"
 
-        recs.append(ComparisonRecommendation(
-            text=text,
-            category=key,
-            estimated_lcp_impact_ms=_lcp_impact_estimate(key, delta_obj.delta),
-            sort_key=_roi_sort_key(key, delta_obj.delta, lower_is_better=True),
-        ))
+        recs.append(
+            ComparisonRecommendation(
+                text=text,
+                category=key,
+                estimated_lcp_impact_ms=_lcp_impact_estimate(key, delta_obj.delta),
+                sort_key=_roi_sort_key(key, delta_obj.delta, lower_is_better=True),
+            )
+        )
 
     # Image payload change (lower total bytes = improvement)
     if images.total_bytes_delta != 0:
-        text = (
-            f"Image payload {images.before_total_bytes / 1024:.0f} KB → "
-            f"{images.after_total_bytes / 1024:.0f} KB"
+        text = f"Image payload {images.before_total_bytes / 1024:.0f} KB → {images.after_total_bytes / 1024:.0f} KB"
+        recs.append(
+            ComparisonRecommendation(
+                text=text,
+                category="image_payload",
+                estimated_lcp_impact_ms=_lcp_impact_estimate("image_payload", images.total_bytes_delta),
+                sort_key=_roi_sort_key("image_payload", images.total_bytes_delta, lower_is_better=True),
+            )
         )
-        recs.append(ComparisonRecommendation(
-            text=text,
-            category="image_payload",
-            estimated_lcp_impact_ms=_lcp_impact_estimate("image_payload", images.total_bytes_delta),
-            sort_key=_roi_sort_key("image_payload", images.total_bytes_delta, lower_is_better=True),
-        ))
 
     # Image waste change (lower waste = improvement)
     if images.total_waste_delta != 0:
         direction = "reduced" if images.total_waste_delta < 0 else "increased"
         text = f"Estimated waste {direction} by {abs(images.total_waste_delta) / 1024:.0f} KB"
-        recs.append(ComparisonRecommendation(
-            text=text,
-            category="image_waste",
-            estimated_lcp_impact_ms=_lcp_impact_estimate("image_waste", images.total_waste_delta),
-            sort_key=_roi_sort_key("image_waste", images.total_waste_delta, lower_is_better=True),
-        ))
+        recs.append(
+            ComparisonRecommendation(
+                text=text,
+                category="image_waste",
+                estimated_lcp_impact_ms=_lcp_impact_estimate("image_waste", images.total_waste_delta),
+                sort_key=_roi_sort_key("image_waste", images.total_waste_delta, lower_is_better=True),
+            )
+        )
 
     # Average image score change (higher score = improvement)
     if images.avg_score_delta != 0:
         direction = "improved" if images.avg_score_delta > 0 else "declined"
         text = f"Average image score {images.before_avg_score:.0f} → {images.after_avg_score:.0f} ({direction})"
-        recs.append(ComparisonRecommendation(
-            text=text,
-            category="image_score",
-            estimated_lcp_impact_ms=_lcp_impact_estimate("image_score", images.avg_score_delta),
-            sort_key=_roi_sort_key("image_score", images.avg_score_delta, lower_is_better=False),
-        ))
+        recs.append(
+            ComparisonRecommendation(
+                text=text,
+                category="image_score",
+                estimated_lcp_impact_ms=_lcp_impact_estimate("image_score", images.avg_score_delta),
+                sort_key=_roi_sort_key("image_score", images.avg_score_delta, lower_is_better=False),
+            )
+        )
 
     # Split into improvements and regressions, each sorted by ROI.
     improvements = sorted(

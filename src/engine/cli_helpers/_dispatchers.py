@@ -39,9 +39,9 @@ def load_or_audit_file(path: Path | str) -> AuditResult:
         return run_audit(path)
 
 
-def fetch_url_as_audit(url: str, *, strategy: str = "mobile",
-                       api_key: str | None = None,
-                       cache: ResponseCache | None = None) -> AuditResult:
+def fetch_url_as_audit(
+    url: str, *, strategy: str = "mobile", api_key: str | None = None, cache: ResponseCache | None = None
+) -> AuditResult:
     """Fetch a live URL via PageSpeed API and run the audit pipeline on it.
 
     The PageSpeed API returns a ``lighthouseResult`` dict; we write it to a
@@ -56,8 +56,7 @@ def fetch_url_as_audit(url: str, *, strategy: str = "mobile",
             TTL don't re-hit the network.
     """
     lhr = fetch_lighthouse_json(url, strategy=strategy, api_key=api_key, cache=cache)
-    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False,
-                                     encoding="utf-8") as fh:
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as fh:
         json.dump(lhr, fh)
         tmp_path = Path(fh.name)
     try:

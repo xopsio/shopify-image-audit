@@ -102,8 +102,7 @@ class ResponseCache:
             return None
         age = time.time() - float(entry.get("timestamp", 0))
         if age > self.ttl:
-            _log.debug("Cache miss (expired): %s age=%.0fs ttl=%ds",
-                       url, age, self.ttl)
+            _log.debug("Cache miss (expired): %s age=%.0fs ttl=%ds", url, age, self.ttl)
             return None
         _log.debug("Cache hit: %s age=%.0fs", url, age)
         return entry.get("data")
