@@ -112,9 +112,11 @@ have `shop_domain`; `access_token` is **optional** since v0.16.1:
 When `access_token` is omitted, the token is read from `tokens.json`
 — i.e. the store must have been logged in once with
 `audit shopify login store-b.myshopify.com` (see
-[`SHOPIFY_OAUTH.md`](SHOPIFY_OAUTH.md)). This lets you share a
-credential-free `stores.json` across a team. If neither source has a
-token, that store's audit fails with an error telling you to run
+[`SHOPIFY_OAUTH.md`](SHOPIFY_OAUTH.md)). To authorise every store in
+the file in one run, use `audit shopify login --stores-file
+stores.json` (v0.16.2+). This lets you share a credential-free
+`stores.json` across a team. If neither source has a token, that
+store's audit fails with an error telling you to run
 `audit shopify login` first.
 
 ## Exit codes

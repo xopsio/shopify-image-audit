@@ -319,6 +319,11 @@ merge. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
     `stores-file` entry has no `access_token`
   - Credential-free `stores.json` shareable across a team
   - Explicit `access_token` still wins (backwards compatible)
+- ✅ Sprint 22 — Multi-store batch login, v0.16.2 (797 tests)
+  - `audit shopify login --stores-file stores.json` authorises all
+    stores in one run
+  - Per-store failures reported in a summary; exit 2 if any failed
+  - Closes the last OAuth follow-up deferred since Sprint 19
 
 ---
 

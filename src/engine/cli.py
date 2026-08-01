@@ -388,9 +388,9 @@ def shopify(
     stores_file: Path | None = typer.Option(
         None,
         "--stores-file",
-        help="[batch] Path to a JSON file listing stores to audit. "
-        "Each entry must have 'shop_domain'; 'access_token' is optional "
-        "(falls back to tokens.json from `audit shopify login`).",
+        help="[batch|login] Path to a JSON file listing stores to audit / "
+        "authorise. Each entry must have 'shop_domain'; 'access_token' is "
+        "optional (falls back to tokens.json from `audit shopify login`).",
     ),
     parallel: int | None = typer.Option(
         None,
@@ -444,10 +444,12 @@ def shopify(
         raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
     # ``login`` opens the OAuth browser flow and stores the resulting
-    # token; it does not need shop_domain / access_token flags.
+    # token; it does not need shop_domain / access_token flags. Since
+    # Sprint 22 it also accepts --stores-file to authorise many stores.
     if subcommand == "login":
         _shopify_login(
             shop_domain=shop_domain,
+            stores_file=stores_file,
             client_id=client_id,
             client_secret=client_secret,
             scopes=scopes,
@@ -591,48 +593,33 @@ def _shopify_batch(
         raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE) from None
 
 
-@handle_shopify_errors()
-def _shopify_login(
-    shop_domain: str | None,
+def _login_one_store(
+    shop_domain: str,
     *,
-    client_id: str | None,
-    client_secret: str | None,
-    scopes: str | None,
-) -> None:
-    """Run the OAuth authorization-code flow against the Shopify Admin API.
+    client_id: str,
+    client_secret: str,
+    scopes: str,
+    position: tuple[int, int] | None = None,
+) -> bool:
+    """Run the OAuth authorization-code flow for one store.
 
-    Opens the user's browser to the Shopify authorize URL, waits on a
-    local HTTP server for the redirect, exchanges the temporary code for
-    a permanent access token, and stores the token in ``TokensStore``
-    (default: ``~/.local/share/.shopify-image-audit/tokens.json``).
+    Returns ``True`` when the token was persisted to ``TokensStore``.
+    On failure (denied, timeout, or exchange error) prints the reason
+    and returns ``False`` so a batch login can continue with the next
+    store. ``position`` renders a ``(2/5)`` counter prefix in
+    multi-store runs (Sprint 22).
     """
     import webbrowser
 
     from engine.tokens import TokensStore
     from integrations.oauth_callback_server import OAuthCallbackServer
     from integrations.shopify_oauth import (
-        DEFAULT_SCOPES,
         build_authorize_url,
         exchange_code_for_token,
         generate_state,
     )
 
-    if shop_domain is None:
-        rprint(
-            "[red]Error:[/red] `audit shopify login` requires a shop_domain "
-            "(e.g. `audit shopify login mystore.myshopify.com`)."
-        )
-        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
-
-    if not client_id or not client_secret:
-        rprint(
-            "[red]Error:[/red] OAuth credentials missing. "
-            "Pass --client-id / --client-secret, set $SHOPIFY_CLIENT_ID / "
-            "$SHOPIFY_CLIENT_SECRET, or configure [shopify] in config.toml."
-        )
-        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
-
-    effective_scopes = scopes or DEFAULT_SCOPES
+    prefix = f"({position[0]}/{position[1]}) " if position else ""
 
     state = generate_state()
     with OAuthCallbackServer(state, timeout=60.0) as server:
@@ -640,12 +627,12 @@ def _shopify_login(
         authorize_url = build_authorize_url(
             shop=shop_domain,
             client_id=client_id,
-            scopes=effective_scopes,
+            scopes=scopes,
             redirect_uri=redirect_uri,
             state=state,
         )
 
-        rprint(f"[cyan]Opening browser to authorize {shop_domain}…[/cyan]")
+        rprint(f"[cyan]{prefix}Opening browser to authorize {shop_domain}…[/cyan]")
         rprint(f"  Authorize URL: {authorize_url}")
         if not webbrowser.open(authorize_url):
             rprint(
@@ -660,13 +647,13 @@ def _shopify_login(
         if code is None:
             err = server.last_error()
             if err:
-                rprint(f"[red]OAuth denied:[/red] {err}")
+                rprint(f"[red]{prefix}OAuth denied:[/red] {err}")
             else:
                 rprint(
-                    "[red]OAuth timed out[/red] — no callback received "
+                    f"[red]{prefix}OAuth timed out[/red] — no callback received "
                     "within 60 seconds. Re-run and complete the browser step."
                 )
-            raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+            return False
 
     try:
         token = exchange_code_for_token(
@@ -676,13 +663,104 @@ def _shopify_login(
             client_secret=client_secret,
         )
     except RuntimeError as exc:
-        rprint(f"[red]Token exchange failed:[/red] {exc}")
-        raise typer.Exit(code=EXIT_INVALID_ARGS) from exc
+        rprint(f"[red]{prefix}Token exchange failed:[/red] {exc}")
+        return False
 
     path = TokensStore().set(shop_domain, token)
-    rprint(f"[green]✓ Authorised {shop_domain}[/green]")
+    rprint(f"[green]{prefix}✓ Authorised {shop_domain}[/green]")
     rprint(f"  Token stored in {path}")
-    rprint(f"  Next: `audit shopify auth {shop_domain}` or `audit shopify inventory {shop_domain}`.")
+    return True
+
+
+@handle_shopify_errors()
+def _shopify_login(
+    shop_domain: str | None,
+    *,
+    stores_file: Path | None,
+    client_id: str | None,
+    client_secret: str | None,
+    scopes: str | None,
+) -> None:
+    """Run the OAuth authorization-code flow against the Shopify Admin API.
+
+    Opens the user's browser to the Shopify authorize URL, waits on a
+    local HTTP server for the redirect, exchanges the temporary code for
+    a permanent access token, and stores the token in ``TokensStore``
+    (default: ``~/.local/share/.shopify-image-audit/tokens.json``).
+
+    Since Sprint 22, ``--stores-file`` authorizes every store in the
+    file in one run — each store gets its own browser flow and per-store
+    failures are reported without aborting the rest.
+    """
+    if not client_id or not client_secret:
+        rprint(
+            "[red]Error:[/red] OAuth credentials missing. "
+            "Pass --client-id / --client-secret, set $SHOPIFY_CLIENT_ID / "
+            "$SHOPIFY_CLIENT_SECRET, or configure [shopify] in config.toml."
+        )
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+
+    if stores_file is not None:
+        if shop_domain is not None:
+            rprint("[red]Error:[/red] Provide either a shop_domain or --stores-file, not both.")
+            raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+
+        from engine.batch import parse_stores_file
+
+        try:
+            stores = parse_stores_file(stores_file)
+        except (FileNotFoundError, ValueError) as exc:
+            rprint(f"[red]Error:[/red] {exc}")
+            raise typer.Exit(code=EXIT_INVALID_ARGS) from exc
+        if not stores:
+            rprint(f"[yellow]No stores found in {stores_file}.[/yellow]")
+            raise typer.Exit(code=EXIT_OK) from None
+        domains = [store.shop_domain for store in stores]
+    else:
+        if shop_domain is None:
+            rprint(
+                "[red]Error:[/red] `audit shopify login` requires a shop_domain "
+                "(e.g. `audit shopify login mystore.myshopify.com`) or "
+                "--stores-file."
+            )
+            raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+        domains = [shop_domain]
+
+    from integrations.shopify_oauth import DEFAULT_SCOPES
+
+    effective_scopes = scopes or DEFAULT_SCOPES
+
+    if len(domains) == 1:
+        # Single-store login preserves the pre-Sprint-22 behavior:
+        # non-zero exit on failure, plus the "next steps" hint.
+        if not _login_one_store(
+            domains[0],
+            client_id=client_id,
+            client_secret=client_secret,
+            scopes=effective_scopes,
+        ):
+            raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+        rprint(f"  Next: `audit shopify auth {domains[0]}` or `audit shopify inventory {domains[0]}`.")
+        raise typer.Exit(code=EXIT_OK) from None
+
+    # Multi-store: authorise every store, then report a summary.
+    total = len(domains)
+    ok_count = 0
+    for index, domain in enumerate(domains, start=1):
+        if _login_one_store(
+            domain,
+            client_id=client_id,
+            client_secret=client_secret,
+            scopes=effective_scopes,
+            position=(index, total),
+        ):
+            ok_count += 1
+    failed = total - ok_count
+    if failed:
+        rprint(f"[yellow]{ok_count} authorised, {failed} failed.[/yellow]")
+        raise typer.Exit(code=EXIT_INVALID_ARGS) from None
+    rprint(f"[green]{ok_count} stores authorised.[/green]")
+    raise typer.Exit(code=EXIT_OK) from None
 
 
 @handle_shopify_errors()
