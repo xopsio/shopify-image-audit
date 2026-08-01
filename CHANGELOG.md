@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.16.3] - 2026-08-01
+
+### Fixed (Sprint 23)
+- **`audit run --device mobile` regression**: Lighthouse CLI rejected
+  `--preset=mobile` and aborted before any network request. Mobile
+  now builds the cmd without `--preset` (Lighthouse default is mobile)
+  and without the redundant `--emulated-form-factor=mobile`. Desktop
+  still passes `--preset=desktop`. v0.16.2 is broken for mobile runs
+  on Lighthouse 12+/13+.
+
+### Tests (Sprint 23)
+- `TestRunLighthouseCmdShape` pins the exact `cmd` list passed to
+  `subprocess.run` for mobile, desktop, and multi-run paths —
+  prevents future `--preset=mobile` regressions
+- 3 new tests; 800 total
+
+---
+
 ## [0.16.2] - 2026-08-01
 
 ### Added (Sprint 22)
