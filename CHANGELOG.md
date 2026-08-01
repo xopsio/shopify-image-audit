@@ -9,7 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Empty — all Sprint 11 work shipped in v0.9.0.
+Empty — all Sprint 12 work shipped in v0.9.1.
+
+---
+
+## [0.9.1] - 2026-08-01
+
+### Changed (Sprint 12)
+- Repository formatted with `ruff format` (53 files reformatted). The
+  drift accumulated during Sprint 10's mypy-gate work — every file now
+  conforms to one canonical style — TD-1
+- CI now runs `ruff format --check` after `ruff check` so format drift
+  can't recur — TD-2
+
+### Fixed (Sprint 12)
+- Dependency refresh via 4 Dependabot PRs (all merged): `rich`
+  constraint widened to `>=13.7,<16`, GitHub Actions versions bumped
+  (`download-artifact 4→8`, `setup-python 5→7`,
+  `attest-build-provenance 2→4`) — TD-3
+
+### Stats
+- 695 tests pass (unchanged; pure hygiene sprint)
+- `ruff format --check`: 61 files already formatted (no drift)
+- 76 PRs merged
 
 ---
 
@@ -133,6 +155,7 @@ Empty — all Sprint 11 work shipped in v0.9.0.
 - Single concurrency primitive (`run_parallel`) replaces two copies
 - Test fixtures consolidated into one place
 
+[0.9.1]: https://github.com/xopsio/shopify-image-audit/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/xopsio/shopify-image-audit/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/xopsio/shopify-image-audit/compare/v0.7.0...v0.7.1

@@ -268,6 +268,10 @@ merge. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
   - `~/.config/shopify-image-audit/config.toml` (13 keys / 5 sections)
   - Precedence: CLI flag > env var > config > default
   - Broken config warns + falls back — never blocks a run
+- ✅ Sprint 12 — Repo hygiene + format gate, v0.9.1 (695 tests)
+  - `ruff format` applied across the whole repo (53 files)
+  - `ruff format --check` added to CI (no future drift)
+  - 4 Dependabot PRs merged (rich constraint widened, GitHub Actions bumps)
 
 ---
 
