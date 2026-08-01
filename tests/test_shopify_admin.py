@@ -518,3 +518,63 @@ def test_token_not_in_normal_error_messages():
         assert "shpat_supersecret" not in str(exc)
     else:
         pytest.fail("Expected RuntimeError")
+
+
+# ---------------------------------------------------------------------------
+# TypedDict contracts (Sprint 18) — `total=False` partial-mock acceptance
+# ---------------------------------------------------------------------------
+
+
+class TestShopifyTypedDicts:
+    """These tests pin the TypedDict contracts for the Admin API. They guard
+    against accidentally tightening `total=False` into `total=True`, which
+    would break every existing mock that builds partial payloads.
+    """
+
+    def test_shop_info_partial_mock(self) -> None:
+        """ShopInfo needs only name+domain — plan_* and currency optional."""
+        from integrations.shopify_admin import ShopInfo
+
+        s: ShopInfo = {"name": "My Shop", "domain": "x.myshopify.com"}
+        assert s["name"] == "My Shop"
+        assert s["domain"] == "x.myshopify.com"
+        assert "plan_display_name" not in s
+
+    def test_product_summary_image_can_be_none(self) -> None:
+        """ProductSummary.image is a ProductImage OR None — runtime tolerates both."""
+        from integrations.shopify_admin import ProductSummary
+
+        p: ProductSummary = {
+            "id": 1,
+            "title": "X",
+            "handle": "x",
+            "image": None,  # type: ignore[typeddict-item]
+        }
+        assert p["title"] == "X"
+        assert p["image"] is None
+
+    def test_product_summary_image_can_be_absent(self) -> None:
+        """``image`` may be missing entirely (products without featured image)."""
+        from integrations.shopify_admin import ProductSummary
+
+        p: ProductSummary = {"id": 2, "title": "Y", "handle": "y"}
+        assert "image" not in p
+
+    def test_theme_asset_summary_public_url_optional(self) -> None:
+        """Runtime skips rows with missing/non-string public_url."""
+        from integrations.shopify_admin import ThemeAssetSummary
+
+        a: ThemeAssetSummary = {"key": "assets/x.jpg"}  # public_url missing
+        assert "public_url" not in a
+
+    def test_product_entry_flat_shape(self) -> None:
+        """ProductEntry is the slim CLI/batch output (not the raw API)."""
+        from integrations.shopify_admin import ProductEntry
+
+        e: ProductEntry = {
+            "id": 1,
+            "title": "T",
+            "handle": "h",
+            "image_url": None,
+        }
+        assert e["image_url"] is None

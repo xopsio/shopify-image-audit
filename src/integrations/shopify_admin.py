@@ -41,7 +41,7 @@ See ``docs/integrations/SHOPIFY_ADMIN.md`` for token-acquisition steps.
 from __future__ import annotations
 
 import time
-from typing import Any
+from typing import Any, TypedDict
 from urllib.parse import urlparse
 
 # NOTE: requests is a runtime dependency (see pyproject.toml). We import it
@@ -82,6 +82,114 @@ class ShopifyAdminError(RuntimeError):
     Distinct from generic ``RuntimeError`` so callers can catch Shopify
     errors specifically (e.g. CLI exit-code mapping).
     """
+
+
+# ---------------------------------------------------------------------------
+# TypedDict contracts (Sprint 18)
+#
+# Every field below is optional (``total=False``) — the runtime always reads
+# via ``.get(...)``, and tests build partial mocks. These types document
+# the shape of the Shopify Admin API responses this module actually
+# consumes; they are not full Admin API schemas.
+# ---------------------------------------------------------------------------
+
+
+class ShopInfo(TypedDict, total=False):
+    """One ``/shop.json`` payload's ``shop`` block (only fields we read)."""
+
+    name: str
+    domain: str
+    plan_display_name: str
+    plan_name: str
+    currency: str
+
+
+class ShopEnvelope(TypedDict, total=False):
+    """Outer envelope of ``GET /shop.json``."""
+
+    shop: ShopInfo
+
+
+class ProductImage(TypedDict, total=False):
+    """The ``image`` field of a product — may be absent or a non-dict."""
+
+    src: str
+
+
+class ProductSummary(TypedDict, total=False):
+    """A product row from ``GET /products.json?fields=id,title,handle,image``."""
+
+    id: int
+    title: str
+    handle: str
+    image: ProductImage  # runtime also tolerates None / str
+
+
+class ProductListEnvelope(TypedDict, total=False):
+    products: list[ProductSummary]
+
+
+class ThemeSummary(TypedDict, total=False):
+    """A row from ``GET /themes.json`` (only fields we read)."""
+
+    id: int
+    name: str
+    role: str  # "main" | "unpublished" | ...
+
+
+class ThemeListEnvelope(TypedDict, total=False):
+    themes: list[ThemeSummary]
+
+
+class ThemeAssetSummary(TypedDict, total=False):
+    """A row from ``GET /themes/{id}/assets.json`` (only fields we read)."""
+
+    key: str
+    public_url: str  # runtime skips rows where this is None
+
+
+class ThemeAssetListEnvelope(TypedDict, total=False):
+    assets: list[ThemeAssetSummary]
+
+
+class ThemeAssetEntry(TypedDict, total=False):
+    """Output of :meth:`ShopifyAdminClient.get_theme_assets` — internal
+    shape after the image-only filter. Distinct from
+    :class:`ThemeAssetSummary` which mirrors the raw API response.
+    """
+
+    theme_name: str
+    key: str
+    url: str
+
+
+class ProductEntry(TypedDict, total=False):
+    """Flattened product row returned by :meth:`ShopifyAdminClient.get_products`.
+
+    Distinct from :class:`ProductSummary`: this is the slim shape the
+    CLI/batch layer consumes (``id``, ``title``, ``handle``,
+    ``image_url``). The ``image`` field of the raw response is normalised
+    into a single nullable URL string here.
+    """
+
+    id: int
+    title: str
+    handle: str
+    image_url: str | None
+
+
+class ShopSummary(TypedDict, total=False):
+    """Slimmed-down shop summary returned by :meth:`ShopifyAdminClient.get_shop_info`.
+
+    Distinct from the raw ``ShopInfo`` envelope: this is the
+    flattened shape the CLI prints (4 fields, with a synthesised ``plan``
+    that falls back from ``plan_display_name`` to ``plan_name``).
+    """
+
+    name: str
+    domain: str
+    plan: str
+    currency: str
 
 
 # ---------------------------------------------------------------------------
@@ -242,8 +350,8 @@ class ShopifyAdminClient:
 
     # ----- public methods ---------------------------------------------------
 
-    def get_shop_info(self) -> dict[str, str]:
-        """Return a minimal ``ShopifyInfo`` dict: name, domain, plan, currency.
+    def get_shop_info(self) -> ShopSummary:
+        """Return a minimal shop summary dict: name, domain, plan, currency.
 
         Raises:
             ValueError: invalid shop domain (caught at construction).
@@ -259,7 +367,7 @@ class ShopifyAdminClient:
             "currency": str(shop.get("currency", "")),
         }
 
-    def get_products(self, limit: int = 50) -> list[dict[str, Any]]:
+    def get_products(self, limit: int = 50) -> list[ProductEntry]:
         """Return a list of products with their featured image URL.
 
         Each entry is ``{"id", "title", "handle", "image_url"}``.
@@ -282,7 +390,7 @@ class ShopifyAdminClient:
             limit=limit,
         )
         products = data.get("products", [])
-        out: list[dict[str, Any]] = []
+        out: list[ProductEntry] = []
         for p in products:
             image = p.get("image") or {}
             out.append(
@@ -295,7 +403,7 @@ class ShopifyAdminClient:
             )
         return out
 
-    def get_theme_assets(self) -> list[dict[str, str]]:
+    def get_theme_assets(self) -> list[ThemeAssetEntry]:
         """Return image assets from the store's main (active) theme.
 
         Each entry is ``{"theme_name", "key", "url"}``. Only files with
@@ -321,7 +429,7 @@ class ShopifyAdminClient:
 
         assets_data = self._request("GET", f"/themes/{theme_id}/assets.json")
         assets = assets_data.get("assets", [])
-        out: list[dict[str, str]] = []
+        out: list[ThemeAssetEntry] = []
         for a in assets:
             key = str(a.get("key", ""))
             public_url = a.get("public_url")
