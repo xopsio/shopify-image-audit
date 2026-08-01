@@ -456,6 +456,15 @@ def _shopify_batch(
     stop_on_error: bool,
 ) -> None:
     """Run an inventory audit across multiple stores from a JSON file."""
+    from rich.progress import (
+        BarColumn,
+        MofNCompleteColumn,
+        Progress,
+        SpinnerColumn,
+        TextColumn,
+        TimeElapsedColumn,
+    )
+
     from engine.batch import merge_inventory, parse_stores_file, run_batch
 
     if stores_file is None:
@@ -481,7 +490,29 @@ def _shopify_batch(
         f"(parallel={parallel if parallel > 0 else len(stores)}, "
         f"stop_on_error={stop_on_error})...[/cyan]"
     )
-    batch_result = run_batch(stores, parallel=parallel, stop_on_error=stop_on_error)
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        MofNCompleteColumn(),
+        TimeElapsedColumn(),
+        console=console,
+        transient=True,
+    ) as progress:
+        task_id = progress.add_task("shopify batch", total=len(stores))
+
+        def _on_done(store: object, _result: object) -> None:
+            # Description shows the last-completed store; the bar + counter
+            # communicate aggregate progress. `store_domain` is the natural
+            # identifier (StoreConfig exposes it as .shop_domain).
+            progress.update(task_id, advance=1, description=getattr(store, "shop_domain", ""))
+
+        batch_result = run_batch(
+            stores,
+            parallel=parallel,
+            stop_on_error=stop_on_error,
+            on_done=_on_done,
+        )
 
     for r in batch_result.results:
         if r.success:
@@ -1242,24 +1273,54 @@ def schedule(
             rprint(f"{format_suggestion(str(parallel), ['0', '1', '2'])}")
             raise typer.Exit(code=EXIT_INVALID_ARGS) from None
 
-        history_store = HistoryStore(base_dir=history_dir)
-        results = run_all_schedules(
-            store,
-            history_store=history_store,
-            api_key=api_key,
-            parallel=parallel,
-            stop_on_error=stop_on_error,
+        from rich.progress import (
+            BarColumn,
+            MofNCompleteColumn,
+            Progress,
+            SpinnerColumn,
+            TextColumn,
+            TimeElapsedColumn,
         )
-        if not results:
+
+        history_store = HistoryStore(base_dir=history_dir)
+        schedules = store.load()
+        if not schedules:
             rprint(f"[yellow]No schedules to run in {store.path}.[/yellow]")
-        else:
-            for r in results:
-                if r.success:
-                    rprint(f"  [green]✓[/green] {r.shop_domain}: recorded (id={r.entry_id})")
-                else:
-                    rprint(f"  [red]✗[/red] {r.shop_domain}: {r.error}")
-            if not any(r.success for r in results):
-                raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE) from None
+            raise typer.Exit(code=EXIT_OK) from None
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            MofNCompleteColumn(),
+            TimeElapsedColumn(),
+            console=console,
+            transient=True,
+        ) as progress:
+            task_id = progress.add_task("schedule run-all", total=len(schedules))
+
+            def _on_done(sched: object, _result: object) -> None:
+                progress.update(
+                    task_id,
+                    advance=1,
+                    description=getattr(sched, "shop_domain", ""),
+                )
+
+            results = run_all_schedules(
+                store,
+                history_store=history_store,
+                api_key=api_key,
+                parallel=parallel,
+                stop_on_error=stop_on_error,
+                on_done=_on_done,
+            )
+        for r in results:
+            if r.success:
+                rprint(f"  [green]✓[/green] {r.shop_domain}: recorded (id={r.entry_id})")
+            else:
+                rprint(f"  [red]✗[/red] {r.shop_domain}: {r.error}")
+        if not any(r.success for r in results):
+            raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE) from None
 
     raise typer.Exit(code=EXIT_OK) from None
 

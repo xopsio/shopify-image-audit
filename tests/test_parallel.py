@@ -191,3 +191,75 @@ class TestRunParallelIntegration:
                 )
             assert len(results) == 2
             assert all(r.success for r in results)
+
+
+# ---------------------------------------------------------------------------
+# Sprint 17 — on_done callback
+# ---------------------------------------------------------------------------
+
+
+class TestOnDoneCallback:
+    def test_callback_called_once_per_completed_sequential(self) -> None:
+        """Sequential: on_done fires exactly len(items) times, in order."""
+        items = [Item(1), Item(2), Item(3)]
+        seen: list[int] = []
+
+        def cb(item: Item, result: Result) -> None:
+            seen.append(item.value)
+
+        results = run_parallel(items, _double, on_done=cb)
+        assert [r.value for r in results] == [2, 4, 6]
+        assert seen == [1, 2, 3]
+
+    def test_callback_called_once_per_completed_parallel(self) -> None:
+        """Parallel: on_done fires exactly len(items) times, regardless of order."""
+        items = [Item(1), Item(2), Item(3)]
+        seen: list[int] = []
+
+        def cb(item: Item, result: Result) -> None:
+            seen.append(item.value)
+
+        run_parallel(items, _double, parallel=0, on_done=cb)
+        assert sorted(seen) == [1, 2, 3]
+
+    def test_callback_not_called_for_cancelled_sequential(self) -> None:
+        """Sequential + stop_on_error: items after the failure aren't run,
+        so on_done isn't called for them either."""
+
+        def fail_on_two(item: Item) -> Result:
+            if item.value == 2:
+                raise RuntimeError(f"boom for {item.value}")
+            return Result(value=item.value * 2)
+
+        seen: list[int] = []
+
+        def cb(item: Item, result: Result) -> None:
+            seen.append(item.value)
+
+        results = run_parallel(
+            [Item(1), Item(2), Item(3)],
+            fail_on_two,
+            parallel=1,
+            stop_on_error=True,
+            on_done=cb,
+        )
+        # Item(1) succeeds → callback fires for Item(1). Item(2) raises
+        # RuntimeError before its callback fires (callback only runs on
+        # completion). Sequential stop_on_error breaks out → Item(3) not
+        # started, no callback for it.
+        assert len(results) == 1
+        assert seen == [1]
+
+    def test_callback_swallowed_exceptions_do_not_break_run(self) -> None:
+        """A buggy callback must never propagate or abort the run."""
+
+        def bad_cb(item: Item, result: Result) -> None:
+            raise ValueError("callback boom")
+
+        results = run_parallel([Item(1), Item(2)], _double, on_done=bad_cb)
+        assert [r.value for r in results] == [2, 4]
+
+    def test_callback_default_none_is_a_no_op(self) -> None:
+        """Existing callers that pass on_done=None keep working unchanged."""
+        results = run_parallel([Item(1), Item(2)], _double)
+        assert [r.value for r in results] == [2, 4]
