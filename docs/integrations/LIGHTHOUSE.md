@@ -115,6 +115,35 @@ ENV PATH="/usr/local/bin:${PATH}"
 npm i -g lighthouse@12
 ```
 
+## Limitations
+
+**Authenticated storefronts are not supported.** The tool runs
+Lighthouse against whatever the browser sees — it has no way to
+log in. If the audited page is behind a Shopify storefront
+password, an auth wall, a geo-redirect, or any other off-target
+redirect, the audit will:
+
+1. Detect the redirect via `finalUrl` / `finalDisplayedUrl` in
+   the Lighthouse JSON and exit with code **10** (Lighthouse
+   failure) plus a clear error message naming the redirect
+   target. No `audit_result.json` is written.
+2. Even if the redirect slips through (e.g. an older report
+   without `finalUrl`), an empty `image-elements` extraction
+   surfaces as **"No images were extracted"** in the summary
+   — not the misleading "All images look well optimised" that
+   v0.16.3 and earlier produced for password-protected stores.
+
+To audit a password-protected Shopify store, either:
+- remove the storefront password temporarily (Settings → Sales
+  channels → Online Store → Password protection → Disable
+  password), or
+- run a manual Lighthouse audit in your browser and pass the
+  saved JSON to `audit run --lhr <file>`.
+
+Tracked for a future sprint: headless-browser auth + cookie
+injection so `--storefront-password` works the same way as
+`--access-token` does for the Admin API.
+
 ## Related
 
 - `audit measure` — uses the PageSpeed Insights REST API; no Lighthouse
