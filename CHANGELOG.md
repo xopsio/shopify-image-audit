@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.17.1] - 2026-08-01
+
+### Fixed (Sprint 26)
+- **Image extractor fallback chain widened**: when the
+  `image-elements` and `resource-summary` Lighthouse audits are
+  both empty (older fixtures, certain SPA / dynamic pages, future
+  audit renames), the extractor now falls back to filtering
+  `audits["network-requests"].details.items` by
+  `resourceType == "Image"`. Restores image discovery for pages
+  that v0.17.0 still missed. The render-tree audits remain
+  preferred (they carry pixel dimensions); the network layer
+  only fills the gap. Case-insensitive `resourceType` match.
+
+### Stats
+- 830 tests pass (up from 825; +5 in `test_core.py`),
+  22 snapshots unchanged.
+
+---
+
 ## [0.17.0] - 2026-08-01
 
 ### Added (Sprint 25)
