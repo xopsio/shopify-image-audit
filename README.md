@@ -3,7 +3,7 @@
 [![CI](https://github.com/xopsio/shopify-image-audit/actions/workflows/ci.yml/badge.svg)](https://github.com/xopsio/shopify-image-audit/actions)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
 [![ruff](https://img.shields.io/badge/lint-ruff-green)](https://docs.astral.sh/ruff/)
-[![tests](https://img.shields.io/badge/tests-812_passing-brightgreen)](#testing)
+[![tests](https://img.shields.io/badge/tests-825_passing-brightgreen)](#testing)
 
 A Lighthouse-based image audit tool for Shopify stores. Produces per-image
 scores, role assignments, optimisation recommendations, and a **before/after
@@ -51,7 +51,7 @@ pip install -e ".[dev]"
 
 # Verify the install
 audit version
-pytest -q                                              # 812 tests
+pytest -q                                              # 825 tests
 ```
 
 ### Shopify stores (OAuth, preferred)
@@ -211,7 +211,7 @@ src/
     └── shopify_admin.py      # Shopify Admin API (auth, products, theme_assets)
 
 src/audit/schemas/audit_result.schema.json  # JSON Schema contract (validated by tests)
-tests/                              # 812 tests, single-writer (ZCode)
+tests/                              # 825 tests, single-writer (ZCode)
 docs/examples/                       # live demo report + comparison JSON
 docs/integrations/                   # Shopify Admin API token guide
 ```
@@ -224,7 +224,7 @@ The codebase is governed by **a single ZCode agent** (see
 ## Testing
 
 ```bash
-pytest -q                                # 812 tests, single-writer discipline
+pytest -q                                # 825 tests, single-writer discipline
 pytest --cov=src --cov-report=term       # ~91% coverage
 ruff check src/ tests/                   # 0 violations
 ```
@@ -357,6 +357,16 @@ merge. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
   - Redirects (e.g. Shopify storefront password -> /password) are
     caught via `finalUrl` and fail with exit 10 + a clear error
   - No `audit_result.json` is written for off-target audits
+  - Docs: `docs/integrations/LIGHTHOUSE.md` Limitations section
+- ✅ Sprint 25 — Authenticated Lighthouse, v0.17.0 (825 tests)
+  - `audit run --storefront-password <pwd>` (or
+    `$SHOPIFY_STOREFRONT_PASSWORD`) authenticates password-
+    protected Shopify storefronts
+  - POSTs the `/password` form once, threads the
+    `_shopify_essential` cookie into Lighthouse via
+    `--extra-headers`
+  - Closes the long-standing "authenticated storefronts are not
+    supported" limitation from v0.16.4
 
 ---
 

@@ -151,6 +151,50 @@ failed`) and the command exits with code 2. An `access_token` in a
 `stores-file` entry is ignored — login always performs the OAuth flow,
 so a file can be shared even if it already carries tokens.
 
+## Authenticated Lighthouse (v0.17.0+)
+
+Once a store is logged in for Admin-API access, the **storefront
+audit** is still blocked when the store has its `Online Store →
+Password protection` enabled. v0.17.0 adds `--storefront-password`
+to authenticate the Lighthouse browser session against the
+storefront `/password` form.
+
+```bash
+# Recommended: pass the password via the env var so it never
+# appears in shell history.
+export SHOPIFY_STOREFRONT_PASSWORD='salainen'
+
+audit run https://visualgain.myshopify.com/ \
+    --device mobile \
+    --runs 1 \
+    --out-dir audit-output-product
+```
+
+Internally the CLI:
+
+1. POSTs `https://<shop>/password` with `form_type=storefront_password`
+   and the password (no CSRF token is required by Shopify's
+   storefront-password form).
+2. On a 302 redirect with a `Location` header and a
+   `_shopify_essential` cookie, treats the session as authenticated
+   and threads the cookie into Lighthouse via `--extra-headers`.
+3. If the user passed the `/password` URL directly, normalises it to
+   the storefront root so the audited page renders content.
+4. The v0.16.4 redirect guard then sees a same-host same-path
+   request (the post-login redirect adds `?pb=0` but is otherwise
+   benign) and lets the audit proceed.
+
+**Limitations:**
+
+- Stores with hCaptcha on the password form are not supported —
+  the CLI will print a clear error and exit 2.
+- Only the storefront password flow is supported (no admin login,
+  no customer login, no multi-factor).
+- The session is **not** persisted; each `audit run` re-authenticates.
+
+If the password is wrong, the CLI prints
+`Wrong storefront password for <shop>.` and exits with code 2.
+
 ## Headless environments
 
 The CLI prints the authorize URL before launching the browser, so

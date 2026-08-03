@@ -117,32 +117,31 @@ npm i -g lighthouse@12
 
 ## Limitations
 
-**Authenticated storefronts are not supported.** The tool runs
-Lighthouse against whatever the browser sees — it has no way to
-log in. If the audited page is behind a Shopify storefront
-password, an auth wall, a geo-redirect, or any other off-target
-redirect, the audit will:
+### Authenticated storefronts (v0.17.0+)
 
-1. Detect the redirect via `finalUrl` / `finalDisplayedUrl` in
-   the Lighthouse JSON and exit with code **10** (Lighthouse
-   failure) plus a clear error message naming the redirect
-   target. No `audit_result.json` is written.
-2. Even if the redirect slips through (e.g. an older report
-   without `finalUrl`), an empty `image-elements` extraction
-   surfaces as **"No images were extracted"** in the summary
-   — not the misleading "All images look well optimised" that
-   v0.16.3 and earlier produced for password-protected stores.
+Shopify password-protected storefronts are now supported via
+`--storefront-password <pwd>` (or `$SHOPIFY_STOREFRONT_PASSWORD`).
+The CLI POSTs the storefront `/password` form once, captures the
+`_shopify_essential` cookie, and threads it into the Lighthouse
+run via `--extra-headers`. See
+[`SHOPIFY_OAUTH.md`](SHOPIFY_OAUTH.md) for the full flow.
 
-To audit a password-protected Shopify store, either:
-- remove the storefront password temporarily (Settings → Sales
-  channels → Online Store → Password protection → Disable
-  password), or
-- run a manual Lighthouse audit in your browser and pass the
-  saved JSON to `audit run --lhr <file>`.
+**Limitations of the auth path:**
 
-Tracked for a future sprint: headless-browser auth + cookie
-injection so `--storefront-password` works the same way as
-`--access-token` does for the Admin API.
+- Stores with hCaptcha on the password form will fail with a
+  clear error — solving a captcha headlessly is out of scope.
+- Only the storefront password flow is implemented. Admin login,
+  customer login and multi-factor flows are not.
+- Each run re-authenticates; the session is **not** persisted.
+
+### Other redirect scenarios
+
+For redirects that are **not** a Shopify storefront password
+(auth wall, geo-redirect, 404 fallback, etc.), the tool still
+refuses to claim success — the v0.16.4 redirect guard remains in
+place. If you see "Lighthouse was redirected to …", either
+re-run with the correct URL or audit the page manually in a
+browser and pass the saved JSON via `audit run --lhr <file>`.
 
 ## Related
 
