@@ -86,17 +86,76 @@ def _extract_lcp_url(lhr: dict[str, Any]) -> str | None:
     return None
 
 
+def _collect_from_network_requests(audits: dict[str, Any]) -> dict[str, Any] | None:
+    """Synthesise an image-elements-shaped audit from ``network-requests``.
+
+    Lighthouse 13 emits every network record in
+    ``audits["network-requests"].details.items`` with a ``resourceType``
+    field (e.g. ``"Image"``). When the render-tree audits are empty or
+    missing — some pages, fixtures, and Lighthouse plugin configs do
+    this — we still want to surface the images that were actually
+    loaded over the wire (Sprint 26).
+
+    Returns a dict shaped like the other image audits
+    (``{"details": {"items": [...]}}``) so the existing item-parsing
+    loop in :func:`_collect_image_items` can read it without changes,
+    or ``None`` when no image network records are present.
+    """
+    nr = audits.get("network-requests")
+    if not isinstance(nr, dict):
+        return None
+    details = nr.get("details")
+    if not isinstance(details, dict):
+        return None
+    items = details.get("items")
+    if not isinstance(items, list):
+        return None
+    image_items: list[dict[str, Any]] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        # Lighthouse 13 emits "Image" (capitalised). The lowercase
+        # comparison also accepts "image" in case of plugin variants
+        # or future audit renames.
+        if str(item.get("resourceType", "")).lower() != "image":
+            continue
+        image_items.append(item)
+    if not image_items:
+        return None
+    return {"details": {"items": image_items}}
+
+
 def _collect_image_items(lhr: dict[str, Any]) -> list[ImageDict]:
     """
     Collect raw image resource entries from Lighthouse audits.
 
     Supports:
-    - audits["image-elements"].details.items
-    - audits["resource-summary"].details.items / .nodes
+    - audits["image-elements"].details.items (preferred — has pixel dims)
+    - audits["resource-summary"].details.items / .nodes (fallback)
+    - audits["network-requests"].details.items filtered by
+      resourceType == "Image" (Sprint 26 — last-resort fallback when
+      neither render-tree audit surfaces images; no pixel dims)
     """
     audits = lhr.get("audits")
     audits = audits if isinstance(audits, dict) else {}
-    img_audit = audits.get("image-elements") or audits.get("resource-summary")
+
+    def _has_items(audit: object) -> bool:
+        """True if the audit dict contains a non-empty items/nodes list."""
+        if not isinstance(audit, dict):
+            return False
+        details = audit.get("details")
+        if not isinstance(details, dict):
+            return False
+        items = details.get("items") or details.get("nodes")
+        return isinstance(items, list) and len(items) > 0
+
+    img_audit: object
+    if _has_items(audits.get("image-elements")):
+        img_audit = audits["image-elements"]
+    elif _has_items(audits.get("resource-summary")):
+        img_audit = audits["resource-summary"]
+    else:
+        img_audit = _collect_from_network_requests(audits)
     if not isinstance(img_audit, dict):
         return []
 
