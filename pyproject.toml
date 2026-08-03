@@ -41,7 +41,7 @@ dependencies = [
     # Token encryption for tokens.json (Sprint 20). Both packages are
     # cross-platform: macOS Keychain / Windows Credential Manager / Linux
     # Secret Service. ``secretstorage`` is the Linux backend only.
-    "cryptography>=42,<46",
+    "cryptography>=42,<51",
     "keyring>=24,<26",
     "secretstorage>=3.3; sys_platform == 'linux'",
 ]
