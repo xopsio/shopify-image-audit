@@ -215,6 +215,83 @@ def _run_lighthouse(
     return best_path
 
 
+def _normalised_url(url: str) -> tuple[str, str, str]:
+    """Return ``(scheme, host, path_query)`` for a URL, lowercased.
+
+    The path-and-query segment is the comparison key for same-host
+    redirects. We strip a trailing slash from the path so that
+    ``/products/x`` and ``/products/x/`` are treated as the same page
+    (Lighthouse and servers often normalise this), but anything that
+    changes the path beyond that (e.g. ``/products/x`` -> ``/password``)
+    is treated as an off-target redirect.
+    """
+    from urllib.parse import urlparse
+
+    try:
+        parsed = urlparse(url)
+    except (TypeError, ValueError):
+        return ("", "", "")
+    scheme = (parsed.scheme or "").lower()
+    host = (parsed.netloc or "").lower()
+    path = (parsed.path or "").rstrip("/")
+    query = (parsed.query or "").lower()
+    return (scheme, host, f"{path}?{query}" if query else path)
+
+
+def _check_audited_url(json_path: Path, requested_url: str) -> None:
+    """Refuse to claim success when Lighthouse was redirected off-target.
+
+    Surfaces the redirect as a clear error (exit 10) so the user can
+    distinguish "page audited successfully" from "page audited after a
+    redirect to a password wall / auth challenge / 404" (Sprint 24).
+
+    Two redirects are caught:
+    - cross-host (treated as a typo / attack signal)
+    - same-host but a different path (e.g. ``/products/x`` -> ``/password``,
+      ``/account/login``, ``/404``)
+
+    Same-host same-path (possibly with trailing-slash difference or
+    fragment change) is treated as a benign normalisation.
+    """
+    try:
+        data = json.loads(json_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return  # cannot read the report — the rest of the pipeline will surface the error
+    if not isinstance(data, dict):
+        return
+    final = data.get("finalUrl") or data.get("finalDisplayedUrl")
+    if not final or not isinstance(final, str):
+        return
+
+    req_scheme, req_host, req_path_q = _normalised_url(requested_url)
+    final_scheme, final_host, final_path_q = _normalised_url(final)
+    if not req_host or not final_host:
+        return  # unparseable URL — don't block on it
+
+    if req_host != final_host:
+        rprint(
+            f"[red]Audit failed:[/red] Lighthouse was redirected from "
+            f"{requested_url} to a different host ({final}). Refusing to "
+            f"audit a cross-host redirect."
+        )
+        raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE) from None
+
+    if req_path_q == final_path_q:
+        return  # same path (modulo trailing slash / fragment) — benign
+
+    # Same host, different path. The most common cause is a Shopify
+    # storefront password redirect to /password, but this also catches
+    # auth walls, geo-redirects, 404 fallback pages, etc.
+    rprint(
+        f"[red]Audit failed:[/red] Lighthouse was redirected to {final}, "
+        f"which is not the requested page ({requested_url}). The audited "
+        f"page is likely behind authentication (e.g. a Shopify storefront "
+        f"password) or has been replaced by an auth wall / 404. "
+        f"Authenticated Lighthouse is not supported in this version."
+    )
+    raise typer.Exit(code=EXIT_LIGHTHOUSE_FAILURE) from None
+
+
 # ---------------------------------------------------------------------------
 # run
 # ---------------------------------------------------------------------------
@@ -277,6 +354,11 @@ def run(
             out_dir=out_dir,
             lighthouse_bin=lighthouse_bin,
         )
+
+    # Sprint 24: refuse to audit a page that Lighthouse never reached
+    # (e.g. password-protected Shopify storefronts). Must run before
+    # ``run_audit`` so we never write a misleading ``audit_result.json``.
+    _check_audited_url(json_path, url)
 
     # --- run the audit pipeline (errors caught by @handle_pipeline_errors) ---
     result: AuditResult = run_audit(json_path, url=url, device=device, runs=runs)
