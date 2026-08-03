@@ -166,6 +166,7 @@ def _run_lighthouse(
     runs: int,
     out_dir: Path,
     lighthouse_bin: Path | None = None,
+    extra_headers: dict[str, str] | None = None,
 ) -> Path:
     """Run Lighthouse CLI and return the path to the best JSON report.
 
@@ -197,6 +198,10 @@ def _run_lighthouse(
         ]
         if device == "desktop":
             cmd.append("--preset=desktop")
+        if extra_headers:
+            # Lighthouse 13.x accepts a JSON object as a single string,
+            # or a path to a JSON file. We pass inline.
+            cmd.append(f"--extra-headers={json.dumps(extra_headers)}")
         rprint(f"[cyan]Lighthouse run {i}/{runs}[/cyan]")
         _lh_log.info("Lighthouse run %d/%d: %s", i, runs, url)
         try:
@@ -315,6 +320,16 @@ def run(
         envvar="LIGHTHOUSE_BIN",
         help="Path to the lighthouse CLI binary (default: $LIGHTHOUSE_BIN or PATH).",
     ),
+    storefront_password: str | None = typer.Option(
+        None,
+        "--storefront-password",
+        envvar="SHOPIFY_STOREFRONT_PASSWORD",
+        help="[Sprint 25] Authenticate a password-protected Shopify storefront by "
+        "POSTing /password. Avoids the 'Lighthouse was redirected to /password' "
+        "error from v0.16.4. Prefer the $SHOPIFY_STOREFRONT_PASSWORD env var to "
+        "keep the password out of shell history. Stores with hCaptcha are not "
+        "supported.",
+    ),
 ) -> None:
     """Run Lighthouse audit on <url>, analyse images, and write results."""
     # --- resolve config defaults (flag > env > config > default) ---
@@ -343,6 +358,31 @@ def run(
     if lhr is None and lighthouse_bin is None and os.environ.get("LIGHTHOUSE_BIN"):
         lighthouse_bin = Path(os.environ["LIGHTHOUSE_BIN"])
 
+    # Sprint 25: optionally authenticate a password-protected Shopify
+    # storefront. POSTs /password once, captures the _shopify_essential
+    # cookie, and threads it into Lighthouse via --extra-headers. Also
+    # normalises the URL away from /password (which the auth flow has
+    # just unlocked) to the storefront root so the audited page renders.
+    extra_headers: dict[str, str] | None = None
+    if storefront_password:
+        from urllib.parse import urlparse
+
+        from integrations.storefront_auth import (
+            StorefrontAuthError,
+            authenticate_storefront,
+        )
+
+        host = urlparse(url).netloc
+        try:
+            session = authenticate_storefront(host, storefront_password)
+        except StorefrontAuthError as exc:
+            rprint(f"[red]Error:[/red] {exc}")
+            raise typer.Exit(code=EXIT_INVALID_ARGS) from exc
+        extra_headers = {"Cookie": session.cookie_header}
+        if urlparse(url).path.rstrip("/") == "/password":
+            url = f"{urlparse(url).scheme}://{host}/"
+            rprint(f"[cyan]Authenticated as {host}; auditing {url}[/cyan]")
+
     # --- obtain LHR JSON ---
     if lhr is not None:
         json_path: Path = require_exists(lhr)
@@ -353,6 +393,7 @@ def run(
             runs=runs,
             out_dir=out_dir,
             lighthouse_bin=lighthouse_bin,
+            extra_headers=extra_headers,
         )
 
     # Sprint 24: refuse to audit a page that Lighthouse never reached

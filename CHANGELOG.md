@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.17.0] - 2026-08-01
+
+### Added (Sprint 25)
+- **Authenticated Lighthouse for password-protected Shopify
+  storefronts**: new `--storefront-password <pwd>` option (and
+  `$SHOPIFY_STOREFRONT_PASSWORD` env var) on `audit run`. The CLI
+  POSTs the storefront `/password` form once, captures the
+  `_shopify_essential` cookie, and threads it into Lighthouse via
+  `--extra-headers` — closing the v0.16.4 limitation that
+  prevented auditing any non-public store.
+- New `src/integrations/storefront_auth.py` module: typed
+  exceptions (`StorefrontWrongPasswordError`,
+  `StorefrontCaptchaError`, `StorefrontMissingCookieError`,
+  `StorefrontUnexpectedResponseError`, `StorefrontNetworkError`)
+  and a `StorefrontSession` dataclass carrying the cookie header.
+- New `tests/test_storefront_auth.py` (10 tests): success, wrong
+  password, hCaptcha detection, missing cookie, unexpected status,
+  network error, `--extra-headers` threading, end-to-end CLI
+  integration.
+
+### Limitations
+- Stores with hCaptcha on the password form are not supported
+  (the CLI prints a clear error and exits 2).
+- Only the storefront password flow is implemented — admin login,
+  customer login, multi-factor remain out of scope.
+- The session is **not** persisted; each `audit run` re-authenticates.
+
+### Stats
+- 825 tests pass (up from 815; +10 in `test_storefront_auth.py`),
+  22 snapshots unchanged.
+
+---
+
 ## [0.16.4] - 2026-08-01
 
 ### Fixed (Sprint 24)
