@@ -96,7 +96,17 @@ def _build_summary(images: list[ImageDict]) -> dict[str, list[str]]:
     if non_modern:
         issues.append(f"{len(non_modern)} image(s) not using modern format (WebP/AVIF)")
 
-    if not issues:
+    if not images:
+        # Sprint 24: the previous code fell into the "well optimised"
+        # fallback branch, which is a lie when zero images were
+        # extracted (the audited page may be empty, behind
+        # authentication, or have failed to load). Surface the truth.
+        issues.append(
+            "No images were extracted from the Lighthouse report. "
+            "The audited page may be empty, require authentication "
+            "(e.g. a Shopify storefront password), or have failed to load."
+        )
+    elif not issues:
         issues.append("All images look well optimised")
 
     return {"top_issues": issues}

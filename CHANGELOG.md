@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.16.4] - 2026-08-01
+
+### Fixed (Sprint 24)
+- **Audit-truth on empty / off-target pages**: when the audited
+  page is empty, behind a Shopify storefront password, an auth
+  wall, a 404 fallback, or otherwise has zero extractable images,
+  v0.16.3 silently produced "All images look well optimised".
+  v0.16.4 replaces that with a clear "No images were extracted"
+  message naming the likely causes.
+- **Redirect detection on the Lighthouse result**: `_run_lighthouse`
+  now reads `finalUrl` / `finalDisplayedUrl` and refuses to claim
+  success when the page was redirected off-target (exit 10 with a
+  clear error). Catches the Shopify-password case at the
+  source — no misleading `audit_result.json` is written.
+
+### Tests (Sprint 24)
+- New `tests/test_audit_truth.py` (12 tests): empty-images
+  summary, redirect detection across no-redirect / password /
+  same-host-404 / cross-host / corrupt-LHR / unparseable-URL
+  cases, and an end-to-end CLI integration test.
+- 812 tests pass (up from 800; +12 in `test_audit_truth.py`),
+  22 snapshots unchanged.
+
+### Docs (Sprint 24)
+- `docs/integrations/LIGHTHOUSE.md` gains a "Limitations" section
+  documenting the no-auth constraint and the manual `--lhr`
+  workaround.
+
+---
+
 ## [0.16.3] - 2026-08-01
 
 ### Fixed (Sprint 23)
